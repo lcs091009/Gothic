@@ -22,7 +22,11 @@ function App() {
   const [subject, setSubject] = useState("");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [driveFileId, setDriveFileId] = useState("");
+  const [driveFileName, setDriveFileName] = useState("");
   const [driveFileUrl, setDriveFileUrl] = useState("");
+  const [isPickerLoading, setIsPickerLoading] = useState(false);
+  const [deletingRecordId, setDeletingRecordId] = useState(null);
 
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -189,6 +193,104 @@ function App() {
     setRecords([]);
     setMessage("");
   }
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const existingScript = document.querySelector(`script[src="${src}"]`);
+
+    if (existingScript) {
+      resolve();
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.defer = true;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.body.appendChild(script);
+  });
+}
+
+async function loadGooglePickerLibraries() {
+  await Promise.all([
+    loadScript("https://apis.google.com/js/api.js"),
+    loadScript("https://accounts.google.com/gsi/client"),
+  ]);
+
+  await new Promise((resolve) => {
+    window.gapi.load("picker", resolve);
+  });
+}
+
+async function openGooglePicker() {
+  setMessage("");
+
+  const googleApiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+  if (!googleApiKey || !googleClientId) {
+    setMessage(
+      "Google Picker 설정이 필요합니다. .env의 VITE_GOOGLE_API_KEY와 VITE_GOOGLE_CLIENT_ID를 확인하세요."
+    );
+    return;
+  }
+
+  setIsPickerLoading(true);
+
+  try {
+    await loadGooglePickerLibraries();
+
+    const tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: googleClientId,
+      scope: "https://www.googleapis.com/auth/drive.file",
+      callback: (tokenResponse) => {
+        if (tokenResponse.error) {
+          setMessage("Google Drive 권한 요청에 실패했습니다.");
+          setIsPickerLoading(false);
+          return;
+        }
+
+        const uploadView = new window.google.picker.DocsUploadView();
+
+        const docsView = new window.google.picker.DocsView()
+          .setIncludeFolders(true)
+          .setSelectFolderEnabled(false);
+
+        const picker = new window.google.picker.PickerBuilder()
+          .setDeveloperKey(googleApiKey)
+          .setOAuthToken(tokenResponse.access_token)
+          .addView(docsView)
+          .addView(uploadView)
+          .setCallback((data) => {
+            if (data.action === window.google.picker.Action.PICKED) {
+              const file = data.docs[0];
+
+              setDriveFileId(file.id || "");
+              setDriveFileName(file.name || file.title || "");
+              setDriveFileUrl(file.url || "");
+
+              setMessage(
+                `Google Drive 파일이 선택되었습니다: ${
+                  file.name || file.title || "파일명 없음"
+                }`
+              );
+            }
+
+            setIsPickerLoading(false);
+          })
+          .build();
+
+        picker.setVisible(true);
+      },
+    });
+
+    tokenClient.requestAccessToken({ prompt: "consent" });
+  } catch (error) {
+    setMessage("Google Picker를 여는 중 오류가 발생했습니다.");
+    setIsPickerLoading(false);
+  }
+}
 
   async function handleSubmitResearchRecord(event) {
     event.preventDefault();
@@ -221,7 +323,9 @@ function App() {
           subject: subject.trim(),
           title: title.trim(),
           content: content.trim(),
-          drive_file_url: driveFileUrl.trim() || null,
+          drive_file_id: driveFileId || null,
+          drive_file_name: driveFileName || null,
+          drive_file_url: driveFileUrl || null,
         })
       );
 
@@ -234,6 +338,8 @@ function App() {
       setSubject("");
       setTitle("");
       setContent("");
+      setDriveFileId("");
+      setDriveFileName("");
       setDriveFileUrl("");
 
       await loadResearchRecords(session.user.id);
@@ -242,8 +348,52 @@ function App() {
     } finally {
       setIsSubmitting(false);
     }
-
   }
+async function handleDeleteResearchRecord(recordId) {
+  setMessage("");
+
+  if (!isSupabaseConfigured()) {
+    setMessage(supabaseConfigError || "Supabase 설정이 필요합니다.");
+    return;
+  }
+
+  if (!session?.user) {
+    setMessage("먼저 로그인해야 합니다.");
+    return;
+  }
+
+  const shouldDelete = window.confirm(
+    "이 탐구 기록을 삭제할까요? 삭제한 기록은 되돌릴 수 없습니다."
+  );
+
+  if (!shouldDelete) {
+    return;
+  }
+
+  setDeletingRecordId(recordId);
+
+  try {
+    const { error } = await withRetry(() =>
+      supabase
+        .from("research_records")
+        .delete()
+        .eq("id", recordId)
+        .eq("user_id", session.user.id)
+    );
+
+    if (error) {
+      setMessage(getFriendlySupabaseError(error));
+      return;
+    }
+
+    setMessage("탐구 기록이 삭제되었습니다.");
+    await loadResearchRecords(session.user.id);
+  } catch (error) {
+    setMessage(getFriendlySupabaseError(error));
+  } finally {
+    setDeletingRecordId(null);
+  }
+}
 
   if (isLoading) {
     return (
@@ -374,18 +524,39 @@ function App() {
                   />
                 </div>
 
-                <div>
-                  <label style={styles.label}>Google Drive 파일 링크</label>
-                  <input
-                    value={driveFileUrl}
-                    onChange={(event) => setDriveFileUrl(event.target.value)}
-                    placeholder="https://drive.google.com/..."
-                    style={styles.input}
-                  />
+                <div style={styles.driveUploadBox}>
+                  <label style={styles.label}>Google Drive 파일 선택/업로드</label>
+
                   <p style={styles.smallText}>
-                    파일 공유 설정을 “링크가 있는 사용자 보기 가능”으로 바꾼
-                    뒤 붙여넣으세요.
+                    버튼을 누르면 Google Picker가 열립니다. 기존 Drive 파일을 선택하거나
+                    새 파일을 Drive에 업로드한 뒤 선택할 수 있습니다.
                   </p>
+
+                  <button
+                    type="button"
+                    onClick={openGooglePicker}
+                    disabled={isPickerLoading}
+                    style={styles.driveButton}
+                  >
+                    {isPickerLoading ? "Google Picker 여는 중..." : "Google Drive에서 파일 선택/업로드"}
+                  </button>
+
+                  {driveFileName && (
+                    <div style={styles.selectedFileBox}>
+                      <p style={styles.fileNameText}>선택된 파일: {driveFileName}</p>
+
+                      {driveFileUrl && (
+                        <a
+                          href={driveFileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={styles.link}
+                        >
+                          선택한 파일 열기
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <button
@@ -417,6 +588,12 @@ function App() {
 
                       <p style={styles.recordContent}>{record.content}</p>
 
+                      {record.drive_file_name && (
+                        <p style={styles.fileNameText}>
+                          업로드한 파일: {record.drive_file_name}
+                        </p>
+                      )}
+
                       {record.drive_file_url && (
                         <a
                           href={record.drive_file_url}
@@ -432,6 +609,17 @@ function App() {
                         저장 시간:{" "}
                         {new Date(record.created_at).toLocaleString("ko-KR")}
                       </p>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteResearchRecord(record.id)}
+                        disabled={deletingRecordId === record.id}
+                        style={styles.deleteButton}
+                      >
+                        {deletingRecordId === record.id
+                          ? "삭제 중..."
+                          : "탐구 기록 삭제"}
+                      </button>
                     </article>
                   ))}
                 </div>
@@ -525,12 +713,45 @@ const styles = {
     fontWeight: 700,
     cursor: "pointer",
   },
+  deleteButton: {
+    marginTop: "16px",
+    border: "1px solid #fecaca",
+    borderRadius: "12px",
+    padding: "10px 14px",
+    backgroundColor: "#fef2f2",
+    color: "#dc2626",
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  driveButton: {
+    marginBottom: "12px",
+    border: "none",
+    borderRadius: "12px",
+    padding: "12px 16px",
+    backgroundColor: "#2563eb",
+    color: "white",
+    fontWeight: 700,
+    cursor: "pointer",
+  },
   box: {
     marginTop: "28px",
     border: "1px solid #e2e8f0",
     borderRadius: "16px",
     padding: "24px",
     backgroundColor: "#f8fafc",
+  },
+  driveUploadBox: {
+    border: "1px solid #bfdbfe",
+    borderRadius: "16px",
+    padding: "16px",
+    backgroundColor: "#eff6ff",
+  },
+  selectedFileBox: {
+    marginTop: "12px",
+    borderRadius: "12px",
+    backgroundColor: "white",
+    padding: "12px",
+    border: "1px solid #dbeafe",
   },
   form: {
     marginTop: "20px",
@@ -610,6 +831,12 @@ const styles = {
     whiteSpace: "pre-wrap",
     color: "#334155",
     lineHeight: 1.7,
+  },
+  fileNameText: {
+    margin: 0,
+    color: "#334155",
+    fontSize: "14px",
+    fontWeight: 700,
   },
   link: {
     display: "inline-block",
