@@ -12,6 +12,15 @@ function getStudentNumber(email) {
   return match ? match[1] : null;
 }
 
+const studentRecordPreview = [
+  "자율활동: 학급 탐구 프로젝트에서 자료 조사와 발표 구성을 맡아 주제의 핵심을 정리하고 친구들의 의견을 종합함.",
+  "진로활동: 과학적 탐구 방법과 데이터 분석 과정에 관심을 가지고 관련 도서를 읽으며 자신의 관심 분야를 구체화함.",
+  "세부능력 및 특기사항: 수업 중 제시된 현상을 관찰한 뒤 가설을 세우고 근거 자료를 찾아 설명하려는 태도가 돋보임.",
+  "동아리활동: 탐구 주제를 선정하고 실험 계획을 작성하는 과정에서 변인 통제와 결과 해석의 중요성을 이해함.",
+  "독서활동: 사회 문제와 과학 기술의 관계를 다룬 글을 읽고 토론 과정에서 자신의 의견을 논리적으로 표현함.",
+  "종합의견: 꾸준한 기록 습관을 바탕으로 이전 활동과 새 탐구 주제를 연결하려는 성실한 태도를 보임.",
+];
+
 function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -419,20 +428,95 @@ async function handleDeleteResearchRecord(recordId) {
 
   if (!session) {
     return (
-      <main style={styles.page}>
-        <section style={styles.card}>
-          <h1 style={styles.title}>학생 탐구 추천 플랫폼</h1>
+      <main style={styles.landingPage}>
+        <div
+          className="floating-record floating-record-left"
+          style={styles.floatingRecord}
+          aria-hidden="true"
+        >
+          <h2 style={styles.recordSheetTitle}>학교생활기록부</h2>
+          {studentRecordPreview.concat(studentRecordPreview).map((text, index) => (
+            <p key={`left-${index}`} style={styles.recordSheetLine}>
+              {text}
+            </p>
+          ))}
+        </div>
 
-          <p style={styles.text}>
-            Google 계정으로 로그인하세요. 학생 계정은
-            26-[학번]@gochon.hs.kr 형식이면 자동으로 학생으로 분류됩니다.
-          </p>
+        <div
+          className="floating-record floating-record-right"
+          style={styles.floatingRecord}
+          aria-hidden="true"
+        >
+          <h2 style={styles.recordSheetTitle}>창의적 체험활동 상황</h2>
+          {studentRecordPreview.concat(studentRecordPreview).map((text, index) => (
+            <p key={`right-${index}`} style={styles.recordSheetLine}>
+              {text}
+            </p>
+          ))}
+        </div>
 
-          <button onClick={signInWithGoogle} style={styles.button}>
-            Google로 로그인
+        <div
+          className="floating-record floating-record-center"
+          style={styles.floatingRecordCenter}
+          aria-hidden="true"
+        >
+          <h2 style={styles.recordSheetTitle}>탐구 활동 종합 기록</h2>
+          {studentRecordPreview.concat(studentRecordPreview).map((text, index) => (
+            <p key={`center-${index}`} style={styles.recordSheetLine}>
+              {text}
+            </p>
+          ))}
+        </div>
+
+        <header style={styles.landingHeader}>
+          <p style={styles.brand}>학생 탐구 추천 플랫폼</p>
+          <button onClick={signInWithGoogle} style={styles.loginButton}>
+            로그인
           </button>
+        </header>
 
-          {message && <p style={styles.message}>{message}</p>}
+        <section style={styles.centerStage}>
+          <img
+            src="/research-logo.svg"
+            alt="학생 탐구 추천 플랫폼 로고"
+            style={styles.heroLogo}
+          />
+
+          <div style={styles.introBox}>
+            <p style={styles.kicker}>생활기록부 기반 탐구 추천</p>
+            <h1 style={styles.heroTitle}>학생 탐구 추천 플랫폼</h1>
+
+            <p style={styles.heroText}>
+              여러분들의 생활 기록부를 더 체계적으로 관리하기 위해 여러분들의
+              이전 탐구 활동 내용을 바탕으로 여러분들이 앞으로 할 탐구의
+              방향성을 잡아드립니다!
+            </p>
+
+            {message && <p style={styles.message}>{message}</p>}
+          </div>
+
+          <div className="landing-feature-row" style={styles.landingFeatureRow}>
+            <article style={styles.landingFeatureCard}>
+              <strong style={styles.landingFeatureTitle}>기록 정리</strong>
+              <span style={styles.landingFeatureText}>
+                흩어진 탐구 활동을 학기별로 모아 봅니다.
+              </span>
+            </article>
+
+            <article style={styles.landingFeatureCard}>
+              <strong style={styles.landingFeatureTitle}>흐름 분석</strong>
+              <span style={styles.landingFeatureText}>
+                이전 활동에서 관심 분야와 강점을 찾습니다.
+              </span>
+            </article>
+
+            <article style={styles.landingFeatureCard}>
+              <strong style={styles.landingFeatureTitle}>방향 추천</strong>
+              <span style={styles.landingFeatureText}>
+                다음 탐구 주제를 더 자연스럽게 이어갑니다.
+              </span>
+            </article>
+          </div>
         </section>
       </main>
     );
@@ -654,6 +738,164 @@ async function handleDeleteResearchRecord(recordId) {
 }
 
 const styles = {
+  landingPage: {
+    minHeight: "100vh",
+    backgroundColor: "#eef8fb",
+    padding: "28px",
+    boxSizing: "border-box",
+    fontFamily:
+      "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    color: "#111111",
+    textAlign: "left",
+    position: "relative",
+    overflow: "hidden",
+  },
+  landingHeader: {
+    width: "calc(100vw - 40px)",
+    margin: "0 auto",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "16px",
+    position: "relative",
+    zIndex: 3,
+  },
+  brand: {
+    margin: 0,
+    fontSize: "15px",
+    fontWeight: 800,
+    color: "#145BA9",
+  },
+  loginButton: {
+    border: "1px solid rgba(20, 91, 169, 0.18)",
+    borderRadius: "999px",
+    padding: "8px 14px",
+    backgroundColor: "#145BA9",
+    color: "white",
+    fontSize: "13px",
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 8px 18px rgba(20, 91, 169, 0.18)",
+  },
+  floatingRecord: {
+    position: "absolute",
+    width: "560px",
+    minHeight: "760px",
+    borderRadius: "22px",
+    padding: "38px",
+    backgroundColor: "rgba(255, 255, 255, 0.76)",
+    border: "1px solid rgba(19, 185, 174, 0.18)",
+    boxShadow: "0 22px 42px rgba(20, 91, 169, 0.12)",
+    filter: "blur(2px)",
+    opacity: 0.32,
+    color: "#1a1a1a",
+    boxSizing: "border-box",
+    pointerEvents: "none",
+    zIndex: 1,
+  },
+  floatingRecordCenter: {
+    position: "absolute",
+    width: "520px",
+    minHeight: "700px",
+    borderRadius: "22px",
+    padding: "34px",
+    backgroundColor: "rgba(255, 255, 255, 0.54)",
+    border: "1px solid rgba(35, 134, 215, 0.12)",
+    boxShadow: "0 18px 34px rgba(20, 91, 169, 0.08)",
+    filter: "blur(2.5px)",
+    opacity: 0.2,
+    color: "#1a1a1a",
+    boxSizing: "border-box",
+    pointerEvents: "none",
+    zIndex: 1,
+  },
+  recordSheetTitle: {
+    margin: "0 0 18px",
+    fontSize: "30px",
+    fontWeight: 900,
+    color: "#0a0a0a",
+  },
+  recordSheetLine: {
+    margin: "0 0 13px",
+    fontSize: "16px",
+    lineHeight: 1.7,
+    fontWeight: 700,
+    wordBreak: "keep-all",
+  },
+  centerStage: {
+    maxWidth: "740px",
+    margin: "34px auto 0",
+    position: "relative",
+    zIndex: 2,
+  },
+  introBox: {
+    padding: "46px",
+    borderRadius: "28px",
+    backgroundColor: "rgba(255, 255, 255, 0.92)",
+    border: "1px solid rgba(154, 223, 226, 0.72)",
+    boxShadow: "0 34px 90px rgba(20, 91, 169, 0.18)",
+    textAlign: "center",
+  },
+  heroLogo: {
+    display: "block",
+    width: "140px",
+    height: "140px",
+    objectFit: "contain",
+    margin: "0 auto 22px",
+  },
+  landingFeatureRow: {
+    marginTop: "18px",
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "12px",
+  },
+  landingFeatureCard: {
+    minHeight: "118px",
+    borderRadius: "18px",
+    padding: "20px",
+    backgroundColor: "rgba(20, 91, 169, 0.9)",
+    border: "1px solid rgba(154, 223, 226, 0.35)",
+    boxShadow: "0 18px 42px rgba(20, 91, 169, 0.16)",
+    boxSizing: "border-box",
+  },
+  landingFeatureTitle: {
+    display: "block",
+    marginBottom: "10px",
+    color: "#9ADFE2",
+    fontSize: "17px",
+    fontWeight: 900,
+  },
+  landingFeatureText: {
+    display: "block",
+    color: "#E8FAFB",
+    fontSize: "14px",
+    lineHeight: 1.6,
+    fontWeight: 700,
+    wordBreak: "keep-all",
+  },
+  kicker: {
+    margin: "0 0 14px",
+    color: "#13B9AE",
+    fontSize: "14px",
+    fontWeight: 900,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+  },
+  heroTitle: {
+    margin: 0,
+    color: "#145BA9",
+    fontSize: "42px",
+    lineHeight: 1.18,
+    fontWeight: 900,
+  },
+  heroText: {
+    margin: "24px auto 0",
+    color: "#24435f",
+    fontSize: "22px",
+    lineHeight: 1.75,
+    fontWeight: 800,
+    wordBreak: "keep-all",
+  },
   page: {
     minHeight: "100vh",
     backgroundColor: "#f8fafc",
