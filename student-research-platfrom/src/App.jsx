@@ -26,11 +26,6 @@ function App() {
   const [profile, setProfile] = useState(null);
   const [records, setRecords] = useState([]);
 
-  const [grade, setGrade] = useState("1학년");
-  const [semester, setSemester] = useState("1학기");
-  const [subject, setSubject] = useState("");
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
   const [driveFileId, setDriveFileId] = useState("");
   const [driveFileName, setDriveFileName] = useState("");
   const [driveFileUrl, setDriveFileUrl] = useState("");
@@ -295,7 +290,7 @@ async function openGooglePicker() {
     });
 
     tokenClient.requestAccessToken({ prompt: "consent" });
-  } catch (error) {
+  } catch {
     setMessage("Google Picker를 여는 중 오류가 발생했습니다.");
     setIsPickerLoading(false);
   }
@@ -315,8 +310,8 @@ async function openGooglePicker() {
       return;
     }
 
-    if (!subject.trim() || !title.trim() || !content.trim()) {
-      setMessage("과목, 탐구 제목, 탐구 내용은 반드시 입력해야 합니다.");
+    if (!driveFileId) {
+      setMessage("Google Drive 파일을 먼저 선택하거나 업로드해 주세요.");
       return;
     }
 
@@ -327,11 +322,11 @@ async function openGooglePicker() {
         supabase.from("research_records").insert({
           user_id: session.user.id,
           student_email: session.user.email,
-          grade,
-          semester,
-          subject: subject.trim(),
-          title: title.trim(),
-          content: content.trim(),
+          grade: "미입력",
+          semester: "미입력",
+          subject: "Google Drive",
+          title: driveFileName || "Google Drive 파일",
+          content: driveFileUrl || "Google Drive 파일이 등록되었습니다.",
           drive_file_id: driveFileId || null,
           drive_file_name: driveFileName || null,
           drive_file_url: driveFileUrl || null,
@@ -343,10 +338,7 @@ async function openGooglePicker() {
         return;
       }
 
-      setMessage("탐구 기록이 저장되었습니다.");
-      setSubject("");
-      setTitle("");
-      setContent("");
+      setMessage("Google Drive 파일이 저장되었습니다.");
       setDriveFileId("");
       setDriveFileName("");
       setDriveFileUrl("");
@@ -539,79 +531,18 @@ async function handleDeleteResearchRecord(recordId) {
 
         {profile?.role === "student" && (
           <>
-            <section style={styles.box}>
-              <h2 style={styles.subTitle}>탐구 기록 등록</h2>
+            <p style={styles.uploadIntroText}>
+              이 곳에 본인이 활동했던 내용이 담긴 파일을 업로드 하세요!
+            </p>
 
-              <p style={styles.text}>
-                1학년 또는 지난 학기에 했던 수행평가·탐구 활동을 과목별로
-                등록하세요. 나중에 AI가 이 내용을 바탕으로 추가 탐구 주제를
-                추천합니다.
-              </p>
+            <section style={styles.uploadPanel}>
+              <h2 style={styles.subTitle}>Google Drive 파일 업로드</h2>
 
               <form onSubmit={handleSubmitResearchRecord} style={styles.form}>
-                <div style={styles.row}>
-                  <div style={styles.field}>
-                    <label style={styles.label}>학년</label>
-                    <select
-                      value={grade}
-                      onChange={(event) => setGrade(event.target.value)}
-                      style={styles.input}
-                    >
-                      <option>1학년</option>
-                      <option>2학년</option>
-                      <option>3학년</option>
-                    </select>
-                  </div>
-
-                  <div style={styles.field}>
-                    <label style={styles.label}>학기</label>
-                    <select
-                      value={semester}
-                      onChange={(event) => setSemester(event.target.value)}
-                      style={styles.input}
-                    >
-                      <option>1학기</option>
-                      <option>2학기</option>
-                      <option>지난 학기</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label style={styles.label}>과목</label>
-                  <input
-                    value={subject}
-                    onChange={(event) => setSubject(event.target.value)}
-                    placeholder="예: 생명과학, 화학, 영어, 통합사회"
-                    style={styles.input}
-                  />
-                </div>
-
-                <div>
-                  <label style={styles.label}>탐구 제목</label>
-                  <input
-                    value={title}
-                    onChange={(event) => setTitle(event.target.value)}
-                    placeholder="예: 온도에 따른 효소 반응 속도 탐구"
-                    style={styles.input}
-                  />
-                </div>
-
-                <div>
-                  <label style={styles.label}>탐구 내용 요약</label>
-                  <textarea
-                    value={content}
-                    onChange={(event) => setContent(event.target.value)}
-                    placeholder="무엇을 탐구했는지, 어떤 자료를 사용했는지, 결과가 어땠는지 자세히 적어 주세요."
-                    rows={7}
-                    style={styles.textarea}
-                  />
-                </div>
-
                 <div style={styles.driveUploadBox}>
-                  <label style={styles.label}>Google Drive 파일 선택/업로드</label>
+                  <label style={styles.uploadLabel}>Google Drive 파일 선택/업로드</label>
 
-                  <p style={styles.smallText}>
+                  <p style={styles.uploadHelpText}>
                     버튼을 누르면 Google Picker가 열립니다. 기존 Drive 파일을 선택하거나
                     새 파일을 Drive에 업로드한 뒤 선택할 수 있습니다.
                   </p>
@@ -648,35 +579,23 @@ async function handleDeleteResearchRecord(recordId) {
                   disabled={isSubmitting}
                   style={styles.button}
                 >
-                  {isSubmitting ? "저장 중..." : "탐구 기록 저장"}
+                  {isSubmitting ? "저장 중..." : "파일 저장"}
                 </button>
               </form>
             </section>
 
             <section style={styles.box}>
-              <h2 style={styles.subTitle}>내 탐구 기록</h2>
+              <h2 style={styles.subTitle}>내 Google Drive 파일</h2>
 
               {records.length === 0 ? (
-                <p style={styles.text}>아직 저장된 탐구 기록이 없습니다.</p>
+                <p style={styles.text}>아직 저장된 파일이 없습니다.</p>
               ) : (
                 <div style={styles.recordList}>
                   {records.map((record) => (
                     <article key={record.id} style={styles.recordCard}>
-                      <div style={styles.badgeRow}>
-                        <span style={styles.badge}>{record.grade}</span>
-                        <span style={styles.badge}>{record.semester}</span>
-                        <span style={styles.badge}>{record.subject}</span>
-                      </div>
-
-                      <h3 style={styles.recordTitle}>{record.title}</h3>
-
-                      <p style={styles.recordContent}>{record.content}</p>
-
-                      {record.drive_file_name && (
-                        <p style={styles.fileNameText}>
-                          업로드한 파일: {record.drive_file_name}
-                        </p>
-                      )}
+                      <h3 style={styles.recordTitle}>
+                        {record.drive_file_name || record.title}
+                      </h3>
 
                       {record.drive_file_url && (
                         <a
@@ -702,7 +621,7 @@ async function handleDeleteResearchRecord(recordId) {
                       >
                         {deletingRecordId === record.id
                           ? "삭제 중..."
-                          : "탐구 기록 삭제"}
+                          : "파일 기록 삭제"}
                       </button>
                     </article>
                   ))}
@@ -931,6 +850,13 @@ const styles = {
     color: "#475569",
     lineHeight: 1.7,
   },
+  uploadIntroText: {
+    margin: "30px 0 0",
+    color: "#1e293b",
+    fontSize: "18px",
+    fontWeight: 800,
+    lineHeight: 1.5,
+  },
   smallText: {
     marginTop: "8px",
     fontSize: "13px",
@@ -940,10 +866,11 @@ const styles = {
   button: {
     border: "none",
     borderRadius: "12px",
-    padding: "14px 18px",
+    padding: "16px 20px",
     backgroundColor: "#0f172a",
     color: "white",
     fontWeight: 700,
+    fontSize: "15px",
     cursor: "pointer",
   },
   secondaryButton: {
@@ -966,13 +893,15 @@ const styles = {
     cursor: "pointer",
   },
   driveButton: {
+    marginTop: "18px",
     marginBottom: "12px",
     border: "none",
     borderRadius: "12px",
-    padding: "12px 16px",
+    padding: "15px 20px",
     backgroundColor: "#2563eb",
     color: "white",
     fontWeight: 700,
+    fontSize: "15px",
     cursor: "pointer",
   },
   box: {
@@ -982,17 +911,43 @@ const styles = {
     padding: "24px",
     backgroundColor: "#f8fafc",
   },
+  uploadPanel: {
+    marginTop: "34px",
+    border: "1px solid #dbeafe",
+    borderRadius: "20px",
+    padding: "28px",
+    backgroundColor: "#f8fbff",
+  },
   driveUploadBox: {
-    border: "1px solid #bfdbfe",
-    borderRadius: "16px",
-    padding: "16px",
+    minHeight: "260px",
+    border: "2px dashed #93c5fd",
+    borderRadius: "18px",
+    padding: "36px",
     backgroundColor: "#eff6ff",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "flex-start",
+  },
+  uploadLabel: {
+    display: "block",
+    marginBottom: "10px",
+    fontSize: "22px",
+    fontWeight: 800,
+    color: "#1e293b",
+  },
+  uploadHelpText: {
+    maxWidth: "640px",
+    margin: 0,
+    fontSize: "15px",
+    color: "#475569",
+    lineHeight: 1.7,
   },
   selectedFileBox: {
-    marginTop: "12px",
+    marginTop: "18px",
     borderRadius: "12px",
     backgroundColor: "white",
-    padding: "12px",
+    padding: "14px 16px",
     border: "1px solid #dbeafe",
   },
   form: {
