@@ -55,15 +55,89 @@ body {
 }
 
 #root {
-  width: 1126px;
-  max-width: 100%;
+  width: 100%;
   margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
   min-height: 100svh;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+}
+
+.floating-record-left {
+  top: 82px;
+  left: -36px;
+  transform: rotate(-6deg);
+  animation: float-record-left 10s ease-in-out infinite;
+}
+
+.floating-record-right {
+  top: 78px;
+  right: -36px;
+  transform: rotate(6deg);
+  animation: float-record-right 12s ease-in-out infinite;
+}
+
+.floating-record-center {
+  top: 138px;
+  left: 50%;
+  transform: translateX(-50%) rotate(1deg);
+  animation: float-record-center 14s ease-in-out infinite;
+}
+
+@keyframes float-record-left {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-6deg);
+  }
+
+  50% {
+    transform: translate3d(14px, 16px, 0) rotate(-4deg);
+  }
+}
+
+@keyframes float-record-right {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(6deg);
+  }
+
+  50% {
+    transform: translate3d(-14px, 16px, 0) rotate(4deg);
+  }
+}
+
+@keyframes float-record-center {
+  0%,
+  100% {
+    transform: translate3d(-50%, 0, 0) rotate(1deg);
+  }
+
+  50% {
+    transform: translate3d(calc(-50% + 8px), 14px, 0) rotate(-1deg);
+  }
+}
+
+@media (max-width: 860px) {
+  .floating-record {
+    width: 420px;
+    opacity: 0.22;
+  }
+
+  .floating-record-left {
+    left: -260px;
+  }
+
+  .floating-record-right {
+    right: -260px;
+  }
+
+  .floating-record-center {
+    display: none;
+  }
+
+  .landing-feature-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 h1,
