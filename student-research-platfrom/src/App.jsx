@@ -6,6 +6,7 @@ import {
   supabaseConfigError,
   withRetry,
 } from "./lib/supabaseClient";
+import { getGooglePickerConfigError } from "./lib/googlePickerConfig";
 
 function getStudentNumber(email) {
   const match = email.match(/^26-(\d+)@gochon\.hs\.kr$/);
@@ -40,6 +41,8 @@ function App() {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentPage, setCurrentPage] = useState("home");
+  const [isLogoutHovered, setIsLogoutHovered] = useState(false);
 
   useEffect(() => {
     async function initAuth() {
@@ -196,7 +199,7 @@ function App() {
     if (isSupabaseConfigured()) {
       await supabase.auth.signOut();
     }
-
+      
     setSession(null);
     setProfile(null);
     setRecords([]);
@@ -235,15 +238,14 @@ async function loadGooglePickerLibraries() {
 async function openGooglePicker() {
   setMessage("");
 
-  const googleApiKey = import.meta.env.VITE_GOOGLE_API_KEY;
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-  if (!googleApiKey || !googleClientId) {
-    setMessage(
-      "Google Picker 설정이 필요합니다. .env의 VITE_GOOGLE_API_KEY와 VITE_GOOGLE_CLIENT_ID를 확인하세요."
-    );
-    return;
-  }
+if (!googleClientId) {
+  setMessage(
+    "Google Picker 설정이 필요합니다. .env의 VITE_GOOGLE_CLIENT_ID를 확인하세요."
+  );
+  return;
+}
 
   setIsPickerLoading(true);
 
@@ -267,7 +269,6 @@ async function openGooglePicker() {
           .setSelectFolderEnabled(false);
 
         const picker = new window.google.picker.PickerBuilder()
-          .setDeveloperKey(googleApiKey)
           .setOAuthToken(tokenResponse.access_token)
           .addView(docsView)
           .addView(uploadView)
@@ -532,12 +533,59 @@ async function handleDeleteResearchRecord(recordId) {
             <p style={styles.text}>역할: {profile?.role || "확인 중"}</p>
           </div>
 
-          <button onClick={signOut} style={styles.secondaryButton}>
-            로그아웃
-          </button>
-        </div>
+          <div style={styles.headerActions}>
+            <button
+              type="button"
+              onClick={() => setCurrentPage("ai")}
+              style={styles.headerButton}
+            >
+              AI 분석 결과 보기
+            </button>
 
-        {profile?.role === "student" && (
+            <button
+              type="button"
+              onClick={signOut}
+              onMouseEnter={() => setIsLogoutHovered(true)}
+              onMouseLeave={() => setIsLogoutHovered(false)}
+              style={{
+                ...styles.headerButton,
+                ...styles.logoutButton,
+                ...(isLogoutHovered ? styles.logoutButtonHover : {}),
+              }}
+            >
+              로그아웃
+            </button>
+          </div>
+        </div>
+        
+                {currentPage === "ai" && (
+          <section style={styles.aiPage}>
+            <button
+              type="button"
+              onClick={() => setCurrentPage("home")}
+              style={styles.secondaryButton}
+            >
+              ← 탐구 기록 화면으로 돌아가기
+            </button>
+
+            <h2 style={styles.subTitle}>AI 분석 결과</h2>
+
+            <p style={styles.text}>
+              아직 실제 AI 분석 기능은 연결되지 않았습니다. 다음 단계에서 저장된
+              탐구 기록을 바탕으로 개인 맞춤형 심화 탐구 주제를 추천하도록 만들 수
+              있습니다.
+            </p>
+
+            <div style={styles.aiInfoBox}>
+              <p style={styles.text}>현재 저장된 탐구 기록 수: {records.length}개</p>
+              <p style={styles.smallText}>
+                이후 이 페이지에서 추천 탐구 주제, 추천 이유, 추가 조사 방향,
+                참고 자료 키워드를 보여주면 됩니다.
+              </p>
+            </div>
+          </section>
+        )}
+        {profile?.role === "student" && currentPage === "home" && (
           <>
             <section style={styles.box}>
               <h2 style={styles.subTitle}>탐구 기록 등록</h2>
@@ -916,6 +964,44 @@ const styles = {
     justifyContent: "space-between",
     gap: "20px",
     alignItems: "flex-start",
+  },
+  headerActions: {
+  display: "flex",
+  gap: "10px",
+  alignItems: "center",
+  flexWrap: "wrap",
+  },
+  headerButton: {
+    border: "1px solid #cbd5e1",
+    borderRadius: "12px",
+    padding: "12px 16px",
+    backgroundColor: "white",
+    color: "#334155",
+    fontWeight: 700,
+    cursor: "pointer",
+    fontSize: "14px",
+  },
+  logoutButton: {
+    transition: "0.15s ease",
+  },
+  logoutButtonHover: {
+    border: "1px solid #dc2626",
+    backgroundColor: "#dc2626",
+    color: "white",
+  },
+  aiPage: {
+    marginTop: "28px",
+    border: "1px solid #bfdbfe",
+    borderRadius: "16px",
+    padding: "24px",
+    backgroundColor: "#eff6ff",
+  },
+  aiInfoBox: {
+    marginTop: "16px",
+    borderRadius: "14px",
+    padding: "16px",
+    backgroundColor: "white",
+    border: "1px solid #dbeafe",
   },
   title: {
     margin: 0,
