@@ -562,6 +562,15 @@ async function handleDeleteResearchRecord(recordId) {
 
           <button
             className="animated-button"
+            type="button"
+            onClick={() => setMessage("AI 분석 결과 기능은 준비 중입니다.")}
+            style={styles.aiResultButton}
+          >
+            AI 분석 결과 보기
+          </button>
+
+          <button
+            className="animated-button"
             onClick={signOut}
             style={styles.secondaryButton}
           >
@@ -935,6 +944,7 @@ const styles = {
     boxShadow: "0 14px 26px rgba(20, 91, 169, 0.18)",
   },
   secondaryButton: {
+    alignSelf: "center",
     border: "1px solid rgba(20, 91, 169, 0.18)",
     borderRadius: "999px",
     padding: "12px 16px",
@@ -943,6 +953,21 @@ const styles = {
     fontWeight: 900,
     cursor: "pointer",
     boxShadow: "0 12px 24px rgba(20, 91, 169, 0.18)",
+  },
+  aiResultButton: {
+    flex: "1 1 auto",
+    minWidth: 0,
+    alignSelf: "center",
+    border: "1px solid rgba(154, 223, 226, 0.88)",
+    borderRadius: "999px",
+    minHeight: "70px",
+    padding: "22px 28px",
+    backgroundColor: "rgba(255, 255, 255, 0.86)",
+    color: "#145BA9",
+    fontWeight: 900,
+    textAlign: "center",
+    cursor: "pointer",
+    boxShadow: "0 12px 26px rgba(20, 91, 169, 0.12)",
   },
   deleteButton: {
     marginTop: "16px",
