@@ -183,3 +183,219 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+.dashboard-page {
+  animation: moveGrid 22s linear infinite;
+}
+
+.dashboard-page::before,
+.dashboard-page::after {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 999px;
+  filter: blur(32px);
+  will-change: transform;
+}
+
+.dashboard-page::before {
+  top: 6%;
+  left: 5%;
+  width: 300px;
+  height: 300px;
+  background: rgba(37, 99, 235, 0.2);
+  animation: floatBlobOne 11s ease-in-out infinite;
+}
+
+.dashboard-page::after {
+  right: 5%;
+  bottom: 8%;
+  width: 360px;
+  height: 360px;
+  background: rgba(16, 185, 129, 0.16);
+  animation: floatBlobTwo 13s ease-in-out infinite;
+}
+
+.dashboard-card {
+  position: relative;
+  z-index: 1;
+  animation:
+    cardEntrance 0.72s cubic-bezier(0.2, 0.78, 0.24, 1) both,
+    cardGlow 5.8s ease-in-out 0.72s infinite;
+}
+
+.animated-button {
+  position: relative;
+  overflow: hidden;
+  transform: translateY(0) scale(1);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    filter 180ms ease;
+}
+
+.animated-button::before {
+  content: "";
+  position: absolute;
+  inset: -35% -80%;
+  background: linear-gradient(
+    115deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.34) 48%,
+    transparent 62%
+  );
+  transform: translateX(-65%);
+  transition: transform 620ms ease;
+  pointer-events: none;
+}
+
+.animated-button:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 18px 34px rgba(20, 91, 169, 0.26) !important;
+  filter: saturate(1.05);
+}
+
+.animated-button:hover:not(:disabled)::before {
+  transform: translateX(65%);
+}
+
+.animated-button:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.dashboard-card :where(h1, h2, h3, p, label, span) {
+  cursor: default;
+}
+
+.dashboard-card :where(a, button) {
+  cursor: pointer;
+}
+
+@keyframes floatBlobOne {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  35% {
+    transform: translate3d(60px, 35px, 0) scale(1.12);
+  }
+
+  70% {
+    transform: translate3d(-25px, 70px, 0) scale(0.94);
+  }
+}
+
+@keyframes floatBlobTwo {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  40% {
+    transform: translate3d(-70px, -30px, 0) scale(1.08);
+  }
+
+  75% {
+    transform: translate3d(30px, -65px, 0) scale(0.92);
+  }
+}
+
+@keyframes moveGrid {
+  from {
+    background-position: 0 0, 0 0, 0 0, 0 0;
+  }
+
+  to {
+    background-position: 0 0, 72px 72px, 72px 72px, 0 0;
+  }
+}
+
+@keyframes cardEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes cardGlow {
+  0%,
+  100% {
+    box-shadow:
+      0 28px 70px rgba(20, 91, 169, 0.13),
+      0 8px 22px rgba(19, 185, 174, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  }
+
+  50% {
+    box-shadow:
+      0 32px 78px rgba(20, 91, 169, 0.2),
+      0 10px 28px rgba(19, 185, 174, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  }
+}
+
+@media (max-width: 700px) {
+  .dashboard-page::before,
+  .dashboard-page::after {
+    filter: blur(22px);
+  }
+
+  .dashboard-page::before {
+    width: 210px;
+    height: 210px;
+    animation-name: floatBlobOneMobile;
+  }
+
+  .dashboard-page::after {
+    width: 250px;
+    height: 250px;
+    animation-name: floatBlobTwoMobile;
+  }
+}
+
+@keyframes floatBlobOneMobile {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(24px, 26px, 0) scale(1.08);
+  }
+}
+
+@keyframes floatBlobTwoMobile {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(-26px, -24px, 0) scale(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-page,
+  .dashboard-page::before,
+  .dashboard-page::after,
+  .dashboard-card,
+  .animated-button,
+  .animated-button::before {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .dashboard-card,
+  .animated-button,
+  .animated-button::before {
+    transform: none !important;
+  }
+}

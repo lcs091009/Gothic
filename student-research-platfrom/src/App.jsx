@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getFriendlySupabaseError,
   isSupabaseConfigured,
@@ -35,6 +35,7 @@ function App() {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const pageRef = useRef(null);
 
   useEffect(() => {
     async function initAuth() {
@@ -89,6 +90,41 @@ function App() {
       listener.subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    const pageElement = pageRef.current;
+
+    if (
+      !pageElement ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      !window.matchMedia("(pointer: fine)").matches
+    ) {
+      return;
+    }
+
+    let animationFrameId = 0;
+
+    function handlePointerMove(event) {
+      if (animationFrameId) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+
+      animationFrameId = window.requestAnimationFrame(() => {
+        pageElement.style.setProperty("--pointer-x", `${event.clientX}px`);
+        pageElement.style.setProperty("--pointer-y", `${event.clientY}px`);
+      });
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+
+      if (animationFrameId) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [session]);
 
   async function ensureProfile(user) {
     if (!isSupabaseConfigured()) {
@@ -515,8 +551,8 @@ async function handleDeleteResearchRecord(recordId) {
   }
 
   return (
-    <main style={styles.page}>
-      <section style={styles.card}>
+    <main ref={pageRef} className="dashboard-page" style={styles.page}>
+      <section className="dashboard-card" style={styles.card}>
         <div style={styles.header}>
           <div>
             <h1 style={styles.title}>학생 탐구 추천 플랫폼</h1>
@@ -524,7 +560,11 @@ async function handleDeleteResearchRecord(recordId) {
             <p style={styles.text}>역할: {profile?.role || "확인 중"}</p>
           </div>
 
-          <button onClick={signOut} style={styles.secondaryButton}>
+          <button
+            className="animated-button"
+            onClick={signOut}
+            style={styles.secondaryButton}
+          >
             로그아웃
           </button>
         </div>
@@ -548,6 +588,7 @@ async function handleDeleteResearchRecord(recordId) {
                   </p>
 
                   <button
+                    className="animated-button"
                     type="button"
                     onClick={openGooglePicker}
                     disabled={isPickerLoading}
@@ -575,6 +616,7 @@ async function handleDeleteResearchRecord(recordId) {
                 </div>
 
                 <button
+                  className="animated-button"
                   type="submit"
                   disabled={isSubmitting}
                   style={styles.button}
@@ -818,19 +860,30 @@ const styles = {
   page: {
     minHeight: "100vh",
     backgroundColor: "#eef8fb",
+    backgroundImage:
+      "radial-gradient(circle at var(--pointer-x, 50%) var(--pointer-y, 28%), rgba(37, 99, 235, 0.08) 0 110px, transparent 260px), linear-gradient(rgba(0, 90, 160, 0.055) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 90, 160, 0.055) 1px, transparent 1px), linear-gradient(180deg, #e8f6fc 0%, #f8fcff 100%)",
+    backgroundSize: "auto, 36px 36px, 36px 36px, auto",
+    backgroundRepeat: "no-repeat, repeat, repeat, no-repeat",
+    backgroundPosition: "0 0, 0 0, 0 0, 0 0",
     padding: "48px 24px",
+    boxSizing: "border-box",
     fontFamily:
       "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     color: "#18324a",
+    overflowX: "hidden",
+    position: "relative",
+    isolation: "isolate",
   },
   card: {
     maxWidth: "960px",
     margin: "0 auto",
     backgroundColor: "rgba(255, 255, 255, 0.94)",
-    border: "1px solid rgba(154, 223, 226, 0.72)",
+    border: "1px solid rgba(255, 255, 255, 0.86)",
     borderRadius: "28px",
     padding: "36px",
-    boxShadow: "0 34px 90px rgba(20, 91, 169, 0.16)",
+    boxShadow:
+      "0 28px 70px rgba(20, 91, 169, 0.14), 0 8px 22px rgba(19, 185, 174, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9)",
+    backdropFilter: "blur(10px)",
   },
   header: {
     display: "flex",
@@ -920,13 +973,17 @@ const styles = {
     borderRadius: "22px",
     padding: "26px",
     backgroundColor: "rgba(255, 255, 255, 0.72)",
+    boxShadow:
+      "0 14px 36px rgba(20, 91, 169, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.74)",
   },
   uploadPanel: {
     marginTop: "34px",
-    border: "1px solid rgba(154, 223, 226, 0.82)",
+    border: "1px solid rgba(154, 223, 226, 0.9)",
     borderRadius: "24px",
     padding: "30px",
     backgroundColor: "rgba(255, 255, 255, 0.78)",
+    boxShadow:
+      "0 18px 46px rgba(20, 91, 169, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.82)",
   },
   driveUploadBox: {
     minHeight: "260px",
@@ -934,6 +991,8 @@ const styles = {
     borderRadius: "22px",
     padding: "36px",
     backgroundColor: "rgba(238, 248, 251, 0.88)",
+    boxShadow:
+      "0 18px 40px rgba(20, 91, 169, 0.08), inset 0 1px 18px rgba(255, 255, 255, 0.74)",
     display: "flex",
     flexDirection: "column",
     justifyContent: "center",
@@ -960,6 +1019,7 @@ const styles = {
     backgroundColor: "white",
     padding: "14px 16px",
     border: "1px solid rgba(154, 223, 226, 0.72)",
+    boxShadow: "0 10px 24px rgba(20, 91, 169, 0.08)",
   },
   form: {
     marginTop: "20px",
