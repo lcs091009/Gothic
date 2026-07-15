@@ -1,3 +1,5 @@
+import GradeSetup from "./components/GradeSetup";
+import AiAnalysisPage from "./components/AiAnalysisPage";
 import { useEffect, useState } from "react";
 import {
   getFriendlySupabaseError,
@@ -43,6 +45,8 @@ function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState("home");
   const [isLogoutHovered, setIsLogoutHovered] = useState(false);
+  const [academicProfile, setAcademicProfile] = useState(null);
+  const [isAcademicProfileLoading, setIsAcademicProfileLoading] = useState(false);
 
   useEffect(() => {
     async function initAuth() {
@@ -58,6 +62,7 @@ function App() {
 
         if (data.session?.user) {
           await ensureProfile(data.session.user);
+          await loadAcademicProfile(data.session.user.id);
           await loadResearchRecords(data.session.user.id);
         }
       } catch (error) {
@@ -80,6 +85,7 @@ function App() {
         if (newSession?.user) {
           try {
             await ensureProfile(newSession.user);
+            await loadAcademicProfile(newSession.user.id);
             await loadResearchRecords(newSession.user.id);
           } catch (error) {
             setMessage(getFriendlySupabaseError(error));
@@ -169,6 +175,35 @@ function App() {
     setRecords(data || []);
   }
 
+  async function loadAcademicProfile(userId) {
+    if (!isSupabaseConfigured()) {
+      return;
+    }
+
+    setIsAcademicProfileLoading(true);
+
+    try {
+      const { data, error } = await withRetry(() =>
+        supabase
+          .from("student_academic_profiles")
+          .select("*")
+          .eq("user_id", userId)
+          .maybeSingle()
+      );
+
+      if (error) {
+        setMessage(getFriendlySupabaseError(error));
+        return;
+      }
+
+      setAcademicProfile(data);
+    } catch (error) {
+      setMessage(getFriendlySupabaseError(error));
+    } finally {
+      setIsAcademicProfileLoading(false);
+    }
+  }
+
   async function signInWithGoogle() {
     setMessage("");
 
@@ -203,6 +238,7 @@ function App() {
     setSession(null);
     setProfile(null);
     setRecords([]);
+    setAcademicProfile(null);
     setMessage("");
   }
 function loadScript(src) {
@@ -557,35 +593,36 @@ async function handleDeleteResearchRecord(recordId) {
             </button>
           </div>
         </div>
-        
-                {currentPage === "ai" && (
-          <section style={styles.aiPage}>
-            <button
-              type="button"
-              onClick={() => setCurrentPage("home")}
-              style={styles.secondaryButton}
-            >
-              ← 탐구 기록 화면으로 돌아가기
-            </button>
 
-            <h2 style={styles.subTitle}>AI 분석 결과</h2>
-
-            <p style={styles.text}>
-              아직 실제 AI 분석 기능은 연결되지 않았습니다. 다음 단계에서 저장된
-              탐구 기록을 바탕으로 개인 맞춤형 심화 탐구 주제를 추천하도록 만들 수
-              있습니다.
-            </p>
-
-            <div style={styles.aiInfoBox}>
-              <p style={styles.text}>현재 저장된 탐구 기록 수: {records.length}개</p>
-              <p style={styles.smallText}>
-                이후 이 페이지에서 추천 탐구 주제, 추천 이유, 추가 조사 방향,
-                참고 자료 키워드를 보여주면 됩니다.
-              </p>
-            </div>
+        {profile?.role === "student" && isAcademicProfileLoading && (
+          <section style={styles.box}>
+            <p style={styles.text}>선택과목 정보를 불러오는 중입니다...</p>
           </section>
         )}
-        {profile?.role === "student" && currentPage === "home" && (
+
+        {profile?.role === "student" &&
+          !isAcademicProfileLoading &&
+          !academicProfile && (
+            <GradeSetup
+              session={session}
+              existingAcademicProfile={academicProfile}
+              onSaved={(savedProfile) => {
+                setAcademicProfile(savedProfile);
+                setCurrentPage("home");
+              }}
+            />
+          )}
+
+        {currentPage === "ai" && (
+          <AiAnalysisPage
+            academicProfile={academicProfile}
+            records={records}
+            onBack={() => setCurrentPage("home")}
+          />
+        )}
+        {profile?.role === "student" &&
+          academicProfile &&
+          currentPage === "home" && (
           <>
             <section style={styles.box}>
               <h2 style={styles.subTitle}>탐구 기록 등록</h2>
