@@ -586,3 +586,108 @@ code {
     transform: none !important;
   }
 }
+
+.teacher-page-panel {
+  animation: softRise 0.5s ease both;
+}
+
+.teacher-card {
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease;
+}
+
+.teacher-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(20, 91, 169, 0.26) !important;
+  box-shadow: 0 18px 42px rgba(20, 91, 169, 0.14) !important;
+  background-color: rgba(255, 255, 255, 0.98) !important;
+}
+
+.teacher-link {
+  transition:
+    transform 160ms ease,
+    color 160ms ease;
+}
+
+.teacher-link:hover {
+  transform: translateX(3px);
+  color: #0f766e !important;
+}
+
+.teacher-match-box {
+  position: relative;
+  overflow: hidden;
+}
+
+.teacher-match-box::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 78%
+  );
+  transform: translateX(-80%);
+  transition:
+    transform 600ms ease,
+    opacity 200ms ease;
+}
+
+.teacher-match-box:hover::after {
+  opacity: 1;
+  transform: translateX(80%);
+}
+
+.teacher-match-box-ok {
+  animation: softConfirm 0.32s ease both;
+}
+
+.teacher-match-box-review {
+  animation: softAttention 0.32s ease both;
+}
+
+@keyframes softConfirm {
+  from {
+    transform: scale(0.99);
+    box-shadow: 0 0 0 rgba(22, 101, 52, 0);
+  }
+
+  to {
+    transform: scale(1);
+    box-shadow: 0 12px 28px rgba(22, 101, 52, 0.08);
+  }
+}
+
+@keyframes softAttention {
+  from {
+    transform: scale(0.99);
+    box-shadow: 0 0 0 rgba(154, 52, 18, 0);
+  }
+
+  to {
+    transform: scale(1);
+    box-shadow: 0 12px 28px rgba(154, 52, 18, 0.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .teacher-page-panel,
+  .teacher-card,
+  .teacher-link,
+  .teacher-match-box,
+  .teacher-match-box::after,
+  .teacher-match-box-ok,
+  .teacher-match-box-review {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}
+

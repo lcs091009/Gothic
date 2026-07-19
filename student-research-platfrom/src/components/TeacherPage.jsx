@@ -32,6 +32,18 @@ function getStudentEmail(studentNumber) {
   return `26-${studentNumber}@gochon.hs.kr`;
 }
 
+function getMatchLabel(matchStatus) {
+  if (matchStatus === "matched") {
+    return "자동 매칭";
+  }
+
+  if (matchStatus === "needs_review") {
+    return "확인 필요";
+  }
+
+  return "미배정";
+}
+
 function TeacherPage({ session }) {
   const [grade, setGrade] = useState("1학년");
   const [semester, setSemester] = useState("1학기");
@@ -155,8 +167,34 @@ function TeacherPage({ session }) {
   }
 
   return (
-    <section style={styles.page}>
-      <h2 style={styles.title}>선생님 자료 제공 페이지</h2>
+    <section className="soft-panel teacher-page-panel" style={styles.page}>
+      <div style={styles.titleRow}>
+        <div>
+          <p style={styles.kicker}>Teacher Workspace</p>
+          <h2 style={styles.title}>선생님 자료 제공 페이지</h2>
+        </div>
+
+        <button
+          className="animated-button"
+          type="button"
+          onClick={loadSharedFiles}
+          disabled={isLoadingFiles}
+          style={styles.refreshButton}
+        >
+          {isLoadingFiles ? (
+            <>
+              새로고침 중
+              <span className="button-dots" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+            </>
+          ) : (
+            "자료 새로고침"
+          )}
+        </button>
+      </div>
 
       <p style={styles.text}>
         선생님이 수행평가, 창체, 동아리, 독서, 발표 자료 등을 학생별로
@@ -164,7 +202,7 @@ function TeacherPage({ session }) {
         계정과 자동으로 연결됩니다.
       </p>
 
-      <div style={styles.noticeBox}>
+      <div className="soft-panel" style={styles.noticeBox}>
         <h3 style={styles.noticeTitle}>파일명 자동 인식 예시</h3>
         <p style={styles.text}>10315_김철수_통합사회.pdf → 26-10315@gochon.hs.kr</p>
         <p style={styles.text}>26-10315_김철수.hwp → 26-10315@gochon.hs.kr</p>
@@ -174,7 +212,7 @@ function TeacherPage({ session }) {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} style={styles.form}>
+      <form className="soft-panel" onSubmit={handleSubmit} style={styles.form}>
         <div style={styles.row}>
           <div>
             <label style={styles.label}>학년</label>
@@ -229,8 +267,32 @@ function TeacherPage({ session }) {
           />
         </div>
 
-        <div style={styles.matchBox}>
-          <h3 style={styles.matchTitle}>자동 매칭 결과</h3>
+        <div
+          className={
+            matchStatus === "matched"
+              ? "teacher-match-box teacher-match-box-ok"
+              : "teacher-match-box teacher-match-box-review"
+          }
+          style={{
+            ...styles.matchBox,
+            ...(matchStatus === "matched"
+              ? styles.matchBoxOk
+              : styles.matchBoxReview),
+          }}
+        >
+          <div style={styles.matchHeader}>
+            <h3 style={styles.matchTitle}>자동 매칭 결과</h3>
+            <span
+              style={{
+                ...styles.statusPill,
+                ...(matchStatus === "matched"
+                  ? styles.statusPillOk
+                  : styles.statusPillReview),
+              }}
+            >
+              {getMatchLabel(matchStatus)}
+            </span>
+          </div>
 
           {fileName.trim() ? (
             <>
@@ -242,11 +304,8 @@ function TeacherPage({ session }) {
                 배정될 학생 이메일:{" "}
                 <strong>{matchedStudentEmail || "자동 배정 불가"}</strong>
               </p>
-              <p style={styles.text}>
-                상태:{" "}
-                <strong>
-                  {matchStatus === "matched" ? "자동 매칭" : "확인 필요"}
-                </strong>
+              <p style={styles.smallText}>
+                저장 후 학생은 본인 계정으로 로그인했을 때 이 자료를 볼 수 있게 됩니다.
               </p>
             </>
           ) : (
@@ -278,37 +337,63 @@ function TeacherPage({ session }) {
         {message && <p style={styles.message}>{message}</p>}
 
         <button
+          className="animated-button"
           type="submit"
           disabled={isSubmitting}
           style={{
             ...styles.button,
-            opacity: isSubmitting ? 0.7 : 1,
-            cursor: isSubmitting ? "not-allowed" : "pointer",
+            opacity: isSubmitting ? 0.72 : 1,
+            cursor: isSubmitting ? "wait" : "pointer",
           }}
         >
-          {isSubmitting ? "저장 중..." : "학생 자료 저장"}
+          {isSubmitting ? (
+            <>
+              저장 중
+              <span className="button-dots" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+            </>
+          ) : (
+            "학생 자료 저장"
+          )}
         </button>
       </form>
 
-      <section style={styles.listBox}>
-        <h3 style={styles.subTitle}>내가 제공한 자료</h3>
+      <section className="soft-panel" style={styles.listBox}>
+        <div style={styles.listTitleRow}>
+          <h3 style={styles.subTitle}>내가 제공한 자료</h3>
+          <span style={styles.countBadge}>{sharedFiles.length}개</span>
+        </div>
 
         {isLoadingFiles ? (
-          <p style={styles.text}>자료를 불러오는 중입니다...</p>
+          <div className="skeleton-panel" style={styles.loadingBox}>
+            <div className="mini-spinner" aria-hidden="true" />
+            <p style={styles.text}>자료를 불러오는 중입니다.</p>
+          </div>
         ) : sharedFiles.length === 0 ? (
-          <p style={styles.text}>아직 등록한 자료가 없습니다.</p>
+          <div style={styles.emptyBox}>
+            <p style={styles.text}>아직 등록한 자료가 없습니다.</p>
+            <p style={styles.smallText}>
+              위 입력창에서 파일명과 설명을 저장하면 여기에 카드로 표시됩니다.
+            </p>
+          </div>
         ) : (
           <div style={styles.list}>
             {sharedFiles.map((file) => (
-              <article key={file.id} style={styles.card}>
+              <article className="teacher-card" key={file.id} style={styles.card}>
                 <div style={styles.badgeRow}>
                   <span style={styles.badge}>{file.category}</span>
-                  <span style={styles.badge}>
-                    {file.match_status === "matched"
-                      ? "자동 매칭"
-                      : file.match_status === "needs_review"
-                        ? "확인 필요"
-                        : "미배정"}
+                  <span
+                    style={{
+                      ...styles.badge,
+                      ...(file.match_status === "matched"
+                        ? styles.matchedBadge
+                        : styles.reviewBadge),
+                    }}
+                  >
+                    {getMatchLabel(file.match_status)}
                   </span>
                 </div>
 
@@ -318,10 +403,11 @@ function TeacherPage({ session }) {
                   배정 학생: {file.student_email || "자동 배정 안 됨"}
                 </p>
 
-                <p style={styles.text}>{file.description}</p>
+                <p style={styles.cardDescription}>{file.description}</p>
 
                 {file.file_url && (
                   <a
+                    className="teacher-link"
                     href={file.file_url}
                     target="_blank"
                     rel="noreferrer"
@@ -350,15 +436,34 @@ const styles = {
     borderRadius: "22px",
     padding: "26px",
     backgroundColor: "rgba(255, 255, 255, 0.72)",
+    boxShadow:
+      "0 14px 36px rgba(20, 91, 169, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.74)",
+  },
+  titleRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "16px",
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+  },
+  kicker: {
+    margin: "0 0 6px",
+    color: "#13B9AE",
+    fontSize: "13px",
+    fontWeight: 900,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
   },
   title: {
     marginTop: 0,
+    marginBottom: 0,
     fontSize: "24px",
     color: "#145BA9",
     fontWeight: 900,
   },
   subTitle: {
     marginTop: 0,
+    marginBottom: 0,
     color: "#145BA9",
     fontSize: "20px",
     fontWeight: 900,
@@ -367,6 +472,13 @@ const styles = {
     margin: "8px 0 0",
     color: "#24435f",
     lineHeight: 1.7,
+    fontWeight: 700,
+  },
+  smallText: {
+    margin: "8px 0 0",
+    color: "#64748b",
+    fontSize: "13px",
+    lineHeight: 1.6,
     fontWeight: 700,
   },
   warningText: {
@@ -381,6 +493,7 @@ const styles = {
     borderRadius: "16px",
     padding: "18px",
     backgroundColor: "#fffbeb",
+    boxShadow: "0 12px 28px rgba(180, 83, 9, 0.08)",
   },
   noticeTitle: {
     marginTop: 0,
@@ -412,6 +525,7 @@ const styles = {
     padding: "12px",
     fontSize: "15px",
     backgroundColor: "white",
+    transition: "0.18s ease",
   },
   textarea: {
     width: "100%",
@@ -423,17 +537,48 @@ const styles = {
     lineHeight: 1.6,
     resize: "vertical",
     backgroundColor: "white",
+    transition: "0.18s ease",
   },
   matchBox: {
     border: "1px solid #dbeafe",
     borderRadius: "16px",
     padding: "16px",
     backgroundColor: "white",
+    transition: "0.22s ease",
+  },
+  matchBoxOk: {
+    borderColor: "#bbf7d0",
+    backgroundColor: "#f0fdf4",
+  },
+  matchBoxReview: {
+    borderColor: "#fed7aa",
+    backgroundColor: "#fff7ed",
+  },
+  matchHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "12px",
+    flexWrap: "wrap",
   },
   matchTitle: {
     marginTop: 0,
-    marginBottom: "8px",
+    marginBottom: 0,
     color: "#1e3a8a",
+  },
+  statusPill: {
+    borderRadius: "999px",
+    padding: "6px 10px",
+    fontSize: "12px",
+    fontWeight: 900,
+  },
+  statusPillOk: {
+    backgroundColor: "#dcfce7",
+    color: "#166534",
+  },
+  statusPillReview: {
+    backgroundColor: "#ffedd5",
+    color: "#9a3412",
   },
   button: {
     border: "none",
@@ -443,6 +588,18 @@ const styles = {
     color: "white",
     fontWeight: 900,
     fontSize: "15px",
+    boxShadow: "0 14px 26px rgba(20, 91, 169, 0.18)",
+  },
+  refreshButton: {
+    border: "1px solid rgba(154, 223, 226, 0.88)",
+    borderRadius: "999px",
+    padding: "11px 14px",
+    backgroundColor: "rgba(255, 255, 255, 0.86)",
+    color: "#145BA9",
+    fontWeight: 900,
+    cursor: "pointer",
+    fontSize: "13px",
+    boxShadow: "0 12px 26px rgba(20, 91, 169, 0.12)",
   },
   message: {
     marginTop: "4px",
@@ -452,6 +609,33 @@ const styles = {
   },
   listBox: {
     marginTop: "28px",
+  },
+  listTitleRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    flexWrap: "wrap",
+    marginBottom: "14px",
+  },
+  countBadge: {
+    borderRadius: "999px",
+    padding: "5px 10px",
+    backgroundColor: "#e0f2fe",
+    color: "#0369a1",
+    fontSize: "13px",
+    fontWeight: 900,
+  },
+  loadingBox: {
+    border: "1px solid rgba(154, 223, 226, 0.72)",
+    borderRadius: "16px",
+    padding: "18px",
+    backgroundColor: "rgba(255, 255, 255, 0.75)",
+  },
+  emptyBox: {
+    border: "1px dashed rgba(20, 91, 169, 0.24)",
+    borderRadius: "16px",
+    padding: "18px",
+    backgroundColor: "rgba(238, 248, 251, 0.74)",
   },
   list: {
     display: "flex",
@@ -463,6 +647,7 @@ const styles = {
     borderRadius: "18px",
     padding: "18px",
     backgroundColor: "rgba(255, 255, 255, 0.9)",
+    boxShadow: "0 12px 30px rgba(20, 91, 169, 0.08)",
   },
   badgeRow: {
     display: "flex",
@@ -477,11 +662,26 @@ const styles = {
     color: "#334155",
     fontWeight: 800,
   },
+  matchedBadge: {
+    backgroundColor: "#dcfce7",
+    color: "#166534",
+  },
+  reviewBadge: {
+    backgroundColor: "#ffedd5",
+    color: "#9a3412",
+  },
   cardTitle: {
     marginBottom: 0,
     fontSize: "17px",
     color: "#145BA9",
     fontWeight: 900,
+  },
+  cardDescription: {
+    margin: "10px 0 0",
+    color: "#334155",
+    lineHeight: 1.7,
+    fontWeight: 700,
+    whiteSpace: "pre-wrap",
   },
   link: {
     display: "inline-block",
