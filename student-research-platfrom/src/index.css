@@ -691,3 +691,30 @@ code {
   }
 }
 
+.ai-analysis-panel,
+.grade-setup-panel {
+  animation: softRise 0.5s ease both;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #145ba9;
+  box-shadow: 0 0 0 4px rgba(20, 91, 169, 0.12);
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  input:focus,
+  select:focus,
+  textarea:focus {
+    transform: none;
+    box-shadow: 0 0 0 2px rgba(20, 91, 169, 0.2);
+  }
+
+  .ai-analysis-panel,
+  .grade-setup-panel {
+    animation: none !important;
+  }
+}
+

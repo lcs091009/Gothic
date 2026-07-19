@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-function AiAnalysisPage({ academicProfile, records, onBack }) {
+function AiAnalysisPage({ academicProfile, records, teacherSharedFiles = [], onBack }) {
   const [analysis, setAnalysis] = useState("");
   const [message, setMessage] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -31,6 +31,7 @@ function AiAnalysisPage({ academicProfile, records, onBack }) {
         body: JSON.stringify({
           academicProfile,
           records,
+          teacherSharedFiles,
           extraContext,
         }),
       });
@@ -64,8 +65,8 @@ function AiAnalysisPage({ academicProfile, records, onBack }) {
   const selectedChoices = academicProfile?.selected_choices || {};
 
   return (
-    <section style={styles.page}>
-      <button type="button" onClick={onBack} style={styles.backButton}>
+    <section className="soft-panel ai-analysis-panel" style={styles.page}>
+      <button className="animated-button" type="button" onClick={onBack} style={styles.backButton}>
         ← 활동 기록 화면으로 돌아가기
       </button>
 
@@ -126,6 +127,26 @@ function AiAnalysisPage({ academicProfile, records, onBack }) {
         )}
       </div>
 
+      <div style={styles.subjectBox}>
+        <h3 style={styles.infoTitle}>선생님 제공 자료 요약</h3>
+
+        {!teacherSharedFiles || teacherSharedFiles.length === 0 ? (
+          <p style={styles.text}>아직 연결된 선생님 제공 자료가 없습니다.</p>
+        ) : (
+          <div style={styles.choiceList}>
+            {teacherSharedFiles.map((file) => (
+              <div key={file.id} style={styles.choiceItem}>
+                <strong style={styles.groupId}>{file.category || "자료"}</strong>
+                <span style={styles.text}>
+                  {file.file_name}
+                  {file.description ? ` - ${file.description}` : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div style={styles.extraBox}>
         <h3 style={styles.infoTitle}>업로드하지 못한 활동 보충 입력</h3>
 
@@ -149,16 +170,28 @@ function AiAnalysisPage({ academicProfile, records, onBack }) {
       {message && <p style={styles.message}>{message}</p>}
 
       <button
+        className="animated-button"
         type="button"
         onClick={handleAnalyze}
         disabled={isAnalyzing}
         style={{
           ...styles.analyzeButton,
-          opacity: isAnalyzing ? 0.7 : 1,
-          cursor: isAnalyzing ? "not-allowed" : "pointer",
+          opacity: isAnalyzing ? 0.72 : 1,
+          cursor: isAnalyzing ? "wait" : "pointer",
         }}
       >
-        {isAnalyzing ? "활동 흐름을 분석 중입니다..." : "작년 활동과 현재 과목 연결점 찾기"}
+        {isAnalyzing ? (
+          <>
+            활동 흐름 분석 중
+            <span className="button-dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          </>
+        ) : (
+          "작년 활동과 현재 과목 연결점 찾기"
+        )}
       </button>
 
       {analysis && (

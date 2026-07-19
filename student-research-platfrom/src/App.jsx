@@ -28,6 +28,8 @@ function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [records, setRecords] = useState([]);
+  const [teacherSharedFiles, setTeacherSharedFiles] = useState([]);
+  const [isLoadingTeacherSharedFiles, setIsLoadingTeacherSharedFiles] = useState(false);
 
   const [grade, setGrade] = useState("1학년");
   const [semester, setSemester] = useState("1학기");
@@ -67,6 +69,7 @@ function App() {
           await ensureProfile(data.session.user);
           await loadAcademicProfile(data.session.user.id);
           await loadResearchRecords(data.session.user.id);
+          await loadTeacherSharedFiles(data.session.user.email);
         }
       } catch (error) {
         setMessage(getFriendlySupabaseError(error));
@@ -90,12 +93,14 @@ function App() {
             await ensureProfile(newSession.user);
             await loadAcademicProfile(newSession.user.id);
             await loadResearchRecords(newSession.user.id);
+            await loadTeacherSharedFiles(newSession.user.email);
           } catch (error) {
             setMessage(getFriendlySupabaseError(error));
           }
         } else {
           setProfile(null);
           setRecords([]);
+          setTeacherSharedFiles([]);
         }
 
         setIsLoading(false);
@@ -214,6 +219,40 @@ function App() {
     setRecords(data || []);
   }
 
+  async function loadTeacherSharedFiles(userEmail) {
+    if (!isSupabaseConfigured()) {
+      return;
+    }
+
+    if (!userEmail) {
+      setTeacherSharedFiles([]);
+      return;
+    }
+
+    setIsLoadingTeacherSharedFiles(true);
+
+    try {
+      const { data, error } = await withRetry(() =>
+        supabase
+          .from("teacher_shared_files")
+          .select("*")
+          .eq("student_email", userEmail)
+          .order("created_at", { ascending: false })
+      );
+
+      if (error) {
+        setMessage(getFriendlySupabaseError(error));
+        return;
+      }
+
+      setTeacherSharedFiles(data || []);
+    } catch (error) {
+      setMessage(getFriendlySupabaseError(error));
+    } finally {
+      setIsLoadingTeacherSharedFiles(false);
+    }
+  }
+
   async function loadAcademicProfile(userId) {
     if (!isSupabaseConfigured()) {
       return;
@@ -277,6 +316,7 @@ function App() {
     setSession(null);
     setProfile(null);
     setRecords([]);
+    setTeacherSharedFiles([]);
     setAcademicProfile(null);
     setCurrentPage("home");
     setMessage("");
@@ -695,6 +735,7 @@ async function handleDeleteResearchRecord(recordId) {
           <AiAnalysisPage
             academicProfile={academicProfile}
             records={records}
+            teacherSharedFiles={teacherSharedFiles}
             onBack={() => setCurrentPage("home")}
           />
         )}
@@ -916,6 +957,90 @@ async function handleDeleteResearchRecord(recordId) {
                           "활동 기록 삭제"
                         )}
                       </button>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="soft-panel" style={styles.box}>
+              <div style={styles.sharedFileTitleRow}>
+                <div>
+                  <h2 style={styles.subTitle}>선생님이 제공한 내 자료</h2>
+                  <p style={styles.text}>
+                    선생님이 파일명과 학번을 기준으로 연결한 자료입니다. 내가 직접 등록한
+                    활동 기록과는 구분해서 확인하세요.
+                  </p>
+                </div>
+
+                <button
+                  className="animated-button"
+                  type="button"
+                  onClick={() => loadTeacherSharedFiles(session.user.email)}
+                  disabled={isLoadingTeacherSharedFiles}
+                  style={styles.headerButton}
+                >
+                  {isLoadingTeacherSharedFiles ? (
+                    <>
+                      새로고침 중
+                      <span className="button-dots" aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                    </>
+                  ) : (
+                    "자료 새로고침"
+                  )}
+                </button>
+              </div>
+
+              {isLoadingTeacherSharedFiles ? (
+                <div className="skeleton-panel" style={styles.teacherSharedLoadingBox}>
+                  <div className="mini-spinner" aria-hidden="true" />
+                  <p style={styles.text}>선생님 제공 자료를 불러오는 중입니다.</p>
+                </div>
+              ) : teacherSharedFiles.length === 0 ? (
+                <div style={styles.emptySharedFileBox}>
+                  <p style={styles.text}>아직 선생님이 제공한 자료가 없습니다.</p>
+                  <p style={styles.smallText}>
+                    선생님이 학번이 포함된 파일명으로 자료를 등록하면 여기에 표시됩니다.
+                  </p>
+                </div>
+              ) : (
+                <div style={styles.recordList}>
+                  {teacherSharedFiles.map((file) => (
+                    <article className="teacher-card" key={file.id} style={styles.recordCard}>
+                      <div style={styles.badgeRow}>
+                        <span style={styles.badge}>{file.category || "기타"}</span>
+                        <span style={styles.badge}>
+                          {file.match_status === "matched" ? "자동 매칭" : "확인 필요"}
+                        </span>
+                      </div>
+
+                      <h3 style={styles.recordTitle}>{file.file_name}</h3>
+
+                      <p style={styles.recordContent}>{file.description}</p>
+
+                      <p style={styles.fileNameText}>
+                        제공한 선생님: {file.teacher_email || "알 수 없음"}
+                      </p>
+
+                      {file.file_url && (
+                        <a
+                          href={file.file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="teacher-link"
+                          style={styles.link}
+                        >
+                          선생님 제공 파일 열기
+                        </a>
+                      )}
+
+                      <p style={styles.dateText}>
+                        등록 시간: {new Date(file.created_at).toLocaleString("ko-KR")}
+                      </p>
                     </article>
                   ))}
                 </div>

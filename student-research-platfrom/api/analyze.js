@@ -14,7 +14,12 @@ export default async function handler(request, response) {
   }
 
   try {
-    const { academicProfile, records, extraContext } = request.body || {};
+    const {
+      academicProfile,
+      records,
+      teacherSharedFiles = [],
+      extraContext,
+    } = request.body || {};
 
     if (!academicProfile) {
       return response.status(400).json({
@@ -38,6 +43,17 @@ export default async function handler(request, response) {
       driveFileUrl: record.drive_file_url || "",
     }));
 
+    const safeTeacherSharedFiles = Array.isArray(teacherSharedFiles)
+      ? teacherSharedFiles.slice(0, 5).map((file) => ({
+          fileName: file.file_name || "",
+          category: file.category || "",
+          description: String(file.description || "").slice(0, 600),
+          teacherEmail: file.teacher_email || "",
+          fileUrl: file.file_url || "",
+          matchStatus: file.match_status || "",
+        }))
+      : [];
+
     const safeExtraContext = String(extraContext || "").slice(0, 1200);
 
     const prompt = `
@@ -56,6 +72,9 @@ export default async function handler(request, response) {
 9. 업로드된 활동 기록과 학생이 직접 보충 입력한 내용을 구분해서 분석한다.
 10. 보충 입력에만 있는 내용은 확정적으로 말하지 말고 "학생 보충 입력에 따르면"이라고 표현한다.
 11. 자료가 부족하면 부족하다고 말하고, 추가로 입력하면 좋은 정보를 제안한다.
+12. 선생님 제공 자료는 학생이 직접 작성한 활동 기록이 아니라 참고 자료로만 다룬다.
+13. 선생님 제공 자료를 근거로 말할 때는 '선생님 제공 자료에 따르면'이라고 구분해서 표현한다.
+14. 학생 활동 기록, 학생 보충 입력, 선생님 제공 자료를 섞어서 확정적으로 말하지 않는다.
 
 학생 정보:
 - 현재 학년: ${academicProfile.current_grade || academicProfile.grade || "알 수 없음"}
@@ -71,11 +90,15 @@ ${JSON.stringify(safeRecords, null, 2)}
 학생 보충 입력:
 ${safeExtraContext || "보충 입력 없음"}
 
+선생님 제공 자료:
+${safeTeacherSharedFiles.length > 0 ? JSON.stringify(safeTeacherSharedFiles, null, 2) : "없음"}
+
 출력 형식:
 
 [1. 자료 완성도 점검]
 - 업로드된 기록으로 확인되는 내용:
 - 학생 보충 입력으로 확인되는 내용:
+- 선생님 제공 자료:
 - 아직 부족한 정보:
 - 추가로 입력하면 좋은 정보:
 

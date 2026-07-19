@@ -188,7 +188,7 @@ function GradeSetup({ session, existingAcademicProfile, onSaved }) {
   }
 
   return (
-    <section style={styles.card}>
+    <section className="soft-panel grade-setup-panel" style={styles.card}>
       <h2 style={styles.title}>학년 및 선택과목 설정</h2>
 
       <p style={styles.text}>
@@ -239,12 +239,24 @@ function GradeSetup({ session, existingAcademicProfile, onSaved }) {
       {message && <p style={styles.message}>{message}</p>}
 
       <button
+        className="animated-button"
         type="button"
         onClick={handleSave}
         disabled={isSaving}
         style={styles.saveButton}
       >
-        {isSaving ? "저장 중..." : "선택과목 저장하고 계속하기"}
+        {isSaving ? (
+          <>
+            저장 중
+            <span className="button-dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          </>
+        ) : (
+          "선택과목 저장하고 계속하기"
+        )}
       </button>
     </section>
   );
