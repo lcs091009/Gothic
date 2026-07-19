@@ -48,6 +48,8 @@ function App() {
   const [isLogoutHovered, setIsLogoutHovered] = useState(false);
   const [academicProfile, setAcademicProfile] = useState(null);
   const [isAcademicProfileLoading, setIsAcademicProfileLoading] = useState(false);
+  const [isUploadDragging, setIsUploadDragging] = useState(false);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
 
   useEffect(() => {
     async function initAuth() {
@@ -376,6 +378,30 @@ if (!googleClientId) {
   }
 }
 
+function handleUploadDragOver(event) {
+  event.preventDefault();
+  setIsUploadDragging(true);
+}
+
+function handleUploadDragLeave(event) {
+  event.preventDefault();
+
+  if (!event.currentTarget.contains(event.relatedTarget)) {
+    setIsUploadDragging(false);
+  }
+}
+
+function handleUploadDrop(event) {
+  event.preventDefault();
+  setIsUploadDragging(false);
+
+  setMessage(
+    "파일을 이 영역에 놓았습니다. 보안을 위해 Google Drive Picker에서 파일을 선택하거나 업로드해 주세요."
+  );
+
+  openGooglePicker();
+}
+
   async function handleSubmitResearchRecord(event) {
     event.preventDefault();
     setMessage("");
@@ -482,8 +508,15 @@ async function handleDeleteResearchRecord(recordId) {
   if (isLoading) {
     return (
       <main style={styles.page}>
-        <section style={styles.card}>
-          <h1>불러오는 중...</h1>
+        <section className="dashboard-card loading-card" style={styles.card}>
+          <div className="loading-orb" aria-hidden="true" />
+          <h1 style={styles.title}>활동 연결 노트</h1>
+          <p style={styles.text}>로그인 상태와 활동 기록을 불러오는 중입니다.</p>
+          <div className="loading-dots" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
         </section>
       </main>
     );
@@ -545,7 +578,11 @@ async function handleDeleteResearchRecord(recordId) {
 
         <header style={styles.landingHeader}>
           <p style={styles.brand}>활동 연결 노트</p>
-          <button onClick={signInWithGoogle} style={styles.loginButton}>
+          <button
+            className="animated-button"
+            onClick={signInWithGoogle}
+            style={styles.loginButton}
+          >
             로그인
           </button>
         </header>
@@ -635,8 +672,9 @@ async function handleDeleteResearchRecord(recordId) {
         </div>
 
         {profile?.role === "student" && isAcademicProfileLoading && (
-          <section style={styles.box}>
-            <p style={styles.text}>선택과목 정보를 불러오는 중입니다...</p>
+          <section className="soft-panel skeleton-panel" style={styles.box}>
+            <div className="mini-spinner" aria-hidden="true" />
+            <p style={styles.text}>선택과목 정보를 불러오는 중입니다.</p>
           </section>
         )}
 
@@ -733,12 +771,27 @@ async function handleDeleteResearchRecord(recordId) {
                   />
                 </div>
 
-                <div style={styles.driveUploadBox}>
+                <div
+                  className={`upload-drop-zone ${
+                    isUploadDragging ? "upload-drop-zone-active" : ""
+                  }`}
+                  style={{
+                    ...styles.driveUploadBox,
+                    ...(isUploadDragging ? styles.driveUploadBoxActive : {}),
+                  }}
+                  onDragOver={handleUploadDragOver}
+                  onDragLeave={handleUploadDragLeave}
+                  onDrop={handleUploadDrop}
+                >
+                  <div className="upload-icon-bubble" aria-hidden="true">
+                    ↑
+                  </div>
+
                   <label style={styles.label}>Google Drive 파일 선택/업로드</label>
 
                   <p style={styles.smallText}>
-                    버튼을 누르면 Google Picker가 열립니다. 기존 Drive 파일을 선택하거나
-                    새 파일을 Drive에 업로드한 뒤 선택할 수 있습니다.
+                    버튼을 누르거나 파일을 이 영역 위에 끌어다 놓으면 Google Picker가 열립니다.
+                    기존 Drive 파일을 선택하거나 새 파일을 Drive에 업로드한 뒤 선택할 수 있습니다.
                   </p>
 
                   <button
@@ -748,7 +801,18 @@ async function handleDeleteResearchRecord(recordId) {
                     disabled={isPickerLoading}
                     style={styles.driveButton}
                   >
-                    {isPickerLoading ? "Google Picker 여는 중..." : "Google Drive에서 파일 선택/업로드"}
+                    {isPickerLoading ? (
+                      <>
+                        Google Picker 여는 중
+                        <span className="button-dots" aria-hidden="true">
+                          <span />
+                          <span />
+                          <span />
+                        </span>
+                      </>
+                    ) : (
+                      "Google Drive에서 파일 선택/업로드"
+                    )}
                   </button>
 
                   {driveFileName && (
@@ -775,7 +839,18 @@ async function handleDeleteResearchRecord(recordId) {
                   disabled={isSubmitting}
                   style={styles.button}
                 >
-                  {isSubmitting ? "저장 중..." : "활동 기록 저장"}
+                  {isSubmitting ? (
+                    <>
+                      저장 중
+                      <span className="button-dots" aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                    </>
+                  ) : (
+                    "활동 기록 저장"
+                  )}
                 </button>
               </form>
             </section>
@@ -822,14 +897,24 @@ async function handleDeleteResearchRecord(recordId) {
                       </p>
 
                       <button
+                        className="delete-button"
                         type="button"
                         onClick={() => handleDeleteResearchRecord(record.id)}
                         disabled={deletingRecordId === record.id}
                         style={styles.deleteButton}
                       >
-                        {deletingRecordId === record.id
-                          ? "삭제 중..."
-                          : "활동 기록 삭제"}
+                        {deletingRecordId === record.id ? (
+                          <>
+                            삭제 중
+                            <span className="button-dots" aria-hidden="true">
+                              <span />
+                              <span />
+                              <span />
+                            </span>
+                          </>
+                        ) : (
+                          "활동 기록 삭제"
+                        )}
                       </button>
                     </article>
                   ))}
@@ -1163,6 +1248,16 @@ const styles = {
     backgroundColor: "rgba(238, 248, 251, 0.88)",
     boxShadow:
       "0 18px 40px rgba(20, 91, 169, 0.08), inset 0 1px 18px rgba(255, 255, 255, 0.74)",
+    transition: "0.22s ease",
+    position: "relative",
+    overflow: "hidden",
+  },
+  driveUploadBoxActive: {
+    border: "2px solid #145BA9",
+    backgroundColor: "rgba(219, 244, 255, 0.95)",
+    transform: "translateY(-2px)",
+    boxShadow:
+      "0 24px 54px rgba(20, 91, 169, 0.16), inset 0 1px 18px rgba(255, 255, 255, 0.82)",
   },
   selectedFileBox: {
     marginTop: "18px",
