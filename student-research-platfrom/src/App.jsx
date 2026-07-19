@@ -1,6 +1,7 @@
 import GradeSetup from "./components/GradeSetup";
+import TeacherPage from "./components/TeacherPage";
 import AiAnalysisPage from "./components/AiAnalysisPage";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getFriendlySupabaseError,
   isSupabaseConfigured,
@@ -8,7 +9,6 @@ import {
   supabaseConfigError,
   withRetry,
 } from "./lib/supabaseClient";
-import { getGooglePickerConfigError } from "./lib/googlePickerConfig";
 
 function getStudentNumber(email) {
   const match = email.match(/^26-(\d+)@gochon\.hs\.kr$/);
@@ -43,6 +43,7 @@ function App() {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const pageRef = useRef(null);
   const [currentPage, setCurrentPage] = useState("home");
   const [isLogoutHovered, setIsLogoutHovered] = useState(false);
   const [academicProfile, setAcademicProfile] = useState(null);
@@ -103,6 +104,42 @@ function App() {
       listener.subscription.unsubscribe();
     };
   }, []);
+
+
+  useEffect(() => {
+    const pageElement = pageRef.current;
+
+    if (
+      !pageElement ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      !window.matchMedia("(pointer: fine)").matches
+    ) {
+      return;
+    }
+
+    let animationFrameId = 0;
+
+    function handlePointerMove(event) {
+      if (animationFrameId) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+
+      animationFrameId = window.requestAnimationFrame(() => {
+        pageElement.style.setProperty("--pointer-x", `${event.clientX}px`);
+        pageElement.style.setProperty("--pointer-y", `${event.clientY}px`);
+      });
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+
+      if (animationFrameId) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [session]);
 
   async function ensureProfile(user) {
     if (!isSupabaseConfigured()) {
@@ -239,6 +276,7 @@ function App() {
     setProfile(null);
     setRecords([]);
     setAcademicProfile(null);
+    setCurrentPage("home");
     setMessage("");
   }
 function loadScript(src) {
@@ -353,7 +391,7 @@ if (!googleClientId) {
     }
 
     if (!subject.trim() || !title.trim() || !content.trim()) {
-      setMessage("과목, 탐구 제목, 탐구 내용은 반드시 입력해야 합니다.");
+      setMessage("과목, 활동 제목, 탐구 내용은 반드시 입력해야 합니다.");
       return;
     }
 
@@ -380,7 +418,7 @@ if (!googleClientId) {
         return;
       }
 
-      setMessage("탐구 기록이 저장되었습니다.");
+      setMessage("활동 기록이 저장되었습니다.");
       setSubject("");
       setTitle("");
       setContent("");
@@ -409,7 +447,7 @@ async function handleDeleteResearchRecord(recordId) {
   }
 
   const shouldDelete = window.confirm(
-    "이 탐구 기록을 삭제할까요? 삭제한 기록은 되돌릴 수 없습니다."
+    "이 활동 기록을 삭제할까요? 삭제한 기록은 되돌릴 수 없습니다."
   );
 
   if (!shouldDelete) {
@@ -432,7 +470,7 @@ async function handleDeleteResearchRecord(recordId) {
       return;
     }
 
-    setMessage("탐구 기록이 삭제되었습니다.");
+    setMessage("활동 기록이 삭제되었습니다.");
     await loadResearchRecords(session.user.id);
   } catch (error) {
     setMessage(getFriendlySupabaseError(error));
@@ -455,7 +493,7 @@ async function handleDeleteResearchRecord(recordId) {
     return (
       <main style={styles.page}>
         <section style={styles.card}>
-          <h1 style={styles.title}>학생 탐구 추천 플랫폼</h1>
+          <h1 style={styles.title}>활동 연결 노트</h1>
 
           <p style={styles.message}>{supabaseConfigError}</p>
         </section>
@@ -506,7 +544,7 @@ async function handleDeleteResearchRecord(recordId) {
         </div>
 
         <header style={styles.landingHeader}>
-          <p style={styles.brand}>학생 탐구 추천 플랫폼</p>
+          <p style={styles.brand}>활동 연결 노트</p>
           <button onClick={signInWithGoogle} style={styles.loginButton}>
             로그인
           </button>
@@ -515,18 +553,18 @@ async function handleDeleteResearchRecord(recordId) {
         <section style={styles.centerStage}>
           <img
             src="/research-logo.svg"
-            alt="학생 탐구 추천 플랫폼 로고"
+            alt="활동 연결 노트 로고"
             style={styles.heroLogo}
           />
 
           <div style={styles.introBox}>
-            <p style={styles.kicker}>생활기록부 기반 탐구 추천</p>
-            <h1 style={styles.heroTitle}>학생 탐구 추천 플랫폼</h1>
+            <p style={styles.kicker}>작년 활동 기반 과목 연결</p>
+            <h1 style={styles.heroTitle}>활동 연결 노트</h1>
 
             <p style={styles.heroText}>
-              여러분들의 생활 기록부를 더 체계적으로 관리하기 위해 여러분들의
-              이전 탐구 활동 내용을 바탕으로 여러분들이 앞으로 할 탐구의
-              방향성을 잡아드립니다!
+              작년 활동과 현재 선택과목을 연결해 다음 활동 방향을 정리합니다.
+              생기부나 보고서를 대신 작성하지 않고, 학생이 스스로 과목 안에서
+              이어갈 활동을 설계하도록 돕습니다.
             </p>
 
             {message && <p style={styles.message}>{message}</p>}
@@ -548,9 +586,9 @@ async function handleDeleteResearchRecord(recordId) {
             </article>
 
             <article style={styles.landingFeatureCard}>
-              <strong style={styles.landingFeatureTitle}>방향 추천</strong>
+              <strong style={styles.landingFeatureTitle}>연결 점검</strong>
               <span style={styles.landingFeatureText}>
-                다음 탐구 주제를 더 자연스럽게 이어갑니다.
+                현재 과목의 정체성이 드러나는 활동 방향을 점검합니다.
               </span>
             </article>
           </div>
@@ -560,25 +598,27 @@ async function handleDeleteResearchRecord(recordId) {
   }
 
   return (
-    <main style={styles.page}>
-      <section style={styles.card}>
+    <main ref={pageRef} className="dashboard-page" style={styles.page}>
+      <section className="dashboard-card" style={styles.card}>
         <div style={styles.header}>
           <div>
-            <h1 style={styles.title}>학생 탐구 추천 플랫폼</h1>
+            <h1 style={styles.title}>활동 연결 노트</h1>
             <p style={styles.text}>로그인 계정: {session.user.email}</p>
             <p style={styles.text}>역할: {profile?.role || "확인 중"}</p>
           </div>
 
           <div style={styles.headerActions}>
             <button
+              className="animated-button"
               type="button"
               onClick={() => setCurrentPage("ai")}
               style={styles.headerButton}
             >
-              AI 분석 결과 보기
+              활동 흐름 분석하기
             </button>
 
             <button
+              className="animated-button"
               type="button"
               onClick={signOut}
               onMouseEnter={() => setIsLogoutHovered(true)}
@@ -625,12 +665,12 @@ async function handleDeleteResearchRecord(recordId) {
           currentPage === "home" && (
           <>
             <section style={styles.box}>
-              <h2 style={styles.subTitle}>탐구 기록 등록</h2>
+              <h2 style={styles.subTitle}>활동 기록 등록</h2>
 
               <p style={styles.text}>
-                1학년 또는 지난 학기에 했던 수행평가·탐구 활동을 과목별로
-                등록하세요. 나중에 AI가 이 내용을 바탕으로 추가 탐구 주제를
-                추천합니다.
+                지난 학기나 작년에 했던 수행평가·발표·탐구·독서·동아리 활동을
+                과목별로 등록하세요. 이후 활동 흐름 분석에서 현재 선택과목과
+                연결 가능한 다음 활동 방향을 정리할 수 있습니다.
               </p>
 
               <form onSubmit={handleSubmitResearchRecord} style={styles.form}>
@@ -673,7 +713,7 @@ async function handleDeleteResearchRecord(recordId) {
                 </div>
 
                 <div>
-                  <label style={styles.label}>탐구 제목</label>
+                  <label style={styles.label}>활동 제목</label>
                   <input
                     value={title}
                     onChange={(event) => setTitle(event.target.value)}
@@ -683,11 +723,11 @@ async function handleDeleteResearchRecord(recordId) {
                 </div>
 
                 <div>
-                  <label style={styles.label}>탐구 내용 요약</label>
+                  <label style={styles.label}>활동 내용 요약</label>
                   <textarea
                     value={content}
                     onChange={(event) => setContent(event.target.value)}
-                    placeholder="무엇을 탐구했는지, 어떤 자료를 사용했는지, 결과가 어땠는지 자세히 적어 주세요."
+                    placeholder="무엇을 했는지, 어떤 과목 개념과 연결되었는지, 알게 된 점, 아쉬웠던 점, 새로 생긴 궁금증을 함께 적어 주세요."
                     rows={7}
                     style={styles.textarea}
                   />
@@ -702,6 +742,7 @@ async function handleDeleteResearchRecord(recordId) {
                   </p>
 
                   <button
+                    className="animated-button"
                     type="button"
                     onClick={openGooglePicker}
                     disabled={isPickerLoading}
@@ -729,20 +770,21 @@ async function handleDeleteResearchRecord(recordId) {
                 </div>
 
                 <button
+                  className="animated-button"
                   type="submit"
                   disabled={isSubmitting}
                   style={styles.button}
                 >
-                  {isSubmitting ? "저장 중..." : "탐구 기록 저장"}
+                  {isSubmitting ? "저장 중..." : "활동 기록 저장"}
                 </button>
               </form>
             </section>
 
             <section style={styles.box}>
-              <h2 style={styles.subTitle}>내 탐구 기록</h2>
+              <h2 style={styles.subTitle}>내 활동 기록</h2>
 
               {records.length === 0 ? (
-                <p style={styles.text}>아직 저장된 탐구 기록이 없습니다.</p>
+                <p style={styles.text}>아직 저장된 활동 기록이 없습니다.</p>
               ) : (
                 <div style={styles.recordList}>
                   {records.map((record) => (
@@ -787,7 +829,7 @@ async function handleDeleteResearchRecord(recordId) {
                       >
                         {deletingRecordId === record.id
                           ? "삭제 중..."
-                          : "탐구 기록 삭제"}
+                          : "활동 기록 삭제"}
                       </button>
                     </article>
                   ))}
@@ -808,12 +850,7 @@ async function handleDeleteResearchRecord(recordId) {
         )}
 
         {profile?.role === "teacher" && (
-          <section style={styles.box}>
-            <h2 style={styles.subTitle}>선생님 계정</h2>
-            <p style={styles.text}>
-              선생님 기능은 다음 단계에서 따로 만들 예정입니다.
-            </p>
-          </section>
+          <TeacherPage session={session} />
         )}
 
         {message && <p style={styles.message}>{message}</p>}
@@ -983,18 +1020,31 @@ const styles = {
   },
   page: {
     minHeight: "100vh",
-    backgroundColor: "#f8fafc",
-    padding: "40px 20px",
+    backgroundColor: "#eef8fb",
+    backgroundImage:
+      "radial-gradient(circle at var(--pointer-x, 50%) var(--pointer-y, 28%), rgba(37, 99, 235, 0.08) 0 110px, transparent 260px), linear-gradient(rgba(0, 90, 160, 0.055) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 90, 160, 0.055) 1px, transparent 1px), linear-gradient(180deg, #e8f6fc 0%, #f8fcff 100%)",
+    backgroundSize: "auto, 36px 36px, 36px 36px, auto",
+    backgroundRepeat: "no-repeat, repeat, repeat, no-repeat",
+    backgroundPosition: "0 0, 0 0, 0 0, 0 0",
+    padding: "48px 24px",
+    boxSizing: "border-box",
     fontFamily:
       "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    color: "#18324a",
+    overflowX: "hidden",
+    position: "relative",
+    isolation: "isolate",
   },
   card: {
-    maxWidth: "900px",
+    maxWidth: "960px",
     margin: "0 auto",
-    backgroundColor: "white",
-    borderRadius: "20px",
-    padding: "32px",
-    boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
+    backgroundColor: "rgba(255, 255, 255, 0.94)",
+    border: "1px solid rgba(255, 255, 255, 0.86)",
+    borderRadius: "28px",
+    padding: "36px",
+    boxShadow:
+      "0 28px 70px rgba(20, 91, 169, 0.14), 0 8px 22px rgba(19, 185, 174, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9)",
+    backdropFilter: "blur(10px)",
   },
   header: {
     display: "flex",
@@ -1003,20 +1053,21 @@ const styles = {
     alignItems: "flex-start",
   },
   headerActions: {
-  display: "flex",
-  gap: "10px",
-  alignItems: "center",
-  flexWrap: "wrap",
+    display: "flex",
+    gap: "10px",
+    alignItems: "center",
+    flexWrap: "wrap",
   },
   headerButton: {
-    border: "1px solid #cbd5e1",
-    borderRadius: "12px",
+    border: "1px solid rgba(154, 223, 226, 0.88)",
+    borderRadius: "999px",
     padding: "12px 16px",
-    backgroundColor: "white",
-    color: "#334155",
-    fontWeight: 700,
+    backgroundColor: "rgba(255, 255, 255, 0.86)",
+    color: "#145BA9",
+    fontWeight: 900,
     cursor: "pointer",
     fontSize: "14px",
+    boxShadow: "0 12px 26px rgba(20, 91, 169, 0.12)",
   },
   logoutButton: {
     transition: "0.15s ease",
@@ -1026,33 +1077,23 @@ const styles = {
     backgroundColor: "#dc2626",
     color: "white",
   },
-  aiPage: {
-    marginTop: "28px",
-    border: "1px solid #bfdbfe",
-    borderRadius: "16px",
-    padding: "24px",
-    backgroundColor: "#eff6ff",
-  },
-  aiInfoBox: {
-    marginTop: "16px",
-    borderRadius: "14px",
-    padding: "16px",
-    backgroundColor: "white",
-    border: "1px solid #dbeafe",
-  },
   title: {
     margin: 0,
-    fontSize: "28px",
-    color: "#0f172a",
+    fontSize: "30px",
+    color: "#145BA9",
+    fontWeight: 900,
   },
   subTitle: {
     marginTop: 0,
-    fontSize: "22px",
-    color: "#0f172a",
+    fontSize: "24px",
+    color: "#145BA9",
+    fontWeight: 900,
   },
   text: {
-    color: "#475569",
+    margin: "8px 0 0",
+    color: "#24435f",
     lineHeight: 1.7,
+    fontWeight: 700,
   },
   smallText: {
     marginTop: "8px",
@@ -1062,21 +1103,25 @@ const styles = {
   },
   button: {
     border: "none",
-    borderRadius: "12px",
-    padding: "14px 18px",
-    backgroundColor: "#0f172a",
+    borderRadius: "14px",
+    padding: "16px 20px",
+    backgroundColor: "#145BA9",
     color: "white",
-    fontWeight: 700,
+    fontWeight: 900,
+    fontSize: "15px",
     cursor: "pointer",
+    boxShadow: "0 14px 26px rgba(20, 91, 169, 0.18)",
   },
   secondaryButton: {
-    border: "1px solid #cbd5e1",
-    borderRadius: "12px",
+    alignSelf: "center",
+    border: "1px solid rgba(20, 91, 169, 0.18)",
+    borderRadius: "999px",
     padding: "12px 16px",
-    backgroundColor: "white",
-    color: "#334155",
-    fontWeight: 700,
+    backgroundColor: "#145BA9",
+    color: "white",
+    fontWeight: 900,
     cursor: "pointer",
+    boxShadow: "0 12px 24px rgba(20, 91, 169, 0.18)",
   },
   deleteButton: {
     marginTop: "16px",
@@ -1089,34 +1134,43 @@ const styles = {
     cursor: "pointer",
   },
   driveButton: {
+    marginTop: "18px",
     marginBottom: "12px",
     border: "none",
-    borderRadius: "12px",
-    padding: "12px 16px",
-    backgroundColor: "#2563eb",
+    borderRadius: "14px",
+    padding: "15px 20px",
+    backgroundColor: "#256fb8",
     color: "white",
-    fontWeight: 700,
+    fontWeight: 900,
+    fontSize: "15px",
     cursor: "pointer",
+    boxShadow: "0 14px 26px rgba(20, 91, 169, 0.18)",
   },
   box: {
     marginTop: "28px",
-    border: "1px solid #e2e8f0",
-    borderRadius: "16px",
-    padding: "24px",
-    backgroundColor: "#f8fafc",
+    border: "1px solid rgba(154, 223, 226, 0.72)",
+    borderRadius: "22px",
+    padding: "26px",
+    backgroundColor: "rgba(255, 255, 255, 0.72)",
+    boxShadow:
+      "0 14px 36px rgba(20, 91, 169, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.74)",
   },
   driveUploadBox: {
-    border: "1px solid #bfdbfe",
-    borderRadius: "16px",
-    padding: "16px",
-    backgroundColor: "#eff6ff",
+    minHeight: "220px",
+    border: "2px dashed #9ADFE2",
+    borderRadius: "22px",
+    padding: "28px",
+    backgroundColor: "rgba(238, 248, 251, 0.88)",
+    boxShadow:
+      "0 18px 40px rgba(20, 91, 169, 0.08), inset 0 1px 18px rgba(255, 255, 255, 0.74)",
   },
   selectedFileBox: {
-    marginTop: "12px",
-    borderRadius: "12px",
+    marginTop: "18px",
+    borderRadius: "14px",
     backgroundColor: "white",
-    padding: "12px",
-    border: "1px solid #dbeafe",
+    padding: "14px 16px",
+    border: "1px solid rgba(154, 223, 226, 0.72)",
+    boxShadow: "0 10px 24px rgba(20, 91, 169, 0.08)",
   },
   form: {
     marginTop: "20px",
@@ -1160,8 +1214,8 @@ const styles = {
   },
   message: {
     marginTop: "16px",
-    color: "#2563eb",
-    fontWeight: 700,
+    color: "#145BA9",
+    fontWeight: 900,
   },
   recordList: {
     display: "flex",
@@ -1169,10 +1223,11 @@ const styles = {
     gap: "16px",
   },
   recordCard: {
-    border: "1px solid #e2e8f0",
-    borderRadius: "16px",
+    border: "1px solid rgba(154, 223, 226, 0.72)",
+    borderRadius: "18px",
     padding: "20px",
-    backgroundColor: "white",
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    boxShadow: "0 12px 30px rgba(20, 91, 169, 0.08)",
   },
   badgeRow: {
     display: "flex",
@@ -1190,7 +1245,8 @@ const styles = {
   recordTitle: {
     marginBottom: 0,
     fontSize: "18px",
-    color: "#0f172a",
+    color: "#145BA9",
+    fontWeight: 900,
   },
   recordContent: {
     whiteSpace: "pre-wrap",
@@ -1199,21 +1255,22 @@ const styles = {
   },
   fileNameText: {
     margin: 0,
-    color: "#334155",
+    color: "#24435f",
     fontSize: "14px",
-    fontWeight: 700,
+    fontWeight: 800,
   },
   link: {
     display: "inline-block",
     marginTop: "10px",
-    color: "#2563eb",
-    fontWeight: 700,
+    color: "#145BA9",
+    fontWeight: 900,
     textDecoration: "none",
   },
   dateText: {
     marginTop: "14px",
     fontSize: "13px",
-    color: "#94a3b8",
+    color: "#5d7890",
+    fontWeight: 700,
   },
 };
 
