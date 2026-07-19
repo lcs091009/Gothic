@@ -12,6 +12,109 @@ function getStudentNumber(email) {
   return match ? match[1] : null;
 }
 
+function normalizeStudentNumber(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const digits = String(value).match(/\d+/);
+  return digits ? String(Number(digits[0])) : null;
+}
+
+// 파일명에서 학번을 추출한다. 예) "26-3_주제탐구.pdf" -> "3", "3번 탐구.pdf" -> "3"
+function parseStudentNumberFromFileName(fileName) {
+  if (!fileName) {
+    return null;
+  }
+
+  const dashStyle = fileName.match(/26[-_ ]?(\d{1,2})(?!\d)/);
+  if (dashStyle) {
+    return normalizeStudentNumber(dashStyle[1]);
+  }
+
+  const beonStyle = fileName.match(/(\d{1,2})\s*번/);
+  if (beonStyle) {
+    return normalizeStudentNumber(beonStyle[1]);
+  }
+
+  return null;
+}
+
+// 파일 목록을 학생 프로필과 학번 기준으로 매칭한다.
+function matchFilesToStudents(files, students) {
+  const studentByNumber = new Map();
+
+  for (const student of students) {
+    const key = normalizeStudentNumber(student.student_number);
+    if (key) {
+      studentByNumber.set(key, student);
+    }
+  }
+
+  return files.map((file) => {
+    const studentNumber = parseStudentNumberFromFileName(file.name);
+    const student = studentNumber
+      ? studentByNumber.get(studentNumber) || null
+      : null;
+
+    return { file, studentNumber, student };
+  });
+}
+
+// 실제 AI 연동 전까지 사용할 임시(자동 생성) 분석 텍스트.
+function buildMockAnalysis({ student, file, topic }) {
+  const who = student?.name
+    ? `${student.name} 학생`
+    : `${student?.student_number || "?"}번 학생`;
+
+  return [
+    "※ 이 분석은 임시(자동 생성) 예시입니다. 실제 AI 분석은 다음 단계에서 연동됩니다.",
+    "",
+    `[대상] ${who}`,
+    `[탐구 주제] ${topic || "미정"}`,
+    `[분석 대상 문서] ${file.name}`,
+    "",
+    "1. 핵심 요약: 제출한 문서에서 드러난 관심 분야와 탐구 흐름을 정리했습니다.",
+    "2. 강점: 자료를 스스로 찾아 근거를 제시하려는 태도가 보입니다.",
+    "3. 다음 탐구 방향 제안: 이번 주제와 연결되는 심화 질문을 이어서 탐구해 보세요.",
+  ].join("\n");
+}
+
+// Drive 폴더 안의 파일 목록(메타데이터)을 가져온다.
+async function listDriveFolderFiles(folderId, accessToken) {
+  const files = [];
+  let pageToken = "";
+
+  do {
+    const params = new URLSearchParams({
+      q: `'${folderId}' in parents and trashed = false`,
+      fields: "nextPageToken, files(id, name, mimeType, webViewLink)",
+      pageSize: "200",
+      supportsAllDrives: "true",
+      includeItemsFromAllDrives: "true",
+    });
+
+    if (pageToken) {
+      params.set("pageToken", pageToken);
+    }
+
+    const response = await fetch(
+      `https://www.googleapis.com/drive/v3/files?${params.toString()}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    if (!response.ok) {
+      throw new Error("Drive files.list 요청이 실패했습니다.");
+    }
+
+    const json = await response.json();
+    files.push(...(json.files || []));
+    pageToken = json.nextPageToken || "";
+  } while (pageToken);
+
+  return files;
+}
+
 const studentRecordPreview = [
   "자율활동: 학급 탐구 프로젝트에서 자료 조사와 발표 구성을 맡아 주제의 핵심을 정리하고 친구들의 의견을 종합함.",
   "진로활동: 과학적 탐구 방법과 데이터 분석 과정에 관심을 가지고 관련 도서를 읽으며 자신의 관심 분야를 구체화함.",
@@ -25,6 +128,14 @@ function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [records, setRecords] = useState([]);
+
+  const [analyses, setAnalyses] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [topic, setTopic] = useState("");
+  const [folderName, setFolderName] = useState("");
+  const [matchResults, setMatchResults] = useState([]);
+  const [isTeacherPickerLoading, setIsTeacherPickerLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const [driveFileId, setDriveFileId] = useState("");
   const [driveFileName, setDriveFileName] = useState("");
@@ -126,6 +237,19 @@ function App() {
     };
   }, [session]);
 
+  useEffect(() => {
+    if (!isSupabaseConfigured() || !profile || !session?.user) {
+      return;
+    }
+
+    if (profile.role === "teacher") {
+      loadStudents();
+    } else if (profile.role === "student") {
+      loadMyAnalyses(session.user.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.role, session?.user?.id]);
+
   async function ensureProfile(user) {
     if (!isSupabaseConfigured()) {
       return;
@@ -195,6 +319,48 @@ function App() {
     }
 
     setRecords(data || []);
+  }
+
+  async function loadStudents() {
+    if (!isSupabaseConfigured()) {
+      return;
+    }
+
+    const { data, error } = await withRetry(() =>
+      supabase
+        .from("profiles")
+        .select("id, email, name, student_number, role")
+        .eq("role", "student")
+        .order("student_number", { ascending: true })
+    );
+
+    if (error) {
+      setMessage(getFriendlySupabaseError(error));
+      return;
+    }
+
+    setStudents(data || []);
+  }
+
+  async function loadMyAnalyses(userId) {
+    if (!isSupabaseConfigured()) {
+      return;
+    }
+
+    const { data, error } = await withRetry(() =>
+      supabase
+        .from("ai_analyses")
+        .select("*")
+        .eq("student_user_id", userId)
+        .order("created_at", { ascending: false })
+    );
+
+    if (error) {
+      setMessage(getFriendlySupabaseError(error));
+      return;
+    }
+
+    setAnalyses(data || []);
   }
 
   async function signInWithGoogle() {
@@ -329,6 +495,182 @@ async function openGooglePicker() {
   } catch {
     setMessage("Google Picker를 여는 중 오류가 발생했습니다.");
     setIsPickerLoading(false);
+  }
+}
+
+async function openTeacherFolderPicker() {
+  setMessage("");
+
+  const googleApiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+  if (!googleApiKey || !googleClientId) {
+    setMessage(
+      "Google Picker 설정이 필요합니다. .env의 VITE_GOOGLE_API_KEY와 VITE_GOOGLE_CLIENT_ID를 확인하세요."
+    );
+    return;
+  }
+
+  setIsTeacherPickerLoading(true);
+
+  try {
+    await loadGooglePickerLibraries();
+
+    const tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: googleClientId,
+      // 폴더 안의 문서 목록을 읽어야 하므로 읽기 권한이 필요합니다.
+      scope: "https://www.googleapis.com/auth/drive.readonly",
+      callback: async (tokenResponse) => {
+        if (tokenResponse.error) {
+          setMessage("Google Drive 권한 요청에 실패했습니다.");
+          setIsTeacherPickerLoading(false);
+          return;
+        }
+
+        const accessToken = tokenResponse.access_token;
+
+        const folderView = new window.google.picker.DocsView(
+          window.google.picker.ViewId.FOLDERS
+        )
+          .setIncludeFolders(true)
+          .setSelectFolderEnabled(true)
+          .setMimeTypes("application/vnd.google-apps.folder");
+
+        const fileView = new window.google.picker.DocsView()
+          .setIncludeFolders(true)
+          .setSelectFolderEnabled(false);
+
+        const picker = new window.google.picker.PickerBuilder()
+          .setDeveloperKey(googleApiKey)
+          .setOAuthToken(accessToken)
+          .addView(folderView)
+          .addView(fileView)
+          .enableFeature(window.google.picker.Feature.MULTISELECT_ENABLED)
+          .setCallback(async (data) => {
+            if (data.action === window.google.picker.Action.CANCEL) {
+              setIsTeacherPickerLoading(false);
+              return;
+            }
+
+            if (data.action !== window.google.picker.Action.PICKED) {
+              return;
+            }
+
+            try {
+              const picked = data.docs || [];
+              const folderDoc = picked.find(
+                (doc) =>
+                  doc.mimeType === "application/vnd.google-apps.folder" ||
+                  doc.type === "folder"
+              );
+
+              let files = [];
+              let pickedTopic = "";
+
+              if (folderDoc) {
+                // 폴더를 선택한 경우: 폴더 안의 문서 목록을 조회한다.
+                pickedTopic = folderDoc.name || folderDoc.title || "";
+                files = await listDriveFolderFiles(folderDoc.id, accessToken);
+              } else {
+                // 문서를 직접 여러 개 선택한 경우.
+                files = picked.map((doc) => ({
+                  id: doc.id,
+                  name: doc.name || doc.title || "",
+                  mimeType: doc.mimeType,
+                  webViewLink: doc.url || "",
+                }));
+              }
+
+              const documentFiles = files.filter(
+                (file) => file.mimeType !== "application/vnd.google-apps.folder"
+              );
+
+              setFolderName(pickedTopic);
+              setTopic((prev) => prev || pickedTopic);
+              setMatchResults(matchFilesToStudents(documentFiles, students));
+              setMessage(
+                documentFiles.length
+                  ? `${documentFiles.length}개의 문서를 불러왔습니다. 매칭 결과를 확인하세요.`
+                  : "폴더에서 문서를 찾지 못했습니다."
+              );
+            } catch {
+              setMessage(
+                "폴더 내용을 불러오는 중 오류가 발생했습니다. Drive 접근 권한(폴더 읽기)을 확인하세요."
+              );
+            } finally {
+              setIsTeacherPickerLoading(false);
+            }
+          })
+          .build();
+
+        picker.setVisible(true);
+      },
+    });
+
+    tokenClient.requestAccessToken({ prompt: "consent" });
+  } catch {
+    setMessage("Google Picker를 여는 중 오류가 발생했습니다.");
+    setIsTeacherPickerLoading(false);
+  }
+}
+
+async function handleGenerateAnalyses() {
+  setMessage("");
+
+  if (!isSupabaseConfigured()) {
+    setMessage(supabaseConfigError || "Supabase 설정이 필요합니다.");
+    return;
+  }
+
+  if (!session?.user) {
+    setMessage("먼저 로그인해야 합니다.");
+    return;
+  }
+
+  const matched = matchResults.filter((result) => result.student);
+
+  if (matched.length === 0) {
+    setMessage(
+      "매칭된 학생 문서가 없습니다. 파일명에 학번(예: 26-3)이 포함되어야 합니다."
+    );
+    return;
+  }
+
+  setIsGenerating(true);
+
+  try {
+    const rows = matched.map((result) => ({
+      student_user_id: result.student.id,
+      student_number: result.student.student_number,
+      student_email: result.student.email,
+      topic: topic || folderName || "미정",
+      source_file_id: result.file.id || null,
+      source_file_name: result.file.name || null,
+      source_file_url: result.file.webViewLink || null,
+      analysis_text: buildMockAnalysis({
+        student: result.student,
+        file: result.file,
+        topic: topic || folderName,
+      }),
+      status: "matched",
+      uploaded_by: session.user.id,
+    }));
+
+    const { error } = await withRetry(() =>
+      supabase.from("ai_analyses").insert(rows)
+    );
+
+    if (error) {
+      setMessage(getFriendlySupabaseError(error));
+      return;
+    }
+
+    setMessage(`${rows.length}명의 학생에게 AI 분석 결과(임시)를 생성했습니다.`);
+    setMatchResults([]);
+  } catch (error) {
+    setMessage(getFriendlySupabaseError(error));
+  } finally {
+    setIsGenerating(false);
   }
 }
 
@@ -563,7 +905,14 @@ async function handleDeleteResearchRecord(recordId) {
           <button
             className="animated-button"
             type="button"
-            onClick={() => setMessage("AI 분석 결과 기능은 준비 중입니다.")}
+            onClick={() => {
+              if (profile?.role === "student") {
+                loadMyAnalyses(session.user.id);
+                setMessage("AI 분석 결과를 새로고침했습니다.");
+              } else {
+                setMessage("학생 계정에서 본인 AI 분석 결과를 볼 수 있습니다.");
+              }
+            }}
             style={styles.aiResultButton}
           >
             AI 분석 결과 보기
@@ -679,6 +1028,53 @@ async function handleDeleteResearchRecord(recordId) {
                 </div>
               )}
             </section>
+
+            <section style={styles.box}>
+              <h2 style={styles.subTitle}>내 AI 분석 결과</h2>
+
+              {analyses.length === 0 ? (
+                <p style={styles.text}>
+                  아직 분석 결과가 없습니다. 선생님이 분석을 생성하면 여기에
+                  표시됩니다.
+                </p>
+              ) : (
+                <div style={styles.recordList}>
+                  {analyses.map((analysis) => (
+                    <article key={analysis.id} style={styles.recordCard}>
+                      <h3 style={styles.recordTitle}>
+                        {analysis.topic || "탐구 분석"}
+                      </h3>
+
+                      {analysis.source_file_name && (
+                        <p style={styles.fileNameText}>
+                          문서: {analysis.source_file_name}
+                        </p>
+                      )}
+
+                      {analysis.source_file_url && (
+                        <a
+                          href={analysis.source_file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={styles.link}
+                        >
+                          원본 문서 열기
+                        </a>
+                      )}
+
+                      <p style={styles.recordContent}>
+                        {analysis.analysis_text}
+                      </p>
+
+                      <p style={styles.dateText}>
+                        생성 시간:{" "}
+                        {new Date(analysis.created_at).toLocaleString("ko-KR")}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
           </>
         )}
 
@@ -693,12 +1089,94 @@ async function handleDeleteResearchRecord(recordId) {
         )}
 
         {profile?.role === "teacher" && (
-          <section style={styles.box}>
-            <h2 style={styles.subTitle}>선생님 계정</h2>
-            <p style={styles.text}>
-              선생님 기능은 다음 단계에서 따로 만들 예정입니다.
-            </p>
-          </section>
+          <>
+            <section style={styles.uploadPanel}>
+              <h2 style={styles.subTitle}>학생 폴더 업로드 (선생님)</h2>
+
+              <p style={styles.uploadHelpText}>
+                같은 주제의 학생 문서가 담긴 Google Drive 폴더를 선택하면,
+                파일명의 학번(예: 26-3)을 읽어 학생별로 자동 분류합니다. 각
+                학생은 본인 계정에서 자신의 분석 결과만 볼 수 있습니다.
+              </p>
+
+              <div style={styles.form}>
+                <div style={styles.field}>
+                  <label style={styles.label}>탐구 주제</label>
+                  <input
+                    style={styles.input}
+                    value={topic}
+                    onChange={(event) => setTopic(event.target.value)}
+                    placeholder="예: 미세먼지와 건강"
+                  />
+                </div>
+
+                <button
+                  className="animated-button"
+                  type="button"
+                  onClick={openTeacherFolderPicker}
+                  disabled={isTeacherPickerLoading}
+                  style={styles.driveButton}
+                >
+                  {isTeacherPickerLoading
+                    ? "폴더 여는 중..."
+                    : "Google Drive 폴더 선택"}
+                </button>
+              </div>
+
+              {students.length === 0 && (
+                <p style={styles.smallText}>
+                  아직 등록된 학생이 없습니다. 학생이 먼저 로그인하면 매칭
+                  대상이 됩니다.
+                </p>
+              )}
+            </section>
+
+            {matchResults.length > 0 && (
+              <section style={styles.box}>
+                <h2 style={styles.subTitle}>
+                  매칭 결과 (
+                  {matchResults.filter((result) => result.student).length}/
+                  {matchResults.length})
+                </h2>
+
+                <div style={styles.recordList}>
+                  {matchResults.map((result, index) => (
+                    <article
+                      key={result.file.id || index}
+                      style={styles.recordCard}
+                    >
+                      <p style={styles.fileNameText}>{result.file.name}</p>
+
+                      {result.student ? (
+                        <p style={styles.text}>
+                          → {result.student.name || "이름 미등록"} (
+                          {result.student.student_number}번) 에게 배정
+                        </p>
+                      ) : (
+                        <p style={styles.text}>
+                          → 매칭 실패: 파일명에서 학번을 찾지 못했거나 해당
+                          학번의 학생이 등록되지 않았습니다
+                          {result.studentNumber
+                            ? ` (인식된 학번: ${result.studentNumber})`
+                            : ""}
+                        </p>
+                      )}
+                    </article>
+                  ))}
+                </div>
+
+                <button
+                  className="animated-button"
+                  type="button"
+                  onClick={handleGenerateAnalyses}
+                  disabled={isGenerating}
+                  style={styles.button}
+                >
+                  {isGenerating ? "생성 중..." : "학생별 AI 분석 결과 생성"}
+                </button>
+              </section>
+            )}
+          </>
         )}
 
         {message && <p style={styles.message}>{message}</p>}
