@@ -47,6 +47,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const pageRef = useRef(null);
+  const pickerScrollYRef = useRef(0);
   const googleAccessTokenRef = useRef("");
   const googleTokenExpiresAtRef = useRef(0);
   const googleTokenClientRef = useRef(null);
@@ -489,11 +490,20 @@ async function getGoogleAccessToken({ forceConsent = false } = {}) {
 }
 
 async function openGooglePicker() {
+  pickerScrollYRef.current = window.scrollY;
+
   setMessage("");
   setIsGoogleAuthLoading(true);
   setIsPickerLoading(false);
 
+  let loadingSafetyTimer = null;
+
   try {
+    loadingSafetyTimer = window.setTimeout(() => {
+      setIsGoogleAuthLoading(false);
+      setIsPickerLoading(false);
+    }, 8000);
+
     const accessToken = await getGoogleAccessToken();
 
     setIsGoogleAuthLoading(false);
@@ -528,17 +538,44 @@ async function openGooglePicker() {
           data.action === window.google.picker.Action.PICKED ||
           data.action === window.google.picker.Action.CANCEL
         ) {
+          setIsGoogleAuthLoading(false);
           setIsPickerLoading(false);
+
+          window.requestAnimationFrame(() => {
+            window.scrollTo({
+              top: pickerScrollYRef.current,
+              behavior: "auto",
+            });
+          });
         }
       })
       .build();
 
     picker.setVisible(true);
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo({
+        top: pickerScrollYRef.current,
+        behavior: "auto",
+      });
+    });
+
     setIsPickerLoading(false);
   } catch (error) {
     setMessage(error.message || "Google Picker를 여는 중 오류가 발생했습니다.");
     setIsGoogleAuthLoading(false);
     setIsPickerLoading(false);
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo({
+        top: pickerScrollYRef.current,
+        behavior: "auto",
+      });
+    });
+  } finally {
+    if (loadingSafetyTimer) {
+      window.clearTimeout(loadingSafetyTimer);
+    }
   }
 }
 
