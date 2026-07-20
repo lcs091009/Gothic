@@ -40,6 +40,7 @@ function App() {
   const [driveFileName, setDriveFileName] = useState("");
   const [driveFileUrl, setDriveFileUrl] = useState("");
   const [isPickerLoading, setIsPickerLoading] = useState(false);
+  const [isGoogleAuthLoading, setIsGoogleAuthLoading] = useState(false);
   const [deletingRecordId, setDeletingRecordId] = useState(null);
 
   const [message, setMessage] = useState("");
@@ -366,6 +367,16 @@ async function getGoogleAccessToken({ forceConsent = false } = {}) {
   await loadGooglePickerLibraries();
 
   const now = Date.now();
+  const savedToken = window.sessionStorage.getItem("googleDriveAccessToken") || "";
+  const savedExpiresAt = Number(
+    window.sessionStorage.getItem("googleDriveTokenExpiresAt") || 0
+  );
+
+  if (savedToken && savedExpiresAt > now + 60_000) {
+    googleAccessTokenRef.current = savedToken;
+    googleTokenExpiresAtRef.current = savedExpiresAt;
+  }
+
   const hasValidToken =
     googleAccessTokenRef.current &&
     googleTokenExpiresAtRef.current &&
@@ -384,31 +395,109 @@ async function getGoogleAccessToken({ forceConsent = false } = {}) {
   }
 
   return new Promise((resolve, reject) => {
-    googleTokenClientRef.current.callback = (tokenResponse) => {
-      if (tokenResponse.error) {
-        reject(new Error("Google Drive 권한 요청에 실패했습니다."));
+    let isSettled = false;
+    let focusCheckTimerId = null;
+
+    function cleanup() {
+      window.clearTimeout(timeoutId);
+      window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+
+      if (focusCheckTimerId) {
+        window.clearTimeout(focusCheckTimerId);
+      }
+    }
+
+    function finishWithError(errorMessage) {
+      if (isSettled) {
         return;
       }
 
-      googleAccessTokenRef.current = tokenResponse.access_token;
-      googleTokenExpiresAtRef.current =
-        Date.now() + Number(tokenResponse.expires_in || 3600) * 1000;
+      isSettled = true;
+      cleanup();
+      reject(new Error(errorMessage));
+    }
 
-      resolve(tokenResponse.access_token);
-    };
+    function finishWithToken(tokenResponse) {
+      if (isSettled) {
+        return;
+      }
 
-    googleTokenClientRef.current.requestAccessToken({
-      prompt: forceConsent || !googleAccessTokenRef.current ? "consent" : "",
-    });
+      if (tokenResponse.error || !tokenResponse.access_token) {
+        finishWithError("Google Drive 권한 요청에 실패했습니다.");
+        return;
+      }
+
+      isSettled = true;
+      cleanup();
+
+      const accessToken = tokenResponse.access_token;
+      const expiresAt = Date.now() + Number(tokenResponse.expires_in || 3600) * 1000;
+
+      googleAccessTokenRef.current = accessToken;
+      googleTokenExpiresAtRef.current = expiresAt;
+
+      window.sessionStorage.setItem("googleDriveAccessToken", accessToken);
+      window.sessionStorage.setItem("googleDriveTokenExpiresAt", String(expiresAt));
+
+      resolve(accessToken);
+    }
+
+    function handleWindowFocus() {
+      if (isSettled) {
+        return;
+      }
+
+      if (focusCheckTimerId) {
+        window.clearTimeout(focusCheckTimerId);
+      }
+
+      focusCheckTimerId = window.setTimeout(() => {
+        if (!isSettled) {
+          finishWithError(
+            "Google 로그인 창이 닫혔습니다. 파일을 선택하려면 버튼을 다시 눌러 주세요."
+          );
+        }
+      }, 900);
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        handleWindowFocus();
+      }
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      finishWithError(
+        "Google 권한 창이 닫혔거나 응답이 없습니다. 다시 파일 선택 버튼을 눌러 주세요."
+      );
+    }, 8000);
+
+    window.addEventListener("focus", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    googleTokenClientRef.current.callback = finishWithToken;
+
+    try {
+      googleTokenClientRef.current.requestAccessToken({
+        prompt: forceConsent ? "consent" : "",
+      });
+    } catch (error) {
+      finishWithError("Google 로그인 창을 여는 중 오류가 발생했습니다.");
+    }
   });
 }
 
 async function openGooglePicker() {
   setMessage("");
-  setIsPickerLoading(true);
+  setIsGoogleAuthLoading(true);
+  setIsPickerLoading(false);
 
   try {
     const accessToken = await getGoogleAccessToken();
+
+    setIsGoogleAuthLoading(false);
+    setIsPickerLoading(true);
 
     const uploadView = new window.google.picker.DocsUploadView();
 
@@ -445,12 +534,10 @@ async function openGooglePicker() {
       .build();
 
     picker.setVisible(true);
-
-    window.setTimeout(() => {
-      setIsPickerLoading(false);
-    }, 3000);
+    setIsPickerLoading(false);
   } catch (error) {
     setMessage(error.message || "Google Picker를 여는 중 오류가 발생했습니다.");
+    setIsGoogleAuthLoading(false);
     setIsPickerLoading(false);
   }
 }
@@ -521,7 +608,9 @@ function handleUploadDragOver(event) {
 function handleUploadDragLeave(event) {
   event.preventDefault();
 
-  if (!event.currentTarget.contains(event.relatedTarget)) {
+  const nextTarget = event.relatedTarget;
+
+  if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
     setIsUploadDragging(false);
   }
 }
@@ -937,12 +1026,21 @@ async function handleDeleteResearchRecord(recordId) {
                     className="animated-button"
                     type="button"
                     onClick={openGooglePicker}
-                    disabled={isPickerLoading || isUploadingFile}
+                    disabled={isPickerLoading || isUploadingFile || isGoogleAuthLoading}
                     style={styles.driveButton}
                   >
                     {isUploadingFile ? (
                       <>
                         Google Drive 업로드 중
+                        <span className="button-dots" aria-hidden="true">
+                          <span />
+                          <span />
+                          <span />
+                        </span>
+                      </>
+                    ) : isGoogleAuthLoading ? (
+                      <>
+                        Google 로그인 확인 중
                         <span className="button-dots" aria-hidden="true">
                           <span />
                           <span />
