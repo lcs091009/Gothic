@@ -46,6 +46,9 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const pageRef = useRef(null);
+  const googleAccessTokenRef = useRef("");
+  const googleTokenExpiresAtRef = useRef(0);
+  const googleTokenClientRef = useRef(null);
   const [currentPage, setCurrentPage] = useState("home");
   const [isLogoutHovered, setIsLogoutHovered] = useState(false);
   const [academicProfile, setAcademicProfile] = useState(null);
@@ -351,70 +354,162 @@ async function loadGooglePickerLibraries() {
   });
 }
 
-async function openGooglePicker() {
-  setMessage("");
-
+async function getGoogleAccessToken({ forceConsent = false } = {}) {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-if (!googleClientId) {
-  setMessage(
-    "Google Picker 설정이 필요합니다. .env의 VITE_GOOGLE_CLIENT_ID를 확인하세요."
-  );
-  return;
+  if (!googleClientId) {
+    throw new Error(
+      "Google Picker 설정이 필요합니다. .env의 VITE_GOOGLE_CLIENT_ID를 확인하세요."
+    );
+  }
+
+  await loadGooglePickerLibraries();
+
+  const now = Date.now();
+  const hasValidToken =
+    googleAccessTokenRef.current &&
+    googleTokenExpiresAtRef.current &&
+    googleTokenExpiresAtRef.current > now + 60_000;
+
+  if (hasValidToken && !forceConsent) {
+    return googleAccessTokenRef.current;
+  }
+
+  if (!googleTokenClientRef.current) {
+    googleTokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
+      client_id: googleClientId,
+      scope: "https://www.googleapis.com/auth/drive.file",
+      callback: () => {},
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    googleTokenClientRef.current.callback = (tokenResponse) => {
+      if (tokenResponse.error) {
+        reject(new Error("Google Drive 권한 요청에 실패했습니다."));
+        return;
+      }
+
+      googleAccessTokenRef.current = tokenResponse.access_token;
+      googleTokenExpiresAtRef.current =
+        Date.now() + Number(tokenResponse.expires_in || 3600) * 1000;
+
+      resolve(tokenResponse.access_token);
+    };
+
+    googleTokenClientRef.current.requestAccessToken({
+      prompt: forceConsent || !googleAccessTokenRef.current ? "consent" : "",
+    });
+  });
 }
 
+async function openGooglePicker() {
+  setMessage("");
   setIsPickerLoading(true);
 
   try {
-    await loadGooglePickerLibraries();
+    const accessToken = await getGoogleAccessToken();
 
-    const tokenClient = window.google.accounts.oauth2.initTokenClient({
-      client_id: googleClientId,
-      scope: "https://www.googleapis.com/auth/drive.file",
-      callback: (tokenResponse) => {
-        if (tokenResponse.error) {
-          setMessage("Google Drive 권한 요청에 실패했습니다.");
-          setIsPickerLoading(false);
-          return;
+    const uploadView = new window.google.picker.DocsUploadView();
+
+    const docsView = new window.google.picker.DocsView()
+      .setIncludeFolders(true)
+      .setSelectFolderEnabled(false);
+
+    const picker = new window.google.picker.PickerBuilder()
+      .setOAuthToken(accessToken)
+      .addView(docsView)
+      .addView(uploadView)
+      .setCallback((data) => {
+        if (data.action === window.google.picker.Action.PICKED) {
+          const file = data.docs[0];
+
+          setDriveFileId(file.id || "");
+          setDriveFileName(file.name || file.title || "");
+          setDriveFileUrl(file.url || "");
+
+          setMessage(
+            `Google Drive 파일이 선택되었습니다: ${
+              file.name || file.title || "파일명 없음"
+            }`
+          );
         }
 
-        const uploadView = new window.google.picker.DocsUploadView();
+        if (
+          data.action === window.google.picker.Action.PICKED ||
+          data.action === window.google.picker.Action.CANCEL
+        ) {
+          setIsPickerLoading(false);
+        }
+      })
+      .build();
 
-        const docsView = new window.google.picker.DocsView()
-          .setIncludeFolders(true)
-          .setSelectFolderEnabled(false);
+    picker.setVisible(true);
 
-        const picker = new window.google.picker.PickerBuilder()
-          .setOAuthToken(tokenResponse.access_token)
-          .addView(docsView)
-          .addView(uploadView)
-          .setCallback((data) => {
-            if (data.action === window.google.picker.Action.PICKED) {
-              const file = data.docs[0];
-
-              setDriveFileId(file.id || "");
-              setDriveFileName(file.name || file.title || "");
-              setDriveFileUrl(file.url || "");
-
-              setMessage(
-                `Google Drive 파일이 선택되었습니다: ${
-                  file.name || file.title || "파일명 없음"
-                }`
-              );
-            }
-
-            setIsPickerLoading(false);
-          })
-          .build();
-
-        picker.setVisible(true);
-      },
-    });
-
-    tokenClient.requestAccessToken({ prompt: "consent" });
+    window.setTimeout(() => {
+      setIsPickerLoading(false);
+    }, 3000);
   } catch (error) {
-    setMessage("Google Picker를 여는 중 오류가 발생했습니다.");
+    setMessage(error.message || "Google Picker를 여는 중 오류가 발생했습니다.");
     setIsPickerLoading(false);
+  }
+}
+
+async function uploadDroppedFileToGoogleDrive(file) {
+  if (!file) {
+    return;
+  }
+
+  setMessage("");
+  setIsUploadingFile(true);
+
+  try {
+    const accessToken = await getGoogleAccessToken();
+
+    const metadata = {
+      name: file.name,
+      mimeType: file.type || "application/octet-stream",
+    };
+
+    const formData = new FormData();
+
+    formData.append(
+      "metadata",
+      new Blob([JSON.stringify(metadata)], {
+        type: "application/json",
+      })
+    );
+
+    formData.append("file", file);
+
+    const uploadResponse = await fetch(
+      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: formData,
+      }
+    );
+
+    const uploadedFile = await uploadResponse.json();
+
+    if (!uploadResponse.ok) {
+      throw new Error(
+        uploadedFile?.error?.message || "Google Drive 업로드에 실패했습니다."
+      );
+    }
+
+    setDriveFileId(uploadedFile.id || "");
+    setDriveFileName(uploadedFile.name || file.name);
+    setDriveFileUrl(uploadedFile.webViewLink || "");
+
+    setMessage(`Google Drive에 업로드되었습니다: ${uploadedFile.name || file.name}`);
+  } catch (error) {
+    setMessage(error.message || "파일 업로드 중 오류가 발생했습니다.");
+  } finally {
+    setIsUploadingFile(false);
   }
 }
 
@@ -435,11 +530,14 @@ function handleUploadDrop(event) {
   event.preventDefault();
   setIsUploadDragging(false);
 
-  setMessage(
-    "파일을 이 영역에 놓았습니다. 보안을 위해 Google Drive Picker에서 파일을 선택하거나 업로드해 주세요."
-  );
+  const droppedFile = event.dataTransfer.files?.[0];
 
-  openGooglePicker();
+  if (!droppedFile) {
+    setMessage("드롭된 파일을 찾지 못했습니다.");
+    return;
+  }
+
+  uploadDroppedFileToGoogleDrive(droppedFile);
 }
 
   async function handleSubmitResearchRecord(event) {
@@ -831,18 +929,27 @@ async function handleDeleteResearchRecord(recordId) {
                   <label style={styles.label}>Google Drive 파일 선택/업로드</label>
 
                   <p style={styles.smallText}>
-                    버튼을 누르거나 파일을 이 영역 위에 끌어다 놓으면 Google Picker가 열립니다.
-                    기존 Drive 파일을 선택하거나 새 파일을 Drive에 업로드한 뒤 선택할 수 있습니다.
+                    버튼을 누르면 기존 Google Drive 파일을 선택할 수 있고, 파일을 이 영역에
+                    끌어다 놓으면 Google Drive에 바로 업로드됩니다.
                   </p>
 
                   <button
                     className="animated-button"
                     type="button"
                     onClick={openGooglePicker}
-                    disabled={isPickerLoading}
+                    disabled={isPickerLoading || isUploadingFile}
                     style={styles.driveButton}
                   >
-                    {isPickerLoading ? (
+                    {isUploadingFile ? (
+                      <>
+                        Google Drive 업로드 중
+                        <span className="button-dots" aria-hidden="true">
+                          <span />
+                          <span />
+                          <span />
+                        </span>
+                      </>
+                    ) : isPickerLoading ? (
                       <>
                         Google Picker 여는 중
                         <span className="button-dots" aria-hidden="true">
