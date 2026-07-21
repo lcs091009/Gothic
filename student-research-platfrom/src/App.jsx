@@ -6,6 +6,7 @@ import {
   supabaseConfigError,
   withRetry,
 } from "./lib/supabaseClient";
+import CurriculumSetup from "./components/CurriculumSetup";
 
 function getStudentNumber(email) {
   const match = email.match(/^26-(\d+)@gochon\.hs\.kr$/);
@@ -929,6 +930,11 @@ async function handleDeleteResearchRecord(recordId) {
 
         {profile?.role === "student" && (
           <>
+            <h2 style={{ ...styles.subTitle, marginTop: 28 }}>
+              내 교육과정 설정
+            </h2>
+            <CurriculumSetup session={session} />
+
             <p style={styles.uploadIntroText}>
               이 곳에 본인이 활동했던 내용이 담긴 파일을 업로드 하세요!
             </p>
