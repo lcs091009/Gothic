@@ -161,11 +161,27 @@ function GradeSetup({ session, existingAcademicProfile, onSaved }) {
             {
               user_id: session.user.id,
               student_email: session.user.email,
+
               grade: currentGrade,
               current_grade: currentGrade,
+
               admission_year: curriculum.admissionYear,
               curriculum_label: curriculum.curriculumLabel,
               selected_choices: choices,
+
+              academic_year: new Date().getFullYear(),
+              curriculum_version: curriculum.curriculumLabel.includes("2022")
+                ? "2022"
+                : "2015",
+
+              subject_name: null,
+              subject_category: null,
+              is_custom_subject: false,
+              custom_subject_name: null,
+
+              selected_units: choices,
+              curriculum_confirmed: true,
+
               updated_at: new Date().toISOString(),
             },
             { onConflict: "user_id" }
