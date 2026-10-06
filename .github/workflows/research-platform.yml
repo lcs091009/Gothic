@@ -1,0 +1,34 @@
+name: Research platform checks
+on:
+  push:
+    paths: ["student-research-platform/**", "package.json", ".github/workflows/research-platform.yml"]
+  pull_request:
+    paths: ["student-research-platform/**", "package.json", ".github/workflows/research-platform.yml"]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: student-research-platform/package-lock.json
+      - run: npm run setup
+      - run: npm test
+      - run: npm run lint
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: test-public-key
+      - name: Reject tracked environment secrets
+        run: |
+          python - <<'PY'
+          import pathlib, subprocess
+          paths = subprocess.check_output(['git', 'ls-files'], text=True).splitlines()
+          bad = [p for p in paths if pathlib.PurePosixPath(p).name.startswith('.env') and pathlib.PurePosixPath(p).name != '.env.example']
+          if bad:
+              raise SystemExit('Environment files must not be tracked: ' + ', '.join(bad))
+          PY
