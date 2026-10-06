@@ -1,0 +1,54 @@
+.student-dashboard {
+  background: #f7f8fa !important;
+  animation: none;
+  padding: 32px 20px !important;
+}
+.student-dashboard::before, .student-dashboard::after { display: none; }
+.student-dashboard > .dashboard-card {
+  max-width: 960px !important;
+  background: #fff !important;
+  border: 1px solid #e8ebef !important;
+  box-shadow: none !important;
+  border-radius: 24px !important;
+  padding: 32px !important;
+  animation: none;
+}
+.student-dashboard .soft-panel { animation: none; }
+.student-dashboard .animated-button::before, .student-dashboard .delete-button::before { display: none; }
+.student-dashboard .animated-button:hover:not(:disabled) { transform: none; box-shadow: none; }
+.student-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 24px; border-bottom: 1px solid #eef0f3; }
+.student-header h1 { font-size: 18px; margin: 0; color: #253349; letter-spacing: -.4px; }
+.student-account { position: relative; color: #64748b; font-size: 13px; }
+.student-account summary { cursor: pointer; padding: 8px; }
+.student-account-panel { position: absolute; right: 0; top: 100%; z-index: 5; width: min(280px, 72vw); padding: 16px; border: 1px solid #e2e8f0; background: #fff; border-radius: 12px; box-shadow: 0 8px 24px #0f172a10; }
+.student-account-panel p { overflow-wrap: anywhere; margin: 0 0 12px; }
+.student-account-panel button, .student-back { background: transparent; border: 1px solid #dde3ea; color: #334155; border-radius: 10px; padding: 9px 14px; cursor: pointer; font: inherit; }
+.student-home { padding: 40px 0 8px; }
+.student-eyebrow { margin: 0 0 12px; font-size: 12px; font-weight: 700; color: #61778e; letter-spacing: .08em; }
+.student-home h2 { font-size: clamp(24px, 4vw, 32px); letter-spacing: -1px; line-height: 1.4; color: #172b43; margin: 0 0 12px; }
+.student-intro { color: #64748b; font-size: 14px; line-height: 1.7; margin: 0; }
+.student-summary { display: flex; flex-wrap: wrap; gap: 24px; margin: 24px 0 32px; font-size: 13px; color: #64748b; }
+.student-summary strong { margin-left: 8px; color: #24364b; }
+.student-setup-note { margin: -12px 0 24px; font-size: 13px; line-height: 1.7; color: #426680; }
+.student-category-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.student-category { display: flex; align-items: center; gap: 16px; min-height: 116px; border: 1px solid #e3e8ee; border-radius: 16px; background: #fff; padding: 24px; text-align: left; color: #365572; font: inherit; cursor: pointer; transition: border-color 150ms, background-color 150ms; }
+.student-category:hover { border-color: #8fa9bd; background: #f8fafc; }
+.student-category svg { width: 26px; height: 26px; flex-shrink: 0; }
+.student-category-copy { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.student-category-copy strong { font-size: 16px; color: #253349; }
+.student-category-copy > span { font-size: 12px; line-height: 1.6; color: #718096; }
+.student-category-arrow { margin-left: auto; color: #8b9eb0; }
+.student-section-header { display: flex; align-items: center; gap: 18px; margin: 28px 0 0; }
+.student-section-header h2 { font-size: 20px; margin: 0; color: #253349; }
+.student-dashboard :where(button, summary):focus-visible { outline: 3px solid #7195b7; outline-offset: 4px; }
+.student-dashboard :is(.student-section-header h2, #student-home-title):focus { outline: none; }
+@media (max-width: 640px) {
+  .student-dashboard { padding: 12px !important; }
+  .student-dashboard > .dashboard-card { padding: 22px 18px !important; border-radius: 18px !important; }
+  .student-home { padding-top: 30px; }
+  .student-category-grid { grid-template-columns: 1fr; gap: 10px; }
+  .student-category { padding: 18px; min-height: 90px; }
+  .student-section-header { gap: 12px; }
+  .student-section-header h2 { font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .student-category { transition: none; } }

@@ -4,6 +4,8 @@ import { saveResearchRecord, deleteResearchRecord } from "./services/dataService
 import { useGoogleDrive } from "./hooks/useGoogleDrive";
 import HomePage from "./pages/HomePage";
 import StudentPage from "./pages/StudentPage";
+import StudentHome from "./pages/StudentHome";
+import { studentCategories } from "./config/studentCategories";
 import styles from "./styles/appStyles";
 import GradeSetup from "./components/GradeSetup";
 import TeacherPage from "./components/TeacherPage";
@@ -30,6 +32,7 @@ function App() {
   const pageRef = useRef(null);
   const [currentPage, setCurrentPage] = useState("home");
   const [isLogoutHovered, setIsLogoutHovered] = useState(false);
+  const sectionTitleRef = useRef(null);
 
   const { session, isLoading, signInWithGoogle, signOut: authSignOut } = useAuth(setMessage);
   const { profile, records, teacherSharedFiles, academicProfile, setAcademicProfile,
@@ -38,6 +41,11 @@ function App() {
   const { driveFileId, driveFileName, driveFileUrl, isPickerLoading, isGoogleAuthLoading, isUploadDragging, isUploadingFile, setDriveFileId, setDriveFileName, setDriveFileUrl, openGooglePicker, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, clearDriveSession } = useGoogleDrive({ setMessage, userId: session?.user?.id });
 
   useEffect(() => {
+    if (profile?.role === "student") sectionTitleRef.current?.focus();
+  }, [currentPage, profile?.role]);
+
+  useEffect(() => {
+    if (profile?.role === "student") return;
     const pageElement = pageRef.current;
 
     if (
@@ -70,7 +78,7 @@ function App() {
         window.cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [session]);
+  }, [session, profile?.role]);
 
   async function signOut() {
     if (!await authSignOut()) return;
@@ -196,9 +204,20 @@ async function handleDeleteResearchRecord(recordId) {
   if (!session) return <HomePage signInWithGoogle={signInWithGoogle} message={message} />;
 
   return (
-    <main ref={pageRef} className="dashboard-page" style={styles.page}>
+    <main ref={pageRef} className={`dashboard-page ${profile?.role === "student" ? "student-dashboard" : ""}`} style={styles.page}>
       <section className="dashboard-card" style={styles.card}>
-        <div style={styles.header}>
+        {profile?.role === "student" ? (
+          <header className="student-header">
+            <h1>활동 연결 노트</h1>
+            <details className="student-account">
+              <summary>내 계정</summary>
+              <div className="student-account-panel">
+                <p>{session.user.email}</p>
+                <button type="button" onClick={signOut}>로그아웃</button>
+              </div>
+            </details>
+          </header>
+        ) : <div style={styles.header}>
           <div>
             <h1 style={styles.title}>활동 연결 노트</h1>
             <p style={styles.text}>로그인 계정: {session.user.email}</p>
@@ -231,9 +250,21 @@ async function handleDeleteResearchRecord(recordId) {
               로그아웃
             </button>
           </div>
-        </div>
+        </div>}
 
-        {profile?.role === "student" && isAcademicProfileLoading && (
+        {profile?.role === "student" && currentPage === "home" && (
+          <StudentHome headingRef={sectionTitleRef} name={profile.name} academicProfile={academicProfile}
+            isAcademicProfileLoading={isAcademicProfileLoading} recordsCount={records.length}
+            materialsCount={teacherSharedFiles.length} onNavigate={setCurrentPage} />
+        )}
+        {profile?.role === "student" && currentPage !== "home" && (
+          <div className="student-section-header">
+            <button className="student-back" type="button" onClick={() => setCurrentPage("home")}>← 메뉴</button>
+            <h2 ref={sectionTitleRef} tabIndex={-1}>{studentCategories.find(category => category.id === currentPage)?.title}</h2>
+          </div>
+        )}
+
+        {profile?.role === "student" && currentPage === "academic" && isAcademicProfileLoading && (
           <section className="soft-panel skeleton-panel" style={styles.box}>
             <div className="mini-spinner" aria-hidden="true" />
             <p style={styles.text}>선택과목 정보를 불러오는 중입니다.</p>
@@ -242,7 +273,7 @@ async function handleDeleteResearchRecord(recordId) {
 
         {profile?.role === "student" &&
           !isAcademicProfileLoading &&
-          !academicProfile && (
+          currentPage === "academic" && (
             <GradeSetup
               session={session}
               existingAcademicProfile={academicProfile}
@@ -253,18 +284,25 @@ async function handleDeleteResearchRecord(recordId) {
             />
           )}
 
-        {profile?.role === "student" && currentPage === "ai" && (
+        {profile?.role === "student" && currentPage === "ai" && (isAcademicProfileLoading ? (
+          <p style={styles.text} role="status">선택과목 정보를 불러오는 중입니다.</p>
+        ) : !academicProfile ? (
+          <section style={styles.box}>
+            <p style={styles.text}>활동 분석을 시작하려면 학년과 선택과목을 먼저 설정해 주세요.</p>
+            <button type="button" className="student-back" onClick={() => setCurrentPage("academic")}>학년 / 선택과목 설정</button>
+          </section>
+        ) : (
           <AiAnalysisPage
             academicProfile={academicProfile}
             records={records}
             teacherSharedFiles={teacherSharedFiles}
             onBack={() => setCurrentPage("home")}
           />
-        )}
+        ))}
         {profile?.role === "student" &&
-          academicProfile &&
-          currentPage === "home" && (
+          ["register", "records", "materials"].includes(currentPage) && (
           <StudentPage
+            section={currentPage}
             grade={grade}
             setGrade={setGrade}
             semester={semester}

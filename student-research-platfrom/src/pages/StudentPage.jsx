@@ -1,9 +1,9 @@
 import styles from "../styles/appStyles";
 
-export default function StudentPage({ grade, setGrade, semester, setSemester, subject, setSubject, title, setTitle, content, setContent, handleSubmitResearchRecord, isUploadDragging, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, openGooglePicker, isPickerLoading, isUploadingFile, isGoogleAuthLoading, driveFileName, driveFileUrl, isSubmitting, records, handleDeleteResearchRecord, deletingRecordId, loadTeacherSharedFiles, session, isLoadingTeacherSharedFiles, teacherSharedFiles }) {
+export default function StudentPage({ section = "register", grade, setGrade, semester, setSemester, subject, setSubject, title, setTitle, content, setContent, handleSubmitResearchRecord, isUploadDragging, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, openGooglePicker, isPickerLoading, isUploadingFile, isGoogleAuthLoading, driveFileName, driveFileUrl, isSubmitting, records, handleDeleteResearchRecord, deletingRecordId, loadTeacherSharedFiles, session, isLoadingTeacherSharedFiles, teacherSharedFiles }) {
   return (
           <>
-            <section style={styles.box}>
+            {section === "register" && <section style={styles.box}>
               <h2 style={styles.subTitle}>활동 기록 등록</h2>
 
               <p style={styles.text}>
@@ -172,9 +172,9 @@ export default function StudentPage({ grade, setGrade, semester, setSemester, su
                   )}
                 </button>
               </form>
-            </section>
+            </section>}
 
-            <section style={styles.box}>
+            {section === "records" && <section style={styles.box}>
               <h2 style={styles.subTitle}>내 활동 기록</h2>
 
               {records.length === 0 ? (
@@ -239,9 +239,9 @@ export default function StudentPage({ grade, setGrade, semester, setSemester, su
                   ))}
                 </div>
               )}
-            </section>
+            </section>}
 
-            <section className="soft-panel" style={styles.box}>
+            {section === "materials" && <section className="soft-panel" style={styles.box}>
               <div style={styles.sharedFileTitleRow}>
                 <div>
                   <h2 style={styles.subTitle}>선생님이 제공한 내 자료</h2>
@@ -323,7 +323,7 @@ export default function StudentPage({ grade, setGrade, semester, setSemester, su
                   ))}
                 </div>
               )}
-            </section>
+            </section>}
           </>
   );
 }
