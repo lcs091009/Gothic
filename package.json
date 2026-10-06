@@ -1,0 +1,11 @@
+{
+  "name": "gothic-workspace",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix student-research-platfrom run dev",
+    "build": "npm --prefix student-research-platfrom run build",
+    "test": "npm --prefix student-research-platfrom test",
+    "lint": "npm --prefix student-research-platfrom run lint",
+    "setup": "npm --prefix student-research-platfrom ci"
+  }
+}

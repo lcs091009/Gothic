@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   getFriendlySupabaseError,
   isSupabaseConfigured,
@@ -7,30 +7,7 @@ import {
   withRetry,
 } from "../lib/supabaseClient";
 
-function extractStudentNumber(fileName) {
-  const patterns = [
-    /26[-_]?(\d{3,5})/,
-    /(?:^|[^0-9])(\d{4,5})(?:[^0-9]|$)/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = fileName.match(pattern);
-
-    if (match) {
-      return match[1];
-    }
-  }
-
-  return "";
-}
-
-function getStudentEmail(studentNumber) {
-  if (!studentNumber) {
-    return "";
-  }
-
-  return `26-${studentNumber}@gochon.hs.kr`;
-}
+import { extractStudentNumber, getStudentEmail, studentAdmissionYear } from "../config/school";
 
 function getMatchLabel(matchStatus) {
   if (matchStatus === "matched") {
@@ -45,6 +22,7 @@ function getMatchLabel(matchStatus) {
 }
 
 function TeacherPage({ session }) {
+  const [admissionYear, setAdmissionYear] = useState(studentAdmissionYear);
   const [grade, setGrade] = useState("1학년");
   const [semester, setSemester] = useState("1학기");
   const [category, setCategory] = useState("수행평가");
@@ -57,17 +35,11 @@ function TeacherPage({ session }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
 
-  const extractedStudentNumber = extractStudentNumber(fileName);
-  const matchedStudentEmail = getStudentEmail(extractedStudentNumber);
+  const extractedStudentNumber = extractStudentNumber(fileName, admissionYear);
+  const matchedStudentEmail = getStudentEmail(extractedStudentNumber, admissionYear);
   const matchStatus = extractedStudentNumber ? "matched" : "needs_review";
 
-  useEffect(() => {
-    if (session?.user?.id) {
-      loadSharedFiles();
-    }
-  }, [session?.user?.id]);
-
-  async function loadSharedFiles() {
+  const loadSharedFiles = useCallback(async () => {
     if (!isSupabaseConfigured()) {
       setMessage(supabaseConfigError || "Supabase 설정이 필요합니다.");
       return;
@@ -99,7 +71,13 @@ function TeacherPage({ session }) {
     } finally {
       setIsLoadingFiles(false);
     }
-  }
+  }, [session]);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      loadSharedFiles();
+    }
+  }, [session?.user?.id, loadSharedFiles]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -112,6 +90,11 @@ function TeacherPage({ session }) {
 
     if (!session?.user) {
       setMessage("먼저 로그인해야 합니다.");
+      return;
+    }
+
+    if (!/^\d{2}$/.test(admissionYear)) {
+      setMessage("입학 연도 앞자리를 두 자리 숫자로 입력해 주세요.");
       return;
     }
 
@@ -204,9 +187,9 @@ function TeacherPage({ session }) {
 
       <div className="soft-panel" style={styles.noticeBox}>
         <h3 style={styles.noticeTitle}>파일명 자동 인식 예시</h3>
-        <p style={styles.text}>10315_김철수_통합사회.pdf → 26-10315@gochon.hs.kr</p>
-        <p style={styles.text}>26-10315_김철수.hwp → 26-10315@gochon.hs.kr</p>
-        <p style={styles.text}>김철수_10315_수행평가.pdf → 26-10315@gochon.hs.kr</p>
+        <p style={styles.text}>10315_김철수_통합사회.pdf → {getStudentEmail("10315", admissionYear)}</p>
+        <p style={styles.text}>{admissionYear}-10315_김철수.hwp → {getStudentEmail("10315", admissionYear)}</p>
+        <p style={styles.text}>김철수_10315_수행평가.pdf → {getStudentEmail("10315", admissionYear)}</p>
         <p style={styles.warningText}>
           이름만 있는 파일은 동명이인 문제가 있을 수 있으므로 자동 배정하지 않습니다.
         </p>
@@ -215,7 +198,10 @@ function TeacherPage({ session }) {
       <form className="soft-panel" onSubmit={handleSubmit} style={styles.form}>
         <div style={styles.row}>
           <div>
-            <label style={styles.label}>학년</label>
+            <label style={styles.label}>학생 이메일의 입학 연도 앞자리</label>
+              <input value={admissionYear} onChange={(event) => setAdmissionYear(event.target.value)}
+                inputMode="numeric" pattern="[0-9]{2}" maxLength={2} required placeholder="예: 26, 27" style={styles.input} />
+              <label style={styles.label}>학년</label>
             <select
               value={grade}
               onChange={(event) => setGrade(event.target.value)}

@@ -1,5 +1,5 @@
 {
-  "name": "student-research-platfrom",
+  "name": "student-research-platform",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.2",
@@ -15,10 +16,14 @@
     "react-dom": "^19.2.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
     "oxlint": "^1.71.0",
     "vite": "^8.1.1"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }

@@ -23,3 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# Environment files are local; commit placeholders only.
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+.vercel/

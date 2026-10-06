@@ -1,3 +1,4 @@
+import { supabase } from "../lib/supabaseClient";
 import { useState } from "react";
 
 function AiAnalysisPage({ academicProfile, records, teacherSharedFiles = [], onBack }) {
@@ -23,15 +24,18 @@ function AiAnalysisPage({ academicProfile, records, teacherSharedFiles = [], onB
     setIsAnalyzing(true);
 
     try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData?.session?.access_token) {
+        setMessage("로그인이 만료되었습니다. 다시 로그인해 주세요.");
+        return;
+      }
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionData.session.access_token}`,
         },
         body: JSON.stringify({
-          academicProfile,
-          records,
-          teacherSharedFiles,
           extraContext,
         }),
       });
@@ -44,7 +48,7 @@ function AiAnalysisPage({ academicProfile, records, teacherSharedFiles = [], onB
         data = JSON.parse(rawText);
       } catch {
         setMessage(
-          `서버가 JSON이 아닌 응답을 보냈습니다. 서버 함수 api/analyze.js에서 오류가 났을 가능성이 큽니다.\n\n응답 내용:\n${rawText.slice(0, 300)}`
+          "분석 서비스에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요."
         );
         return;
       }
@@ -159,6 +163,7 @@ function AiAnalysisPage({ academicProfile, records, teacherSharedFiles = [], onB
           value={extraContext}
           onChange={(event) => setExtraContext(event.target.value)}
           rows={8}
+          maxLength={1200}
           placeholder={`예:
 통합사회 시간에 기후와 지형이 문화 차이에 미치는 영향을 발표했습니다.
 파일은 없지만, 문화 차이를 단순히 국민성으로 설명하면 안 되고 환경 조건도 같이 봐야 한다고 느꼈습니다.

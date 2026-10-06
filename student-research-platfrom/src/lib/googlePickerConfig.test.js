@@ -17,7 +17,7 @@ test('returns helpful error when Google API key format is invalid', () => {
 
 test('returns null for a plausible key and client id', () => {
   const error = getGooglePickerConfigError({
-    googleApiKey: 'AIzaSyDExampleKey12345678901234567890',
+    googleApiKey: 'AIza' + 'a'.repeat(35),
     googleClientId: '1234567890-example.apps.googleusercontent.com',
   });
 
