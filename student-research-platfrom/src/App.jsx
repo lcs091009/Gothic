@@ -252,6 +252,7 @@ async function handleDeleteResearchRecord(recordId) {
           </div>
         </div>}
 
+        {profile?.role === "student" && <div key={currentPage} className="student-view">
         {profile?.role === "student" && currentPage === "home" && (
           <StudentHome headingRef={sectionTitleRef} name={profile.name} academicProfile={academicProfile}
             isAcademicProfileLoading={isAcademicProfileLoading} recordsCount={records.length}
@@ -303,6 +304,7 @@ async function handleDeleteResearchRecord(recordId) {
           ["register", "records", "materials"].includes(currentPage) && (
           <StudentPage
             section={currentPage}
+            onNavigate={setCurrentPage}
             grade={grade}
             setGrade={setGrade}
             semester={semester}
@@ -334,6 +336,8 @@ async function handleDeleteResearchRecord(recordId) {
             teacherSharedFiles={teacherSharedFiles}
           />
         )}
+
+        </div>}
 
         {profile?.role === "pending" && (
           <section style={styles.box}>
