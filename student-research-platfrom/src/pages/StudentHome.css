@@ -69,7 +69,18 @@
 .student-empty-state { padding: 12px 0; }
 .student-record-details { margin: 16px 0; border-top: 1px solid #e2e8f0; padding-top: 12px; }
 .student-record-details summary { cursor: pointer; color: #365572; font-size: 14px; padding: 6px 0; }
-.student-record-details summary:hover { color: #1e40af; }
+.student-record-details summary:hover { color: #303841; }
+.student-dashboard .upload-icon-bubble { color: #59616b; border-color: #dde1e6; background: #fff; box-shadow: none; animation: none; }
+.student-dashboard .upload-drop-zone-active::after { border-color: #a5adb6; box-shadow: none; }
+.student-dashboard .mini-spinner { border-color: #e3e5e8; border-top-color: #59616b; }
+.student-dashboard .teacher-card:hover { border-color: #c3cad2 !important; box-shadow: 0 6px 16px #3038410a !important; }
+.student-dashboard .teacher-link:hover { color: #303841 !important; }
+.student-dashboard :where(input, textarea, select):focus-visible { outline: 2px solid #858f9a; outline-offset: 2px; border-color: #858f9a; }
+.student-dashboard :where(button, summary):focus-visible { outline-color: #858f9a; }
+.student-dashboard > .dashboard-card > p { color: #59616b !important; }
+@media (max-width: 640px) {
+  .student-dashboard .student-view > section { padding: 18px !important; }
+}
 @keyframes student-view-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) {
   .student-dashboard .student-view, .student-dashboard .student-account-panel { animation: none; }

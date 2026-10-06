@@ -212,10 +212,10 @@ function AiAnalysisPage({ academicProfile, records, teacherSharedFiles = [], onB
 const styles = {
   page: {
     marginTop: "28px",
-    border: "1px solid #bfdbfe",
+    border: "1px solid #e3e5e8",
     borderRadius: "16px",
     padding: "24px",
-    backgroundColor: "#eff6ff",
+    backgroundColor: "#f7f8fa",
   },
   backButton: {
     border: "1px solid #cbd5e1",
@@ -239,10 +239,10 @@ const styles = {
   },
   noticeBox: {
     marginTop: "18px",
-    border: "1px solid #fde68a",
+    border: "1px solid #e3e5e8",
     borderRadius: "14px",
     padding: "16px",
-    backgroundColor: "#fffbeb",
+    backgroundColor: "#f7f8fa",
   },
   infoGrid: {
     display: "grid",
@@ -251,7 +251,7 @@ const styles = {
     marginTop: "20px",
   },
   infoBox: {
-    border: "1px solid #dbeafe",
+    border: "1px solid #e3e5e8",
     borderRadius: "14px",
     padding: "16px",
     backgroundColor: "white",
@@ -259,18 +259,18 @@ const styles = {
   infoTitle: {
     marginTop: 0,
     marginBottom: "10px",
-    color: "#1e3a8a",
+    color: "#303841",
   },
   subjectBox: {
     marginTop: "18px",
-    border: "1px solid #dbeafe",
+    border: "1px solid #e3e5e8",
     borderRadius: "14px",
     padding: "16px",
     backgroundColor: "white",
   },
   extraBox: {
     marginTop: "18px",
-    border: "1px solid #dbeafe",
+    border: "1px solid #e3e5e8",
     borderRadius: "14px",
     padding: "16px",
     backgroundColor: "white",
@@ -304,7 +304,7 @@ const styles = {
     paddingBottom: "8px",
   },
   groupId: {
-    color: "#1d4ed8",
+    color: "#454d57",
     minWidth: "120px",
   },
   message: {
@@ -318,7 +318,7 @@ const styles = {
     border: "none",
     borderRadius: "12px",
     padding: "14px 18px",
-    backgroundColor: "#2563eb",
+    backgroundColor: "#303841",
     color: "white",
     fontWeight: 800,
   },

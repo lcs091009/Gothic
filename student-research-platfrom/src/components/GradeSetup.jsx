@@ -43,6 +43,7 @@ function ChoiceGroup({ group, selectedSubjects, onToggle }) {
               key={subject}
               type="button"
               onClick={() => onToggle(group, subject)}
+              aria-pressed={isSelected}
               style={{
                 ...styles.subjectButton,
                 ...(isSelected ? styles.subjectButtonSelected : {}),
@@ -218,6 +219,7 @@ function GradeSetup({ session, existingAcademicProfile, onSaved }) {
             key={gradeOption}
             type="button"
             onClick={() => handleChangeGrade(gradeOption)}
+            aria-pressed={currentGrade === gradeOption}
             style={{
               ...styles.gradeButton,
               ...(currentGrade === gradeOption ? styles.gradeButtonSelected : {}),
@@ -316,21 +318,21 @@ const styles = {
     cursor: "pointer",
   },
   gradeButtonSelected: {
-    border: "1px solid #2563eb",
-    backgroundColor: "#2563eb",
+    border: "1px solid #303841",
+    backgroundColor: "#303841",
     color: "white",
   },
   infoBox: {
     marginTop: "20px",
-    border: "1px solid #dbeafe",
+    border: "1px solid #e3e5e8",
     borderRadius: "14px",
     padding: "16px",
-    backgroundColor: "#eff6ff",
+    backgroundColor: "#f7f8fa",
   },
   infoTitle: {
     marginTop: 0,
     marginBottom: "8px",
-    color: "#1e3a8a",
+    color: "#303841",
   },
   choiceList: {
     marginTop: "20px",
@@ -359,8 +361,8 @@ const styles = {
   countText: {
     borderRadius: "999px",
     padding: "6px 10px",
-    backgroundColor: "#e0f2fe",
-    color: "#0369a1",
+    backgroundColor: "#eef0f3",
+    color: "#59616b",
     fontSize: "14px",
     whiteSpace: "nowrap",
   },
@@ -380,13 +382,13 @@ const styles = {
     textAlign: "left",
   },
   subjectButtonSelected: {
-    border: "1px solid #2563eb",
-    backgroundColor: "#dbeafe",
-    color: "#1d4ed8",
+    border: "1px solid #303841",
+    backgroundColor: "#eef0f3",
+    color: "#303841",
   },
   message: {
     marginTop: "16px",
-    color: "#2563eb",
+    color: "#303841",
     fontWeight: 700,
   },
   saveButton: {
@@ -394,7 +396,7 @@ const styles = {
     border: "none",
     borderRadius: "12px",
     padding: "14px 18px",
-    backgroundColor: "#0f172a",
+    backgroundColor: "#303841",
     color: "white",
     fontWeight: 700,
     cursor: "pointer",
