@@ -8,7 +8,7 @@ Node.js 22.12 이상을 사용합니다. 저장소 최상위 기준:
 
 ```bash
 npm run setup
-cp student-research-platform/.env.example student-research-platform/.env.local
+cp student-research-platfrom/.env.example student-research-platfrom/.env.local
 # 로컬 설정값 입력
 npm run dev
 ```
@@ -101,7 +101,7 @@ update public.profiles set role = 'teacher' where id = 'VERIFIED_TEACHER_UUID'::
 3. Supabase에서 현재 스키마·정책을 확인하고 백업합니다. 이미 서비스 테이블이 있는 환경에는 보안 마이그레이션 `20261006000000_security_and_ai_quota.sql`을 SQL Editor에서 적용할 수 있습니다. 이 SQL은 위 네 서비스 테이블의 기존 RLS 정책을 지정된 규칙으로 교체합니다. 테이블 이름과 소유자 컬럼이 위 구조와 일치해야 합니다.
 4. 새 데이터베이스는 Supabase CLI의 `supabase db push`로 전체 마이그레이션을 순서대로 적용합니다. 기존 프로젝트에 새로 추가한 과거 시각의 baseline을 무작정 적용하지 마세요. CLI의 원격 migration 이력과 기존 스키마를 먼저 맞춰야 합니다. 선택과목의 `grade`는 현재 화면에서 `2학년` 같은 문자열로 저장합니다. 실제 DB가 정수 컬럼이면 백업 후 컬럼 타입을 맞춰야 합니다.
 5. 기존 교사 계정 권한을 확인하고, 학생 2개·교사 1개 계정으로 타인의 기록 접근 차단과 자료 배정을 확인합니다. 적용된 한도 함수 및 RLS는 아래 쿼리로 조회할 수 있습니다.
-6. Vercel의 **Root Directory를 `student-research-platform`**으로 바꿉니다. Build Command는 `npm run build`, Output Directory는 `dist`입니다. `.env.example`에 적힌 환경변수를 등록하고, Supabase/Google의 허용 주소를 확인합니다. 폴더 이동과 이 설정 변경은 같은 배포에서 맞춰야 합니다.
+6. Vercel의 **Root Directory는 기존 `student-research-platfrom`**을 유지합니다. Build Command는 `npm run build`, Output Directory는 `dist`입니다. `.env.example`에 적힌 환경변수를 등록하고, Supabase/Google의 허용 주소를 확인합니다. 별도 폴더 경로 변경은 필요하지 않습니다.
 7. 수정 브랜치를 검토·병합한 뒤 배포하고 로그인·기록 저장·삭제·파일 선택·AI 분석을 확인합니다. DB 보안 SQL이 적용되지 않았으면 AI는 503으로 차단됩니다.
 
 ```sql

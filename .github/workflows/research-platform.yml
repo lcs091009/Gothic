@@ -1,9 +1,9 @@
 name: Research platform checks
 on:
   push:
-    paths: ["student-research-platform/**", "package.json", ".github/workflows/research-platform.yml"]
+    paths: ["student-research-platfrom/**", "package.json", ".github/workflows/research-platform.yml"]
   pull_request:
-    paths: ["student-research-platform/**", "package.json", ".github/workflows/research-platform.yml"]
+    paths: ["student-research-platfrom/**", "package.json", ".github/workflows/research-platform.yml"]
 permissions:
   contents: read
 jobs:
@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: student-research-platform/package-lock.json
+          cache-dependency-path: student-research-platfrom/package-lock.json
       - run: npm run setup
       - run: npm test
       - run: npm run lint
