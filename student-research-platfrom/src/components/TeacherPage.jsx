@@ -1,3 +1,4 @@
+import StudentDirectory from "./StudentDirectory";
 import { useCallback, useEffect, useState } from "react";
 import {
   getFriendlySupabaseError,
@@ -184,6 +185,8 @@ function TeacherPage({ session }) {
         제공할 수 있는 공간입니다. 파일명에 학번이 포함되어 있으면 학생
         계정과 자동으로 연결됩니다.
       </p>
+
+      <StudentDirectory teacherId={session?.user?.id} />
 
       <div className="soft-panel" style={styles.noticeBox}>
         <h3 style={styles.noticeTitle}>파일명 자동 인식 예시</h3>
