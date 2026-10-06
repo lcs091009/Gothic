@@ -51,4 +51,28 @@
   .student-section-header { gap: 12px; }
   .student-section-header h2 { font-size: 18px; }
 }
-@media (prefers-reduced-motion: reduce) { .student-category { transition: none; } }
+.student-view { animation: student-view-enter 220ms ease-out both; }
+.student-category { transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease; }
+.student-category svg, .student-category-arrow { transition: transform 160ms ease, color 160ms ease; }
+.student-category-count { border-radius: 8px; background: #f0f4f7; color: #526f88; font-size: 12px; padding: 4px 8px; margin-left: auto; }
+.student-category-count + .student-category-arrow { margin-left: 0; }
+@media (hover: hover) and (pointer: fine) {
+  .student-category:hover { transform: translateY(-3px); box-shadow: 0 7px 16px #203b5010; }
+  .student-category:hover svg { transform: rotate(-5deg); }
+  .student-category:hover .student-category-arrow { transform: translate(2px, -2px); color: #365572; }
+}
+.student-category:active { transform: scale(.98); background: #eef3f7; box-shadow: none; }
+.student-back, .student-account summary, .student-account-panel button { transition: background-color 140ms ease, border-color 140ms ease; }
+.student-back:hover, .student-account summary:hover, .student-account-panel button:hover { background: #f0f4f7; border-color: #8fa9bd; }
+.student-back:active, .student-account-panel button:active { background: #e5edf3; }
+.student-account[open] .student-account-panel { animation: student-view-enter 150ms ease-out both; }
+.student-empty-state { padding: 12px 0; }
+.student-record-details { margin: 16px 0; border-top: 1px solid #e2e8f0; padding-top: 12px; }
+.student-record-details summary { cursor: pointer; color: #365572; font-size: 14px; padding: 6px 0; }
+.student-record-details summary:hover { color: #1e40af; }
+@keyframes student-view-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .student-dashboard .student-view, .student-dashboard .student-account-panel { animation: none; }
+  .student-category, .student-category svg, .student-category-arrow, .student-back, .student-account summary, .student-account-panel button { transition: none; }
+  .student-category:hover, .student-category:active, .student-category:hover svg, .student-category:hover .student-category-arrow { transform: none; }
+}

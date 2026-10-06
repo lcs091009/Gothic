@@ -1,6 +1,6 @@
 import styles from "../styles/appStyles";
 
-export default function StudentPage({ section = "register", grade, setGrade, semester, setSemester, subject, setSubject, title, setTitle, content, setContent, handleSubmitResearchRecord, isUploadDragging, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, openGooglePicker, isPickerLoading, isUploadingFile, isGoogleAuthLoading, driveFileName, driveFileUrl, isSubmitting, records, handleDeleteResearchRecord, deletingRecordId, loadTeacherSharedFiles, session, isLoadingTeacherSharedFiles, teacherSharedFiles }) {
+export default function StudentPage({ section = "register", onNavigate, grade, setGrade, semester, setSemester, subject, setSubject, title, setTitle, content, setContent, handleSubmitResearchRecord, isUploadDragging, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, openGooglePicker, isPickerLoading, isUploadingFile, isGoogleAuthLoading, driveFileName, driveFileUrl, isSubmitting, records, handleDeleteResearchRecord, deletingRecordId, loadTeacherSharedFiles, session, isLoadingTeacherSharedFiles, teacherSharedFiles }) {
   return (
           <>
             {section === "register" && <section style={styles.box}>
@@ -178,7 +178,10 @@ export default function StudentPage({ section = "register", grade, setGrade, sem
               <h2 style={styles.subTitle}>내 활동 기록</h2>
 
               {records.length === 0 ? (
-                <p style={styles.text}>아직 저장된 활동 기록이 없습니다.</p>
+                <div className="student-empty-state">
+                  <p style={styles.text}>아직 저장된 활동 기록이 없습니다.</p>
+                  <button type="button" className="student-back" onClick={() => onNavigate("register")}>첫 활동 등록하기 →</button>
+                </div>
               ) : (
                 <div style={styles.recordList}>
                   {records.map((record) => (
@@ -191,7 +194,10 @@ export default function StudentPage({ section = "register", grade, setGrade, sem
 
                       <h3 style={styles.recordTitle}>{record.title}</h3>
 
-                      <p style={styles.recordContent}>{record.content}</p>
+                      <details className="student-record-details">
+                        <summary>활동 내용 보기</summary>
+                        <p style={styles.recordContent}>{record.content}</p>
+                      </details>
 
                       {record.drive_file_name && (
                         <p style={styles.fileNameText}>

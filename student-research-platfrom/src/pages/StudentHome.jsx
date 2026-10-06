@@ -20,6 +20,8 @@ export default function StudentHome({ headingRef, name, academicProfile, isAcade
           <button key={category.id} type="button" className="student-category" onClick={() => onNavigate(category.id)}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={category.icon} /></svg>
             <span className="student-category-copy"><strong>{category.title}</strong><span>{category.description}</span></span>
+            {category.id === "records" && <span className="student-category-count" aria-label={`기록 ${recordsCount}개`}>{recordsCount}</span>}
+            {category.id === "materials" && <span className="student-category-count" aria-label={`자료 ${materialsCount}개`}>{materialsCount}</span>}
             <span className="student-category-arrow" aria-hidden="true">↗</span>
           </button>
         ))}
