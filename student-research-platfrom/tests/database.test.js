@@ -16,7 +16,8 @@ grant execute on all functions in schema auth to anon, authenticated, service_ro
 const base = fileURLToPath(new URL('../supabase/migrations', import.meta.url));
 for (const file of (await readdir(base)).sort()) { await db.exec(await readFile(`${base}/${file}`, 'utf8')); console.log('Migration passed:',file); }
 await db.exec(await readFile(`${base}/20261006000000_security_and_ai_quota.sql`, 'utf8'));
-console.log('Security migration is safe to apply again.');
+await db.exec(await readFile(`${base}/20261006001000_teacher_student_directory.sql`, 'utf8'));
+console.log('Security and directory migrations are safe to apply again in order.');
 const ids=['00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000004'];
 const emails=['27-1234@gochon.hs.kr','28-2345@gochon.hs.kr','teacher@gochon.hs.kr','outsider@example.com'];
 for(let i=0;i<ids.length;i++) await db.query('insert into auth.users values($1,$2,now())',[ids[i],emails[i]]);
@@ -60,6 +61,24 @@ console.log('Distributed quota passed: 5/10min, 20/24h, reset, independent users
 await db.exec('begin; set local role anon;');
 await assert.rejects(db.query('select * from research_records'),/permission denied/);await db.exec('rollback');
 console.log('Anonymous access denied. All database checks passed.');
+
+for (const [id, email] of [['00000000-0000-0000-0000-000000000005','27-10315@gochon.hs.kr'],['00000000-0000-0000-0000-000000000006','27-20315@gochon.hs.kr']]) {
+  ids.push(id); emails.push(email);
+  await db.query('insert into auth.users values($1,$2,now())',[id,email]);
+  await asUser(ids.length-1,()=>db.query("insert into profiles(id,email,name) values($1,$2,'Directory Student')",[id,email]));
+}
+const directory = await asUser(2,()=>db.query("select directory_grade,directory_class,directory_number from profiles where role='student' and directory_grade=1"));
+assert.deepEqual(directory.rows,[{directory_grade:1,directory_class:3,directory_number:15}]);
+assert.equal((await asUser(2,()=>db.query("select id from profiles where role='student' and directory_class=3"))).rows.length,2);
+assert.equal((await asUser(2,()=>db.query("select id from profiles where role='student' and directory_number=15"))).rows.length,2);
+assert.equal((await asUser(2,()=>db.query("select id from profiles where role='student' and directory_grade=2 and directory_class=3 and directory_number=15"))).rows.length,1);
+assert.equal((await asUser(2,()=>db.query('select * from research_records'))).rows.length,1);
+assert.equal((await asUser(2,()=>db.query('select * from student_academic_profiles'))).rows.length,1);
+assert.equal((await asUser(2,()=>db.query("update research_records set title='Forbidden' returning id"))).rows.length,0);
+assert.equal((await asUser(0,()=>db.query("select id from profiles where role='student' and id <> auth.uid()"))).rows.length,0);
+assert.equal((await asUser(3,()=>db.query("select id from profiles where role='student'"))).rows.length,0);
+await db.exec(await readFile(`${base}/20261006001000_teacher_student_directory.sql`, 'utf8'));
+console.log('Teacher directory passed: independent filters, exact placement, read-only details, student/pending isolation, migration reapplication.');
 await db.close();
 
 });

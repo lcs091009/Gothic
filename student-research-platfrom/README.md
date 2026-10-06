@@ -119,3 +119,9 @@ select to_regprocedure('public.consume_ai_analysis_quota()');
 - [Supabase: Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security)
 - [Google: 웹앱에 Picker 연결](https://developers.google.com/workspace/drive/picker/guides/web-picker)
 - [Vercel: Vite 프로젝트](https://vercel.com/docs/frameworks/frontend/vite)
+
+## 교사 학생 조회
+
+교사 화면에서 학년·반·번호를 각각 선택하거나 비워둘 수 있습니다. 카드에는 이름과 학년·반·번호·학번을 표시하고, 클릭하면 이메일·선택과목·최근 활동 기록을 확인할 수 있습니다. 학번은 `10315 = 1학년 3반 15번` 형식을 사용합니다. 5자리 형식에 맞지 않는 학번은 필터를 비운 전체 목록에서 확인할 수 있습니다.
+
+이 기능에는 기존 보안 SQL을 적용한 뒤 **`supabase/migrations/20261006001000_teacher_student_directory.sql`**도 실제 Supabase에 적용해야 합니다. 승인된 교사에게 학생 프로필·선택과목·활동 기록의 읽기 권한을 추가하며, 학생의 접근·수정 권한은 유지합니다. 학생 목록은 서버에서 필터링하고 30명씩 표시하며 상세 창은 최신 활동 20개를 표시합니다.
