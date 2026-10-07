@@ -436,7 +436,7 @@ const styles = {
   },
   kicker: {
     margin: "0 0 6px",
-    color: "#737d88",
+    color: "#648675",
     fontSize: "13px",
     fontWeight: 900,
     letterSpacing: "0.08em",
@@ -446,13 +446,13 @@ const styles = {
     marginTop: 0,
     marginBottom: 0,
     fontSize: "24px",
-    color: "#303841",
+    color: "#355c50",
     fontWeight: 900,
   },
   subTitle: {
     marginTop: 0,
     marginBottom: 0,
-    color: "#303841",
+    color: "#355c50",
     fontSize: "20px",
     fontWeight: 900,
   },
@@ -480,7 +480,7 @@ const styles = {
     border: "1px solid #dde1e6",
     borderRadius: "16px",
     padding: "18px",
-    backgroundColor: "#f7f8fa",
+    backgroundColor: "#f3f6f1",
     boxShadow: "none",
   },
   noticeTitle: {
@@ -528,7 +528,7 @@ const styles = {
     transition: "0.18s ease",
   },
   matchBox: {
-    border: "1px solid #e3e5e8",
+    border: "1px solid #d8e3d8",
     borderRadius: "16px",
     padding: "16px",
     backgroundColor: "white",
@@ -540,7 +540,7 @@ const styles = {
   },
   matchBoxReview: {
     borderColor: "#d3d8de",
-    backgroundColor: "#f7f8fa",
+    backgroundColor: "#f3f6f1",
   },
   matchHeader: {
     display: "flex",
@@ -552,7 +552,7 @@ const styles = {
   matchTitle: {
     marginTop: 0,
     marginBottom: 0,
-    color: "#303841",
+    color: "#355c50",
   },
   statusPill: {
     borderRadius: "999px",
@@ -561,7 +561,7 @@ const styles = {
     fontWeight: 900,
   },
   statusPillOk: {
-    backgroundColor: "#e7eaee",
+    backgroundColor: "#e1ebdf",
     color: "#454d57",
   },
   statusPillReview: {
@@ -572,7 +572,7 @@ const styles = {
     border: "none",
     borderRadius: "14px",
     padding: "16px 20px",
-    backgroundColor: "#303841",
+    backgroundColor: "#355c50",
     color: "white",
     fontWeight: 900,
     fontSize: "15px",
@@ -583,7 +583,7 @@ const styles = {
     borderRadius: "999px",
     padding: "11px 14px",
     backgroundColor: "rgba(255, 255, 255, 0.86)",
-    color: "#303841",
+    color: "#355c50",
     fontWeight: 900,
     cursor: "pointer",
     fontSize: "13px",
@@ -591,7 +591,7 @@ const styles = {
   },
   message: {
     marginTop: "4px",
-    color: "#303841",
+    color: "#355c50",
     fontWeight: 900,
     whiteSpace: "pre-wrap",
   },
@@ -608,7 +608,7 @@ const styles = {
   countBadge: {
     borderRadius: "999px",
     padding: "5px 10px",
-    backgroundColor: "#eef0f3",
+    backgroundColor: "#e8f0e7",
     color: "#59616b",
     fontSize: "13px",
     fontWeight: 900,
@@ -623,7 +623,7 @@ const styles = {
     border: "1px dashed #d3d8de",
     borderRadius: "16px",
     padding: "18px",
-    backgroundColor: "#f7f8fa",
+    backgroundColor: "#f3f6f1",
   },
   list: {
     display: "flex",
@@ -651,7 +651,7 @@ const styles = {
     fontWeight: 800,
   },
   matchedBadge: {
-    backgroundColor: "#e7eaee",
+    backgroundColor: "#e1ebdf",
     color: "#454d57",
   },
   reviewBadge: {
@@ -661,7 +661,7 @@ const styles = {
   cardTitle: {
     marginBottom: 0,
     fontSize: "17px",
-    color: "#303841",
+    color: "#355c50",
     fontWeight: 900,
   },
   cardDescription: {
@@ -674,7 +674,7 @@ const styles = {
   link: {
     display: "inline-block",
     marginTop: "10px",
-    color: "#303841",
+    color: "#355c50",
     fontWeight: 900,
     textDecoration: "none",
   },

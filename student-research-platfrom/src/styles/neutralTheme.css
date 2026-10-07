@@ -17,6 +17,18 @@
 .neutral-dashboard .teacher-match-box::after { display: none; }
 .neutral-landing .floating-record { border-color: #dde1e6 !important; box-shadow: none !important; }
 .neutral-landing .animated-button:active:not(:disabled) { transform: scale(.98); }
+.neutral-landing { background: radial-gradient(ellipse at top, #e7efe3, transparent 70%), #f3f6f1 !important; }
+.neutral-landing .floating-record { border-color: #c9dacb !important; }
+.teacher-dashboard { background: #f3f6f1 !important; }
+.teacher-dashboard::before, .teacher-dashboard::after { display: block; }
+.teacher-dashboard::before { background: #bfd2b966; }
+.teacher-dashboard::after { background: #d8dbc066; }
+.teacher-dashboard > .dashboard-card { border-color: #d8e3d8 !important; }
+.teacher-dashboard .teacher-link:hover { color: #355c50 !important; }
+.teacher-dashboard .animated-button:focus-visible, .neutral-landing button:focus-visible { outline-color: #648675; }
+@media (prefers-reduced-motion: reduce) {
+  .teacher-dashboard::before, .teacher-dashboard::after, .neutral-landing .floating-record { animation: none; }
+}
 @media (max-width: 640px) {
   .neutral-dashboard { padding: 16px 12px !important; }
   .neutral-dashboard > .dashboard-card { padding: 22px 18px !important; }
