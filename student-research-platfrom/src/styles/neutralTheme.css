@@ -1,0 +1,24 @@
+.neutral-dashboard { animation: none; }
+.neutral-dashboard::before, .neutral-dashboard::after { display: none; }
+.neutral-dashboard > .dashboard-card {
+  background: #fff !important;
+  border: 1px solid #e3e5e8 !important;
+  box-shadow: none !important;
+  animation: none;
+}
+.neutral-dashboard .animated-button::before, .neutral-landing .animated-button::before { display: none; }
+.neutral-dashboard .animated-button:hover:not(:disabled), .neutral-landing .animated-button:hover:not(:disabled) { box-shadow: none; }
+.neutral-dashboard .teacher-card:hover { border-color: #c3cad2 !important; box-shadow: 0 6px 16px #3038410a !important; }
+.neutral-dashboard .teacher-link:hover { color: #303841 !important; }
+.neutral-dashboard .loading-orb { border-color: #e3e5e8; border-top-color: #59616b; border-right-color: #a5adb6; box-shadow: none; }
+.neutral-dashboard .mini-spinner { border-color: #e3e5e8; border-top-color: #59616b; }
+.neutral-dashboard :where(input, textarea, select):focus-visible { outline: 2px solid #858f9a; outline-offset: 2px; }
+.neutral-dashboard :where(button, a, summary):focus-visible, .neutral-landing button:focus-visible { outline: 3px solid #858f9a; outline-offset: 3px; }
+.neutral-dashboard .teacher-match-box::after { display: none; }
+.neutral-landing .floating-record { border-color: #dde1e6 !important; box-shadow: none !important; }
+.neutral-landing .animated-button:active:not(:disabled) { transform: scale(.98); }
+@media (max-width: 640px) {
+  .neutral-dashboard { padding: 16px 12px !important; }
+  .neutral-dashboard > .dashboard-card { padding: 22px 18px !important; }
+  .neutral-dashboard .teacher-page-panel { padding: 18px !important; }
+}

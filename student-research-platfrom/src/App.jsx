@@ -7,6 +7,7 @@ import StudentPage from "./pages/StudentPage";
 import StudentHome from "./pages/StudentHome";
 import { studentCategories } from "./config/studentCategories";
 import styles from "./styles/appStyles";
+import "./styles/neutralTheme.css";
 import GradeSetup from "./components/GradeSetup";
 import TeacherPage from "./components/TeacherPage";
 import AiAnalysisPage from "./components/AiAnalysisPage";
@@ -44,41 +45,6 @@ function App() {
     if (profile?.role === "student") sectionTitleRef.current?.focus();
   }, [currentPage, profile?.role]);
 
-  useEffect(() => {
-    if (profile?.role === "student") return;
-    const pageElement = pageRef.current;
-
-    if (
-      !pageElement ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
-      !window.matchMedia("(pointer: fine)").matches
-    ) {
-      return;
-    }
-
-    let animationFrameId = 0;
-
-    function handlePointerMove(event) {
-      if (animationFrameId) {
-        window.cancelAnimationFrame(animationFrameId);
-      }
-
-      animationFrameId = window.requestAnimationFrame(() => {
-        pageElement.style.setProperty("--pointer-x", `${event.clientX}px`);
-        pageElement.style.setProperty("--pointer-y", `${event.clientY}px`);
-      });
-    }
-
-    window.addEventListener("pointermove", handlePointerMove);
-
-    return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-
-      if (animationFrameId) {
-        window.cancelAnimationFrame(animationFrameId);
-      }
-    };
-  }, [session, profile?.role]);
 
   async function signOut() {
     if (!await authSignOut()) return;
@@ -174,7 +140,7 @@ async function handleDeleteResearchRecord(recordId) {
 
   if (isLoading) {
     return (
-      <main style={styles.page}>
+      <main className="neutral-dashboard" style={styles.page}>
         <section className="dashboard-card loading-card" style={styles.card}>
           <div className="loading-orb" aria-hidden="true" />
           <h1 style={styles.title}>활동 연결 노트</h1>
@@ -191,7 +157,7 @@ async function handleDeleteResearchRecord(recordId) {
 
   if (!isSupabaseConfigured()) {
     return (
-      <main style={styles.page}>
+      <main className="neutral-dashboard" style={styles.page}>
         <section style={styles.card}>
           <h1 style={styles.title}>활동 연결 노트</h1>
 
@@ -204,7 +170,7 @@ async function handleDeleteResearchRecord(recordId) {
   if (!session) return <HomePage signInWithGoogle={signInWithGoogle} message={message} />;
 
   return (
-    <main ref={pageRef} className={`dashboard-page ${profile?.role === "student" ? "student-dashboard" : ""}`} style={styles.page}>
+    <main ref={pageRef} className={`dashboard-page neutral-dashboard ${profile?.role === "student" ? "student-dashboard" : ""}`} style={styles.page}>
       <section className="dashboard-card" style={styles.card}>
         {profile?.role === "student" ? (
           <header className="student-header">
