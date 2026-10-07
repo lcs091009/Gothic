@@ -1,5 +1,7 @@
 import StudentDirectory from "./StudentDirectory";
-import { useCallback, useEffect, useState } from "react";
+import "../pages/StudentHome.css";
+import "./TeacherPage.css";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getFriendlySupabaseError,
   isSupabaseConfigured,
@@ -23,6 +25,9 @@ function getMatchLabel(matchStatus) {
 }
 
 function TeacherPage({ session }) {
+  const [currentSection, setCurrentSection] = useState("menu");
+  const headingRef = useRef(null);
+  useEffect(() => { headingRef.current?.focus(); }, [currentSection]);
   const [admissionYear, setAdmissionYear] = useState(studentAdmissionYear);
   const [grade, setGrade] = useState("1학년");
   const [semester, setSemester] = useState("1학기");
@@ -142,6 +147,7 @@ function TeacherPage({ session }) {
       setFileUrl("");
       setDescription("");
 
+      setCurrentSection("files");
       await loadSharedFiles();
     } catch (error) {
       setMessage(getFriendlySupabaseError(error));
@@ -152,42 +158,37 @@ function TeacherPage({ session }) {
 
   return (
     <section className="soft-panel teacher-page-panel" style={styles.page}>
-      <div style={styles.titleRow}>
-        <div>
-          <p style={styles.kicker}>Teacher Workspace</p>
-          <h2 style={styles.title}>선생님 자료 제공 페이지</h2>
+      {currentSection === "menu" ? (
+        <div className="teacher-menu student-home">
+          <p className="student-eyebrow">교사 활동 공간</p>
+          <h2 ref={headingRef} tabIndex={-1}>무엇을 도와드릴까요?</h2>
+          <p className="student-intro">학생을 살펴보고, 필요한 자료를 연결해 주세요.</p>
+          <nav className="student-category-grid teacher-category-grid" aria-label="교사 메뉴">
+            {[
+              { id: "students", title: "학생 조회", description: "학년·반·번호로 찾고 상세 정보를 확인해요", icon: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M16 3a4 4 0 0 1 0 8M22 21v-2a4 4 0 0 0-3-4M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" },
+              { id: "register", title: "자료 등록", description: "파일을 학생에게 연결하고 안내를 남겨요", icon: "M12 5v14M5 12h14" },
+              { id: "files", title: "제공한 자료", description: "등록한 자료와 배정 상태를 살펴봐요", icon: "M3 7V4h6l2 3h10v13H3V7Z" },
+            ].map(item => (
+              <button key={item.id} type="button" className="student-category" onClick={() => setCurrentSection(item.id)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={item.icon} /></svg>
+                <span className="student-category-copy"><strong>{item.title}</strong><span>{item.description}</span></span>
+                {item.id === "files" && !isLoadingFiles && <span className="student-category-count" aria-label={`제공한 자료 ${sharedFiles.length}개`}>{sharedFiles.length}</span>}
+                <span className="student-category-arrow" aria-hidden="true">↗</span>
+              </button>
+            ))}
+          </nav>
         </div>
+      ) : (
+        <header className="student-section-header teacher-section-header">
+          <button type="button" className="student-back" onClick={() => setCurrentSection("menu")}>← 메뉴</button>
+          <h2 ref={headingRef} tabIndex={-1}>{currentSection === "students" ? "학생 조회" : currentSection === "register" ? "자료 등록" : "제공한 자료"}</h2>
+          {currentSection === "files" && <button type="button" className="student-back teacher-refresh" onClick={loadSharedFiles} disabled={isLoadingFiles}>{isLoadingFiles ? "새로고침 중" : "새로고침"}</button>}
+        </header>
+      )}
 
-        <button
-          className="animated-button"
-          type="button"
-          onClick={loadSharedFiles}
-          disabled={isLoadingFiles}
-          style={styles.refreshButton}
-        >
-          {isLoadingFiles ? (
-            <>
-              새로고침 중
-              <span className="button-dots" aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </span>
-            </>
-          ) : (
-            "자료 새로고침"
-          )}
-        </button>
-      </div>
-
-      <p style={styles.text}>
-        선생님이 수행평가, 창체, 동아리, 독서, 발표 자료 등을 학생별로
-        제공할 수 있는 공간입니다. 파일명에 학번이 포함되어 있으면 학생
-        계정과 자동으로 연결됩니다.
-      </p>
-
-      <StudentDirectory teacherId={session?.user?.id} />
-
+      <div key={currentSection} className="student-view">
+      {currentSection === "students" && <StudentDirectory teacherId={session?.user?.id} />}
+      {currentSection === "register" && <>
       <div className="soft-panel" style={styles.noticeBox}>
         <h3 style={styles.noticeTitle}>파일명 자동 인식 예시</h3>
         <p style={styles.text}>10315_김철수_통합사회.pdf → {getStudentEmail("10315", admissionYear)}</p>
@@ -323,7 +324,6 @@ function TeacherPage({ session }) {
           />
         </div>
 
-        {message && <p style={styles.message}>{message}</p>}
 
         <button
           className="animated-button"
@@ -349,8 +349,9 @@ function TeacherPage({ session }) {
           )}
         </button>
       </form>
+      </>}
 
-      <section className="soft-panel" style={styles.listBox}>
+      {currentSection === "files" && <section className="soft-panel" style={styles.listBox}>
         <div style={styles.listTitleRow}>
           <h3 style={styles.subTitle}>내가 제공한 자료</h3>
           <span style={styles.countBadge}>{sharedFiles.length}개</span>
@@ -365,8 +366,9 @@ function TeacherPage({ session }) {
           <div style={styles.emptyBox}>
             <p style={styles.text}>아직 등록한 자료가 없습니다.</p>
             <p style={styles.smallText}>
-              위 입력창에서 파일명과 설명을 저장하면 여기에 카드로 표시됩니다.
+              자료를 등록하면 배정 상태와 파일을 여기서 확인할 수 있습니다.
             </p>
+            <button type="button" className="student-back" onClick={() => setCurrentSection("register")}>첫 자료 등록하기 →</button>
           </div>
         ) : (
           <div style={styles.list}>
@@ -413,7 +415,9 @@ function TeacherPage({ session }) {
             ))}
           </div>
         )}
-      </section>
+      </section>}
+      </div>
+      {message && <p style={styles.message} role="status">{message}</p>}
     </section>
   );
 }

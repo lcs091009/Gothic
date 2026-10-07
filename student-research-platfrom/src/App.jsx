@@ -172,7 +172,7 @@ async function handleDeleteResearchRecord(recordId) {
   return (
     <main ref={pageRef} className={`dashboard-page neutral-dashboard ${profile?.role === "student" ? "student-dashboard" : profile?.role === "teacher" ? "teacher-dashboard" : ""}`} style={styles.page}>
       <section className="dashboard-card" style={styles.card}>
-        {profile?.role === "student" ? (
+        {["student", "teacher"].includes(profile?.role) ? (
           <header className="student-header">
             <h1>활동 연결 노트</h1>
             <details className="student-account">

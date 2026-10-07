@@ -1,0 +1,15 @@
+.teacher-dashboard .teacher-page-panel { margin-top: 0 !important; padding: 0 !important; border: 0 !important; background: transparent !important; }
+.teacher-category-grid { margin-top: 32px; }
+.teacher-menu h2:focus, .teacher-section-header h2:focus { outline: none; }
+.teacher-category-grid .student-category svg { color: #557969; }
+.teacher-category-grid .student-category-count { background: #edf2ec; color: #557969; }
+.teacher-section-header { flex-wrap: wrap; }
+.teacher-refresh { margin-left: auto; }
+.teacher-dashboard .student-view { margin-top: 24px; }
+.teacher-dashboard :where(button, summary):focus-visible { outline: 3px solid #648675; outline-offset: 3px; }
+.teacher-dashboard .teacher-menu { padding-bottom: 16px; }
+@media (max-width: 640px) {
+  .teacher-dashboard .teacher-page-panel form > div:first-child { grid-template-columns: 1fr !important; }
+  .teacher-dashboard .student-directory { padding: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .teacher-dashboard .student-view { animation: none; } }
