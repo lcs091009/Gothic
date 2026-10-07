@@ -170,7 +170,7 @@ async function handleDeleteResearchRecord(recordId) {
   if (!session) return <HomePage signInWithGoogle={signInWithGoogle} message={message} />;
 
   return (
-    <main ref={pageRef} className={`dashboard-page neutral-dashboard ${profile?.role === "student" ? "student-dashboard" : ""}`} style={styles.page}>
+    <main ref={pageRef} className={`dashboard-page neutral-dashboard ${profile?.role === "student" ? "student-dashboard" : profile?.role === "teacher" ? "teacher-dashboard" : ""}`} style={styles.page}>
       <section className="dashboard-card" style={styles.card}>
         {profile?.role === "student" ? (
           <header className="student-header">
