@@ -1,4 +1,7 @@
 import styles from "../styles/appStyles";
+import { studentCategories } from "../config/studentCategories";
+import "./StudentHome.css";
+import "./HomePage.css";
 
 const studentRecordPreview = [
   "자율활동: 학급 탐구 프로젝트에서 자료 조사와 발표 구성을 맡아 주제의 핵심을 정리하고 친구들의 의견을 종합함.",
@@ -12,7 +15,7 @@ const studentRecordPreview = [
 
 export default function HomePage({ signInWithGoogle, message }) {
 return (
-      <main className="neutral-landing" style={styles.landingPage}>
+      <main className="student-dashboard neutral-landing login-page">
         <div
           className="floating-record floating-record-left"
           style={styles.floatingRecord}
@@ -52,58 +55,35 @@ return (
           ))}
         </div>
 
-        <header style={styles.landingHeader}>
-          <p style={styles.brand}>활동 연결 노트</p>
-          <button
-            className="animated-button"
-            onClick={signInWithGoogle}
-            style={styles.loginButton}
-          >
-            로그인
-          </button>
-        </header>
+        <section className="dashboard-card login-shell" aria-labelledby="login-title">
+          <header className="student-header">
+            <p className="login-brand">활동 연결 노트</p>
+            <button type="button" className="student-back" onClick={signInWithGoogle}>로그인</button>
+          </header>
 
-        <section style={styles.centerStage}>
-          <img
-            src="/research-logo.svg"
-            alt="활동 연결 노트 로고"
-            style={styles.heroLogo}
-          />
-
-          <div style={styles.introBox}>
-            <p style={styles.kicker}>작년 활동 기반 과목 연결</p>
-            <h1 style={styles.heroTitle}>활동 연결 노트</h1>
-
-            <p style={styles.heroText}>
+          <div className="login-hero">
+            <img src="/research-logo.svg" alt="활동 연결 노트 로고" className="login-logo" />
+            <p className="student-eyebrow">작년 활동 기반 과목 연결</p>
+            <h1 id="login-title">활동 연결 노트</h1>
+            <p className="student-intro">
               작년 활동과 현재 선택과목을 연결해 다음 활동 방향을 정리합니다.
               생기부나 보고서를 대신 작성하지 않고, 학생이 스스로 과목 안에서
               이어갈 활동을 설계하도록 돕습니다.
             </p>
-
-            {message && <p style={styles.message}>{message}</p>}
+            {message && <p className="login-message" role="status">{message}</p>}
           </div>
 
-          <div className="landing-feature-row" style={styles.landingFeatureRow}>
-            <article style={styles.landingFeatureCard}>
-              <strong style={styles.landingFeatureTitle}>기록 정리</strong>
-              <span style={styles.landingFeatureText}>
-                흩어진 탐구 활동을 학기별로 모아 봅니다.
-              </span>
-            </article>
-
-            <article style={styles.landingFeatureCard}>
-              <strong style={styles.landingFeatureTitle}>흐름 분석</strong>
-              <span style={styles.landingFeatureText}>
-                이전 활동에서 관심 분야와 강점을 찾습니다.
-              </span>
-            </article>
-
-            <article style={styles.landingFeatureCard}>
-              <strong style={styles.landingFeatureTitle}>연결 점검</strong>
-              <span style={styles.landingFeatureText}>
-                현재 과목의 정체성이 드러나는 활동 방향을 점검합니다.
-              </span>
-            </article>
+          <div className="login-feature-grid" aria-label="주요 기능">
+            {[
+              { title: "기록 정리", description: "흩어진 탐구 활동을 학기별로 모아 봅니다.", icon: studentCategories[1].icon },
+              { title: "흐름 분석", description: "이전 활동에서 관심 분야와 강점을 찾습니다.", icon: studentCategories[3].icon },
+              { title: "연결 점검", description: "현재 과목의 정체성이 드러나는 활동 방향을 점검합니다.", icon: studentCategories[4].icon },
+            ].map(feature => (
+              <article className="student-category login-feature" key={feature.title}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={feature.icon} /></svg>
+                <span className="student-category-copy"><strong>{feature.title}</strong><span>{feature.description}</span></span>
+              </article>
+            ))}
           </div>
         </section>
       </main>
