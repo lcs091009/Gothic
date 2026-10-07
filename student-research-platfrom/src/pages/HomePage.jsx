@@ -12,7 +12,7 @@ const studentRecordPreview = [
 
 export default function HomePage({ signInWithGoogle, message }) {
 return (
-      <main style={styles.landingPage}>
+      <main className="neutral-landing" style={styles.landingPage}>
         <div
           className="floating-record floating-record-left"
           style={styles.floatingRecord}
