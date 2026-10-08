@@ -31,8 +31,9 @@ function fixture(overrides = {}) {
     fetchImpl: async (url, options) => {
       providerCalls.push({ url, options });
       if (overrides.fetchError) throw overrides.fetchError;
-      return { ok: overrides.ok ?? true, status: overrides.status || 200,
-        text: async () => overrides.raw ?? JSON.stringify({ choices: [{ message: { content: "분석 완료" } }] }) };
+      const reply = overrides.providerResponses?.[providerCalls.length - 1] || overrides;
+      return { ok: reply.ok ?? true, status: reply.status || 200,
+        text: async () => reply.raw ?? JSON.stringify({ choices: [{ message: { content: "분석 완료" } }] }) };
     } });
   async function call(request = {}) {
     const response = { headers: {}, setHeader(k, v) { this.headers[k] = v; },
@@ -140,8 +141,8 @@ test("distinguishes provider authentication, model, billing, input and availabil
     assert.equal(r.body.providerStatus, status);
     assert.match(r.body.error, new RegExp(String(status)));
     assert.doesNotMatch(JSON.stringify([r.body, f.logs]), /PRIVATE_PROVIDER_BODY|fake-test-only|valid-token/);
-    assert.equal(f.providerCalls.length, 1);
-    assert.equal(f.logs.length, 1);
+    assert.equal(f.providerCalls.length, status === 410 ? 2 : 1);
+    assert.equal(f.logs.length, status === 410 ? 2 : 1);
   }
 });
 
@@ -164,15 +165,57 @@ test("trims accidental whitespace around a server key and rejects whitespace-onl
   assert.equal(empty.providerCalls.length, 0);
 });
 
-test("uses a supported instruct model without the retired Nemotron identifier or model-specific thinking switch", async () => {
+test("uses Nemotron 3 Super with explicit non-streaming and reasoning disabled", async () => {
   const f = fixture();
   assert.equal((await f.call()).code, 200);
   const payload = JSON.parse(f.providerCalls[0].options.body);
-  assert.equal(payload.model, "qwen/qwen3-next-80b-a3b-instruct");
+  assert.equal(payload.model, "nvidia/nemotron-3-super-120b-a12b");
   assert.equal(payload.temperature, 0.6);
-  assert.ok(payload.max_tokens <= 4096);
+  assert.ok(payload.max_tokens <= 32768);
+  assert.equal(payload.stream, false);
+  assert.equal(payload.reasoning_effort, "none");
   assert.deepEqual(payload.messages.map(m => m.role), ["system", "user"]);
   assert.doesNotMatch(payload.messages[0].content, /\/no_think/);
   assert.match(payload.messages[0].content, /근거 규칙/);
   assert.equal(f.providerCalls.length, 1);
+});
+
+
+test("a 410 switches once to Nano with the same deadline, owner data and one quota charge", async () => {
+  const f = fixture({ providerResponses: [{ ok: false, status: 410, raw: "PRIVATE_RETIRED_BODY" }, { ok: true }] });
+  const r = await f.call();
+  assert.equal(r.code, 200);
+  assert.equal(r.body.analysis, "분석 완료");
+  assert.equal(r.body.fallbackUsed, true);
+  assert.equal(r.body.providerModel, "nvidia/nemotron-3-nano-30b-a3b");
+  assert.equal(f.quotaCalls, 1);
+  assert.equal(f.providerCalls.length, 2);
+  const first = JSON.parse(f.providerCalls[0].options.body);
+  const second = JSON.parse(f.providerCalls[1].options.body);
+  assert.deepEqual(first.messages, second.messages);
+  assert.equal(second.chat_template_kwargs.enable_thinking, false);
+  assert.equal(second.stream, false);
+  assert.equal(f.providerCalls[0].options.signal, f.providerCalls[1].options.signal);
+  assert.doesNotMatch(JSON.stringify([r.body, f.logs]), /PRIVATE_RETIRED_BODY/);
+});
+
+test("does not retry authentication, rate limit, unavailable models, server failure or empty successful answers", async () => {
+  for (const status of [401, 403, 404, 429, 500]) {
+    const f = fixture({ ok: false, status });
+    await f.call();
+    assert.equal(f.providerCalls.length, 1);
+  }
+  const f = fixture({ raw: JSON.stringify({ choices: [{ message: { content: "" } }] }) });
+  assert.equal((await f.call()).code, 502);
+  assert.equal(f.providerCalls.length, 1);
+});
+
+test("two retired models stop after two attempts and identify the final model", async () => {
+  const f = fixture({ ok: false, status: 410 });
+  const r = await f.call();
+  assert.equal(r.code, 503);
+  assert.equal(r.body.code, "AI_PROVIDER_MODEL_RETIRED");
+  assert.equal(r.body.providerModel, "nvidia/nemotron-3-nano-30b-a3b");
+  assert.equal(f.providerCalls.length, 2);
+  assert.equal(f.quotaCalls, 1);
 });

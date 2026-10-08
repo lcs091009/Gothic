@@ -3,7 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { buildAnalysisContext, RECORD_SCAN_LIMIT, SYSTEM_PROMPT } from "../server/analysisContext.js";
 
 export const MAX_BODY_BYTES = 16_384;
-export const AI_MODEL = "qwen/qwen3-next-80b-a3b-instruct";
+export const AI_MODEL = "nvidia/nemotron-3-super-120b-a12b";
+export const AI_FALLBACK_MODEL = "nvidia/nemotron-3-nano-30b-a3b";
 
 export function providerFailure(status) {
   if (status === 401 || status === 403) return {
@@ -119,34 +120,42 @@ return async function handler(request, response) {
     const controller = new AbortController();
     timeoutId = setTimeout(() => controller.abort(), 45000);
 
-    const nvidiaResponse = await fetchImpl(
-      "https://integrate.api.nvidia.com/v1/chat/completions",
-      {
-        method: "POST",
-        signal: controller.signal,
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: AI_MODEL,
-          messages: [
-            {
-              role: "system",
-              content: SYSTEM_PROMPT,
-            },
-            {
-              role: "user",
-              content: userPrompt,
-            },
-          ],
-          temperature: 0.6,
-          max_tokens: 2600,
-        }),
-      }
-    );
-
-    const nvidiaRawText = await nvidiaResponse.text();
+    let nvidiaResponse, nvidiaRawText, usedModel;
+    for (const model of [AI_MODEL, AI_FALLBACK_MODEL]) {
+      usedModel = model;
+      nvidiaResponse = await fetchImpl(
+        "https://integrate.api.nvidia.com/v1/chat/completions",
+        {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              { role: "user", content: userPrompt },
+            ],
+            temperature: 0.6,
+            max_tokens: 2600,
+            stream: false,
+            ...(model === AI_MODEL
+              ? { reasoning_effort: "none" }
+              : { chat_template_kwargs: { enable_thinking: false } }),
+          }),
+        }
+      );
+      nvidiaRawText = await nvidiaResponse.text();
+      // A retired model cannot generate an answer: try the bounded alternative
+      // only for 410, sharing the original deadline and student quota charge.
+      if (nvidiaResponse.status !== 410 || model === AI_FALLBACK_MODEL) break;
+      logger.warn("AI model retired; using fallback", {
+        code: "AI_PROVIDER_MODEL_RETIRED", providerStatus: 410, model,
+      });
+    }
     clearTimeout(timeoutId);
 
     // Only log our fixed error code and HTTP status: never response bodies,
@@ -154,10 +163,10 @@ return async function handler(request, response) {
     if (!nvidiaResponse.ok) {
       const { status, ...failure } = providerFailure(nvidiaResponse.status);
       logger.warn("AI provider request failed", {
-        code: failure.code, providerStatus: failure.providerStatus,
+        code: failure.code, providerStatus: failure.providerStatus, model: usedModel,
       });
       if (nvidiaResponse.status === 429) response.setHeader("Retry-After", "60");
-      return response.status(status).json(failure);
+      return response.status(status).json({ ...failure, providerModel: usedModel });
     }
 
     let result = null;
@@ -182,6 +191,8 @@ return async function handler(request, response) {
     return response.status(200).json({
       analysis: text,
       scope,
+      providerModel: usedModel,
+      fallbackUsed: usedModel === AI_FALLBACK_MODEL,
       warning: choice.finish_reason === "length"
         ? "응답 길이 제한으로 분석 일부가 생략되었을 수 있습니다." : null,
     });

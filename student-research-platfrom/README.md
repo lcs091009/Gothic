@@ -91,15 +91,15 @@ update public.profiles set role = 'teacher' where id = 'VERIFIED_TEACHER_UUID'::
 
 서버는 Supabase `getUser(token)`으로 로그인 토큰을 검증한 뒤 승인된 학생인지 확인합니다. 브라우저는 보충 입력만 전송하며, 서버가 본인의 저장된 선택과목·최근 등록한 활동 최대 48개·교사 자료 8개를 다시 읽습니다. 활동은 개요 전체와 최신 기록·이전 학기·과목을 고려해 고른 최대 12개의 본문을 참고합니다. 긴 본문은 앞부분과 끝부분을 합쳐 2,000자 이내로 발췌하며 생략 여부를 모델에 알립니다. 등록일을 활동일로 취급하지 않습니다. 브라우저가 보낸 임의의 사용자 ID·활동 목록은 분석 자료로 사용하지 않습니다.
 
-요청은 16 KiB, 보충 입력은 1,200자로 제한합니다. 데이터베이스에서 사용자별 **10분에 5회·24시간에 20회**를 제한하며, 서버 재시작이나 여러 인스턴스에서도 동일하게 집계합니다. 한도 SQL 함수가 없거나 오류가 나면 AI 호출을 차단합니다. NVIDIA 요청을 시작한 시도는 실패하더라도 한도에 포함됩니다. NVIDIA에서 제공하는 `qwen/qwen3-next-80b-a3b-instruct` 모델에 temperature 0.6을 사용하고, 한 번의 호출에서 출력 상한 2,600토큰으로 분석합니다. 답변에는 활동 근거 번호·과목 연결 이유·탐구 방법·소요 시간·결과물을 요청합니다. 모델 응답 시간 제한은 45초이며 공급자 오류 본문은 브라우저에 노출하지 않습니다.
+요청은 16 KiB, 보충 입력은 1,200자로 제한합니다. 데이터베이스에서 사용자별 **10분에 5회·24시간에 20회**를 제한하며, 서버 재시작이나 여러 인스턴스에서도 동일하게 집계합니다. 한도 SQL 함수가 없거나 오류가 나면 AI 호출을 차단합니다. NVIDIA 요청을 시작한 시도는 실패하더라도 한도에 포함됩니다. NVIDIA에서 제공하는 `nvidia/nemotron-3-super-120b-a12b` 모델에 temperature 0.6을 사용하고, 출력 상한 2,600토큰으로 분석합니다. 기본 모델이 410을 반환하면 `nvidia/nemotron-3-nano-30b-a3b`로 한 번만 전환합니다. 두 호출은 45초 제한과 사용자 한도 차감을 공유하며, 다른 오류에는 자동 재시도하지 않습니다. 두 모델 모두 비추론 모드와 `stream: false`를 명시합니다. 답변에는 활동 근거 번호·과목 연결 이유·탐구 방법·소요 시간·결과물을 요청합니다. 모델 응답 시간 제한은 45초이며 공급자 오류 본문은 브라우저에 노출하지 않습니다.
 
-근거 번호는 각 분석 요청 안에서 부여한 `R1`(활동), `T1`(교사 자료) 형태입니다. 응답에는 실제 분석 범위와 길이 제한 경고를 함께 반환합니다. 빈 응답은 성공으로 처리하지 않고, 실패 시 화면의 이전 결과를 유지합니다. 요청 횟수와 응답 길이를 늘리는 자동 재시도는 사용하지 않습니다.
+근거 번호는 각 분석 요청 안에서 부여한 `R1`(활동), `T1`(교사 자료) 형태입니다. 응답에는 실제 분석 범위와 길이 제한 경고를 함께 반환합니다. 빈 응답은 성공으로 처리하지 않고, 실패 시 화면의 이전 결과를 유지합니다. 일반 오류 재시도는 하지 않으며, 모델 종료(410)에만 최대 1회 대체 모델을 사용합니다. 응답과 안전한 로그에는 실제 사용 모델명을 포함합니다.
 
 2026-10-08 운영 프로젝트에는 `enable_student_ai_analysis_quota` 마이그레이션으로 요청 한도 테이블/함수만 적용했습니다. 아래 전체 보안 마이그레이션의 서비스 테이블 정책 교체는 별도 작업입니다. 새 환경에서는 기존 SQL의 `-- One locked row per user`부터 시작하는 한도 블록을 적용할 수 있습니다.
 
-기존 NVIDIA-hosted Nemotron Super 49B v1/v1.5는 2026-08-26 제공이 종료되어 HTTP 410을 반환하므로 사용하지 않습니다. Qwen Instruct는 non-thinking 모델이므로 기존 Nemotron 전용 `/no_think` 지시는 제거했습니다. 410은 모델 종료 안내로 표시하며 자동 재시도하지 않습니다. 기존 `NVIDIA_API_KEY`와 API 주소를 사용합니다.
+기존 Nemotron Super 49B v1/v1.5와 Qwen3-Next 모델의 HTTP 410 문제가 보고되어 Nemotron 3 계열로 전환했습니다. 모델 설명 페이지가 남아 있다고 실제 호스팅 제공을 보장하지 않으므로 배포 후 실제 API 응답을 확인해야 합니다. 기존 `NVIDIA_API_KEY`와 API 주소를 사용합니다.
 
-공식 참고: [NVIDIA 모델 종료 공지](https://nvidia.github.io/NeMo-Retriever/extraction/prerequisites-support-matrix/), [Qwen3-Next API 설정](https://docs.api.nvidia.com/nim/re/reference/qwen-qwen3-next-80b-a3b-instruct-infer).
+공식 참고: [Nemotron 3 Super API](https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3-super-120b-a12b-infer), [Nano API](https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3-nano-30b-a3b-infer), [Nano 추론 설정](https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3-nano-30b-a3b).
 
 ## 기존 서비스에 적용하는 순서
 
