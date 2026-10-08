@@ -19,6 +19,7 @@ function fixture(overrides = {}) {
     from(table) {
       const query = { table, filters: [] }; queries.push(query);
       const chain = { select() { return chain; }, eq(...args) { query.filters.push(args); return chain; },
+        in(column, values) { query.in = [column, values]; return chain; },
         order() { return chain; }, limit(n) { query.limit = n; return chain; },
         maybeSingle() { return Promise.resolve(tables[table]); },
         then(resolve, reject) { return Promise.resolve(tables[table]).then(resolve, reject); } };
@@ -218,4 +219,36 @@ test("two retired models stop after two attempts and identify the final model", 
   assert.equal(r.body.providerModel, "nvidia/nemotron-3-nano-30b-a3b");
   assert.equal(f.providerCalls.length, 2);
   assert.equal(f.quotaCalls, 1);
+});
+
+const selectedId = "00000000-0000-4000-8000-000000000001";
+const olderId = "00000000-0000-4000-8000-000000000002";
+test("selected older records use an owner-scoped ID query and only stored content", async () => {
+  const f = fixture({ tables: { research_records: { data: [{ id: olderId, title: "작년 활동", content: "기록된 결론" }] } } });
+  const r = await f.call({ body: { selectedRecordIds: [olderId], records: [{ content: "FORGED" }] } });
+  assert.equal(r.code, 200);
+  const query = f.queries.find(q => q.table === "research_records");
+  assert.deepEqual(query.in, ["id", [olderId]]);
+  assert.deepEqual(query.filters, [["user_id", user.id]]);
+  assert.equal(query.limit, 48);
+  const prompt = JSON.parse(f.providerCalls[0].options.body).messages[1].content;
+  assert.match(prompt, /작년 활동|기록된 결론/);
+  assert.doesNotMatch(prompt, /FORGED/);
+  assert.equal(r.body.scope.scannedRecords, 1);
+});
+test("empty, invalid, duplicate and oversized selections never spend AI quota", async () => {
+  for (const ids of [[], null, "all", [123], ["invalid"], [selectedId, selectedId], Array(49).fill(selectedId)]) {
+    const f = fixture();
+    assert.equal((await f.call({ body: { selectedRecordIds: ids } })).code, 400);
+    assert.equal(f.quotaCalls, 0);
+    assert.equal(f.providerCalls.length, 0);
+  }
+});
+test("missing, deleted or inaccessible selected IDs fail without falling back to all records", async () => {
+  for (const data of [[], [{ id: olderId, content: "not selected" }]]) {
+    const f = fixture({ tables: { research_records: { data } } });
+    assert.equal((await f.call({ body: { selectedRecordIds: [selectedId] } })).code, 400);
+    assert.equal(f.quotaCalls, 0);
+    assert.equal(f.providerCalls.length, 0);
+  }
 });

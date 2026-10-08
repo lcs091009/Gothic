@@ -292,6 +292,11 @@ async function handleDeleteResearchRecord(recordId) {
             isGoogleAuthLoading={isGoogleAuthLoading}
             driveFileName={driveFileName}
             driveFileUrl={driveFileUrl}
+            onClearSelectedFile={() => {
+              setDriveFileId("");
+              setDriveFileName("");
+              setDriveFileUrl("");
+            }}
             isSubmitting={isSubmitting}
             records={records}
             handleDeleteResearchRecord={handleDeleteResearchRecord}
