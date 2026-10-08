@@ -1,3 +1,4 @@
+import { requestDriveAccessToken } from "../lib/googleDriveAuth";
 import { getGooglePickerConfigError } from "../lib/googlePickerConfig";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -12,11 +13,12 @@ export function useGoogleDrive({ setMessage, userId }) {
   const pickerScrollYRef = useRef(0);
   const googleAccessTokenRef = useRef("");
   const googleTokenExpiresAtRef = useRef(0);
-  const googleTokenClientRef = useRef(null);
+  const googleAuthRequestRef = useRef(null);
   const clearDriveSession = useCallback(() => {
     googleAccessTokenRef.current = "";
     googleTokenExpiresAtRef.current = 0;
-    googleTokenClientRef.current = null;
+    googleAuthRequestRef.current?.abort();
+    googleAuthRequestRef.current = null;
     for (const key of ["googleDriveAccessToken", "googleDriveTokenExpiresAt", "googleDriveUserId"]) {
       window.sessionStorage.removeItem(key);
     }
@@ -24,7 +26,7 @@ export function useGoogleDrive({ setMessage, userId }) {
   }, []);
   useEffect(() => {
     if (window.sessionStorage.getItem("googleDriveUserId") !== userId) clearDriveSession();
-    return () => { googleAccessTokenRef.current = ""; googleTokenClientRef.current = null; };
+    return () => { googleAccessTokenRef.current = ""; googleAuthRequestRef.current?.abort(); };
   }, [userId, clearDriveSession]);
 
 function loadScript(src) {
@@ -89,107 +91,27 @@ async function getGoogleAccessToken({ forceConsent = false } = {}) {
     return googleAccessTokenRef.current;
   }
 
-  if (!googleTokenClientRef.current) {
-    googleTokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
-      client_id: googleClientId,
-      scope: "https://www.googleapis.com/auth/drive.file",
-      callback: () => {},
+  googleAuthRequestRef.current?.abort();
+  const controller = new AbortController();
+  googleAuthRequestRef.current = controller;
+  try {
+    const tokenResponse = await requestDriveAccessToken({
+      oauth2: window.google.accounts.oauth2,
+      clientId: googleClientId,
+      forceConsent,
+      signal: controller.signal,
     });
+    const accessToken = tokenResponse.access_token;
+    const expiresAt = Date.now() + Number(tokenResponse.expires_in || 3600) * 1000;
+    googleAccessTokenRef.current = accessToken;
+    googleTokenExpiresAtRef.current = expiresAt;
+    window.sessionStorage.setItem("googleDriveUserId", userId);
+    window.sessionStorage.setItem("googleDriveAccessToken", accessToken);
+    window.sessionStorage.setItem("googleDriveTokenExpiresAt", String(expiresAt));
+    return accessToken;
+  } finally {
+    if (googleAuthRequestRef.current === controller) googleAuthRequestRef.current = null;
   }
-
-  return new Promise((resolve, reject) => {
-    let isSettled = false;
-    let focusCheckTimerId = null;
-
-    function cleanup() {
-      window.clearTimeout(timeoutId);
-      window.removeEventListener("focus", handleWindowFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-
-      if (focusCheckTimerId) {
-        window.clearTimeout(focusCheckTimerId);
-      }
-    }
-
-    function finishWithError(errorMessage) {
-      if (isSettled) {
-        return;
-      }
-
-      isSettled = true;
-      cleanup();
-      reject(new Error(errorMessage));
-    }
-
-    function finishWithToken(tokenResponse) {
-      if (isSettled) {
-        return;
-      }
-
-      if (tokenResponse.error || !tokenResponse.access_token) {
-        finishWithError("Google Drive 권한 요청에 실패했습니다.");
-        return;
-      }
-
-      isSettled = true;
-      cleanup();
-
-      const accessToken = tokenResponse.access_token;
-      const expiresAt = Date.now() + Number(tokenResponse.expires_in || 3600) * 1000;
-
-      googleAccessTokenRef.current = accessToken;
-      googleTokenExpiresAtRef.current = expiresAt;
-
-      window.sessionStorage.setItem("googleDriveUserId", userId);
-      window.sessionStorage.setItem("googleDriveAccessToken", accessToken);
-      window.sessionStorage.setItem("googleDriveTokenExpiresAt", String(expiresAt));
-
-      resolve(accessToken);
-    }
-
-    function handleWindowFocus() {
-      if (isSettled) {
-        return;
-      }
-
-      if (focusCheckTimerId) {
-        window.clearTimeout(focusCheckTimerId);
-      }
-
-      focusCheckTimerId = window.setTimeout(() => {
-        if (!isSettled) {
-          finishWithError(
-            "Google 로그인 창이 닫혔습니다. 파일을 선택하려면 버튼을 다시 눌러 주세요."
-          );
-        }
-      }, 900);
-    }
-
-    function handleVisibilityChange() {
-      if (document.visibilityState === "visible") {
-        handleWindowFocus();
-      }
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      finishWithError(
-        "Google 권한 창이 닫혔거나 응답이 없습니다. 다시 파일 선택 버튼을 눌러 주세요."
-      );
-    }, 8000);
-
-    window.addEventListener("focus", handleWindowFocus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    googleTokenClientRef.current.callback = finishWithToken;
-
-    try {
-      googleTokenClientRef.current.requestAccessToken({
-        prompt: forceConsent ? "consent" : "",
-      });
-    } catch {
-      finishWithError("Google 로그인 창을 여는 중 오류가 발생했습니다.");
-    }
-  });
 }
 
 async function openGooglePicker() {
@@ -206,14 +128,7 @@ async function openGooglePicker() {
   setIsGoogleAuthLoading(true);
   setIsPickerLoading(false);
 
-  let loadingSafetyTimer = null;
-
   try {
-    loadingSafetyTimer = window.setTimeout(() => {
-      setIsGoogleAuthLoading(false);
-      setIsPickerLoading(false);
-    }, 8000);
-
     const accessToken = await getGoogleAccessToken();
 
     setIsGoogleAuthLoading(false);
@@ -284,10 +199,6 @@ async function openGooglePicker() {
         behavior: "auto",
       });
     });
-  } finally {
-    if (loadingSafetyTimer) {
-      window.clearTimeout(loadingSafetyTimer);
-    }
   }
 }
 
