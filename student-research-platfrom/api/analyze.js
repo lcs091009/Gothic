@@ -4,7 +4,35 @@ import { buildAnalysisContext, RECORD_SCAN_LIMIT, SYSTEM_PROMPT } from "../serve
 
 export const MAX_BODY_BYTES = 16_384;
 
-export function createAnalyzeHandler({ env = process.env, fetchImpl = fetch, clientFactory = createClient } = {}) {
+export function providerFailure(status) {
+  if (status === 401 || status === 403) return {
+    status: 503, code: "AI_PROVIDER_AUTH", providerStatus: status,
+    error: `AI 연결 인증에 실패했습니다(NVIDIA ${status}). 관리자가 배포 환경의 NVIDIA_API_KEY와 모델 접근 권한을 확인해야 합니다.`,
+  };
+  if (status === 429) return {
+    status: 429, code: "AI_PROVIDER_LIMIT", providerStatus: status,
+    error: "AI 공급자의 요청 한도에 도달했습니다(NVIDIA 429). 잠시 후 다시 시도해 주세요. 반복되면 관리자가 API 사용 한도와 크레딧을 확인해야 합니다.",
+  };
+  if (status === 402) return {
+    status: 503, code: "AI_PROVIDER_BILLING", providerStatus: status,
+    error: "AI 공급자의 사용 요금 또는 크레딧 확인이 필요합니다(NVIDIA 402). 관리자에게 문의해 주세요.",
+  };
+  if (status === 404) return {
+    status: 503, code: "AI_PROVIDER_MODEL", providerStatus: status,
+    error: "설정된 AI 모델을 사용할 수 없습니다(NVIDIA 404). 관리자가 모델 제공 여부와 접근 권한을 확인해야 합니다.",
+  };
+  if ([400, 413, 422].includes(status)) return {
+    status: 502, code: "AI_PROVIDER_REQUEST", providerStatus: status,
+    error: `AI 공급자가 분석 요청을 거부했습니다(NVIDIA ${status}). 관리자에게 이 오류 번호를 알려 주세요.`,
+  };
+  return {
+    status: 502, code: "AI_PROVIDER_UNAVAILABLE", providerStatus: status,
+    error: `AI 공급자에서 오류가 발생했습니다(NVIDIA ${status}). 잠시 후 다시 시도해 주세요.`,
+  };
+}
+
+export function createAnalyzeHandler({ env = process.env, fetchImpl = fetch, clientFactory = createClient,
+  logger = console } = {}) {
 return async function handler(request, response) {
   response.setHeader("Cache-Control", "no-store");
   if (request.method !== "POST") {
@@ -20,7 +48,7 @@ return async function handler(request, response) {
   const supabaseUrl = env.SUPABASE_URL || env.VITE_SUPABASE_URL;
   const supabaseKey = env.SUPABASE_PUBLISHABLE_KEY || env.SUPABASE_ANON_KEY ||
     env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_ANON_KEY;
-  const apiKey = env.NVIDIA_API_KEY;
+  const apiKey = typeof env.NVIDIA_API_KEY === "string" ? env.NVIDIA_API_KEY.trim() : "";
   if (!supabaseUrl || !supabaseKey || !apiKey) {
     return response.status(503).json({ error: "AI 분석 서비스 설정이 필요합니다. 관리자에게 문의해 주세요." });
   }
@@ -117,6 +145,17 @@ return async function handler(request, response) {
     const nvidiaRawText = await nvidiaResponse.text();
     clearTimeout(timeoutId);
 
+    // Only log our fixed error code and HTTP status: never response bodies,
+    // keys, tokens, student records, or untrusted provider error messages.
+    if (!nvidiaResponse.ok) {
+      const { status, ...failure } = providerFailure(nvidiaResponse.status);
+      logger.warn("AI provider request failed", {
+        code: failure.code, providerStatus: failure.providerStatus,
+      });
+      if (nvidiaResponse.status === 429) response.setHeader("Retry-After", "60");
+      return response.status(status).json(failure);
+    }
+
     let result = null;
 
     try {
@@ -125,10 +164,6 @@ return async function handler(request, response) {
       return response.status(502).json({
         error: "AI 서비스가 올바른 응답을 보내지 않았습니다. 잠시 후 다시 시도해 주세요.",
       });
-    }
-
-    if (!nvidiaResponse.ok) {
-      return response.status(502).json({ error: "AI 서비스 요청에 실패했습니다. 잠시 후 다시 시도해 주세요." });
     }
 
     const choice = result?.choices?.[0];

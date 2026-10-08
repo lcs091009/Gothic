@@ -12,7 +12,7 @@ function fixture(overrides = {}) {
     teacher_shared_files: { data: [] },
     ...overrides.tables,
   };
-  const queries = [], providerCalls = [];
+  const queries = [], providerCalls = [], logs = [];
   let authCalls = 0, quotaCalls = 0;
   const client = {
     auth: { async getUser(token) { authCalls++; assert.equal(token, "valid-token"); return overrides.auth || { data: { user } }; } },
@@ -27,6 +27,7 @@ function fixture(overrides = {}) {
     async rpc(name) { quotaCalls++; assert.equal(name, "consume_ai_analysis_quota"); return overrides.quota || { data: { allowed: true } }; },
   };
   const handler = createAnalyzeHandler({ env: overrides.env || env, clientFactory: () => client,
+    logger: { warn: (...args) => logs.push(args) },
     fetchImpl: async (url, options) => {
       providerCalls.push({ url, options });
       if (overrides.fetchError) throw overrides.fetchError;
@@ -39,7 +40,7 @@ function fixture(overrides = {}) {
     await handler({ method: "POST", headers: { authorization: "Bearer valid-token" }, body: { extraContext: "추가 요청" }, ...request }, response);
     return response;
   }
-  return { call, queries, providerCalls, get authCalls() { return authCalls; }, get quotaCalls() { return quotaCalls; } };
+  return { call, queries, providerCalls, logs, get authCalls() { return authCalls; }, get quotaCalls() { return quotaCalls; } };
 }
 
 test("rejects non-POST and missing bearer without invoking auth/provider", async () => {
@@ -122,4 +123,42 @@ test("returns source scope, hides reasoning and flags truncated answers without 
   assert.equal(r.body.scope.detailedRecords, 1);
   assert.equal(f.providerCalls.length, 1);
   assert.equal(f.quotaCalls, 1);
+});
+
+test("distinguishes provider authentication, model, billing, input and availability failures without leaking payloads", async () => {
+  for (const [status, code, httpStatus] of [
+    [401, "AI_PROVIDER_AUTH", 503], [403, "AI_PROVIDER_AUTH", 503],
+    [402, "AI_PROVIDER_BILLING", 503], [404, "AI_PROVIDER_MODEL", 503],
+    [400, "AI_PROVIDER_REQUEST", 502], [413, "AI_PROVIDER_REQUEST", 502],
+    [422, "AI_PROVIDER_REQUEST", 502], [500, "AI_PROVIDER_UNAVAILABLE", 502],
+  ]) {
+    const f = fixture({ ok: false, status, raw: "PRIVATE_PROVIDER_BODY fake-test-only valid-token" });
+    const r = await f.call();
+    assert.equal(r.code, httpStatus);
+    assert.equal(r.body.code, code);
+    assert.equal(r.body.providerStatus, status);
+    assert.match(r.body.error, new RegExp(String(status)));
+    assert.doesNotMatch(JSON.stringify([r.body, f.logs]), /PRIVATE_PROVIDER_BODY|fake-test-only|valid-token/);
+    assert.equal(f.providerCalls.length, 1);
+    assert.equal(f.logs.length, 1);
+  }
+});
+
+test("provider rate limiting returns a retry header independently of student quota", async () => {
+  const f = fixture({ ok: false, status: 429, raw: "rate limit" });
+  const r = await f.call();
+  assert.equal(r.code, 429);
+  assert.equal(r.body.code, "AI_PROVIDER_LIMIT");
+  assert.equal(r.headers["Retry-After"], "60");
+  assert.equal(f.quotaCalls, 1);
+  assert.equal(f.providerCalls.length, 1);
+});
+
+test("trims accidental whitespace around a server key and rejects whitespace-only configuration", async () => {
+  const f = fixture({ env: { ...env, NVIDIA_API_KEY: "  fake-test-only\n" } });
+  assert.equal((await f.call()).code, 200);
+  assert.equal(f.providerCalls[0].options.headers.Authorization, "Bearer fake-test-only");
+  const empty = fixture({ env: { ...env, NVIDIA_API_KEY: " \n " } });
+  assert.equal((await empty.call()).code, 503);
+  assert.equal(empty.providerCalls.length, 0);
 });
