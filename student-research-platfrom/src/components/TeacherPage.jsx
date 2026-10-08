@@ -186,20 +186,20 @@ function TeacherPage({ session }) {
         </header>
       )}
 
-      <div key={currentSection} className="student-view">
+      <div key={currentSection} className={`student-view ${currentSection !== "menu" ? "inner-page teacher-inner-page" : ""}`}>
       {currentSection === "students" && <StudentDirectory teacherId={session?.user?.id} />}
       {currentSection === "register" && <>
-      <div className="soft-panel" style={styles.noticeBox}>
-        <h3 style={styles.noticeTitle}>파일명 자동 인식 예시</h3>
+      <details className="quiet-details" style={styles.noticeBox}>
+        <summary>파일명 작성 안내</summary>
         <p style={styles.text}>10315_김철수_통합사회.pdf → {getStudentEmail("10315", admissionYear)}</p>
         <p style={styles.text}>{admissionYear}-10315_김철수.hwp → {getStudentEmail("10315", admissionYear)}</p>
         <p style={styles.text}>김철수_10315_수행평가.pdf → {getStudentEmail("10315", admissionYear)}</p>
         <p style={styles.warningText}>
           이름만 있는 파일은 동명이인 문제가 있을 수 있으므로 자동 배정하지 않습니다.
         </p>
-      </div>
+      </details>
 
-      <form className="soft-panel" onSubmit={handleSubmit} style={styles.form}>
+      <form onSubmit={handleSubmit} style={styles.form}>
         <div style={styles.row}>
           <div>
             <label style={styles.label}>학생 이메일의 입학 연도 앞자리</label>
@@ -257,7 +257,7 @@ function TeacherPage({ session }) {
           />
         </div>
 
-        <div
+        {fileName.trim() && <div
           className={
             matchStatus === "matched"
               ? "teacher-match-box teacher-match-box-ok"
@@ -301,7 +301,7 @@ function TeacherPage({ session }) {
           ) : (
             <p style={styles.text}>파일명을 입력하면 자동 매칭 결과가 표시됩니다.</p>
           )}
-        </div>
+        </div>}
 
         <div>
           <label style={styles.label}>파일 링크</label>
@@ -318,7 +318,7 @@ function TeacherPage({ session }) {
           <textarea
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            rows={6}
+            rows={4}
             placeholder="이 자료가 어떤 활동과 관련되어 있는지, 학생이 어떤 과목이나 활동과 연결해 볼 수 있는지 적어 주세요."
             style={styles.textarea}
           />
@@ -351,9 +351,9 @@ function TeacherPage({ session }) {
       </form>
       </>}
 
-      {currentSection === "files" && <section className="soft-panel" style={styles.listBox}>
+      {currentSection === "files" && <section style={styles.listBox}>
         <div style={styles.listTitleRow}>
-          <h3 style={styles.subTitle}>내가 제공한 자료</h3>
+          <p style={styles.smallText}>등록한 자료</p>
           <span style={styles.countBadge}>{sharedFiles.length}개</span>
         </div>
 
@@ -373,7 +373,7 @@ function TeacherPage({ session }) {
         ) : (
           <div style={styles.list}>
             {sharedFiles.map((file) => (
-              <article className="teacher-card" key={file.id} style={styles.card}>
+              <article className="compact-record" key={file.id} style={styles.card}>
                 <div style={styles.badgeRow}>
                   <span style={styles.badge}>{file.category}</span>
                   <span
@@ -394,7 +394,7 @@ function TeacherPage({ session }) {
                   배정 학생: {file.student_email || "자동 배정 안 됨"}
                 </p>
 
-                <p style={styles.cardDescription}>{file.description}</p>
+                <details className="quiet-details"><summary>자료 설명</summary><p style={styles.cardDescription}>{file.description}</p></details>
 
                 {file.file_url && (
                   <a
@@ -442,7 +442,7 @@ const styles = {
     margin: "0 0 6px",
     color: "#648675",
     fontSize: "13px",
-    fontWeight: 900,
+    fontWeight: 650,
     letterSpacing: "0.08em",
     textTransform: "uppercase",
   },
@@ -451,41 +451,40 @@ const styles = {
     marginBottom: 0,
     fontSize: "24px",
     color: "#355c50",
-    fontWeight: 900,
+    fontWeight: 650,
   },
   subTitle: {
     marginTop: 0,
     marginBottom: 0,
     color: "#355c50",
     fontSize: "20px",
-    fontWeight: 900,
+    fontWeight: 650,
   },
   text: {
     margin: "8px 0 0",
     color: "#59616b",
     lineHeight: 1.7,
-    fontWeight: 700,
+    fontWeight: 400,
   },
   smallText: {
     margin: "8px 0 0",
     color: "#64748b",
     fontSize: "13px",
     lineHeight: 1.6,
-    fontWeight: 700,
+    fontWeight: 400,
   },
   warningText: {
     margin: "10px 0 0",
     color: "#59616b",
     lineHeight: 1.7,
-    fontWeight: 800,
+    fontWeight: 600,
   },
   noticeBox: {
-    marginTop: "18px",
-    border: "1px solid #dde1e6",
-    borderRadius: "16px",
-    padding: "18px",
-    backgroundColor: "#f3f6f1",
-    boxShadow: "none",
+    marginTop: "14px",
+    border: "none",
+    borderBottom: "1px solid #e3e5e8",
+    padding: "14px 0",
+    backgroundColor: "transparent",
   },
   noticeTitle: {
     marginTop: 0,
@@ -506,7 +505,7 @@ const styles = {
   label: {
     display: "block",
     marginBottom: "8px",
-    fontWeight: 800,
+    fontWeight: 600,
     color: "#1e293b",
   },
   input: {
@@ -562,7 +561,7 @@ const styles = {
     borderRadius: "999px",
     padding: "6px 10px",
     fontSize: "12px",
-    fontWeight: 900,
+    fontWeight: 650,
   },
   statusPillOk: {
     backgroundColor: "#e1ebdf",
@@ -578,7 +577,7 @@ const styles = {
     padding: "16px 20px",
     backgroundColor: "#355c50",
     color: "white",
-    fontWeight: 900,
+    fontWeight: 650,
     fontSize: "15px",
     boxShadow: "none",
   },
@@ -588,7 +587,7 @@ const styles = {
     padding: "11px 14px",
     backgroundColor: "rgba(255, 255, 255, 0.86)",
     color: "#355c50",
-    fontWeight: 900,
+    fontWeight: 650,
     cursor: "pointer",
     fontSize: "13px",
     boxShadow: "none",
@@ -596,7 +595,7 @@ const styles = {
   message: {
     marginTop: "4px",
     color: "#355c50",
-    fontWeight: 900,
+    fontWeight: 650,
     whiteSpace: "pre-wrap",
   },
   listBox: {
@@ -615,7 +614,7 @@ const styles = {
     backgroundColor: "#e8f0e7",
     color: "#59616b",
     fontSize: "13px",
-    fontWeight: 900,
+    fontWeight: 650,
   },
   loadingBox: {
     border: "1px solid #dde1e6",
@@ -635,11 +634,11 @@ const styles = {
     gap: "14px",
   },
   card: {
-    border: "1px solid #dde1e6",
-    borderRadius: "18px",
-    padding: "18px",
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    boxShadow: "none",
+    marginTop: "14px",
+    border: "none",
+    borderBottom: "1px solid #e3e5e8",
+    padding: "14px 0",
+    backgroundColor: "transparent",
   },
   badgeRow: {
     display: "flex",
@@ -652,7 +651,7 @@ const styles = {
     padding: "6px 10px",
     fontSize: "13px",
     color: "#334155",
-    fontWeight: 800,
+    fontWeight: 600,
   },
   matchedBadge: {
     backgroundColor: "#e1ebdf",
@@ -666,27 +665,27 @@ const styles = {
     marginBottom: 0,
     fontSize: "17px",
     color: "#355c50",
-    fontWeight: 900,
+    fontWeight: 650,
   },
   cardDescription: {
     margin: "10px 0 0",
     color: "#334155",
     lineHeight: 1.7,
-    fontWeight: 700,
+    fontWeight: 400,
     whiteSpace: "pre-wrap",
   },
   link: {
     display: "inline-block",
     marginTop: "10px",
     color: "#355c50",
-    fontWeight: 900,
+    fontWeight: 650,
     textDecoration: "none",
   },
   dateText: {
     marginTop: "12px",
     color: "#64748b",
     fontSize: "13px",
-    fontWeight: 700,
+    fontWeight: 400,
   },
 };
 

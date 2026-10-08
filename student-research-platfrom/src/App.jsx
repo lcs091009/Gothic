@@ -8,6 +8,7 @@ import StudentHome from "./pages/StudentHome";
 import { studentCategories } from "./config/studentCategories";
 import styles from "./styles/appStyles";
 import "./styles/neutralTheme.css";
+import "./styles/innerPages.css";
 import GradeSetup from "./components/GradeSetup";
 import TeacherPage from "./components/TeacherPage";
 import AiAnalysisPage from "./components/AiAnalysisPage";
@@ -263,7 +264,6 @@ async function handleDeleteResearchRecord(recordId) {
             academicProfile={academicProfile}
             records={records}
             teacherSharedFiles={teacherSharedFiles}
-            onBack={() => setCurrentPage("home")}
           />
         ))}
         {profile?.role === "student" &&

@@ -1,0 +1,40 @@
+.inner-page { margin-top: 24px; color: #303841; }
+.inner-page > p:first-child { margin-top: 0; }
+.inner-page :where(h3, h4) { font-weight: 650; }
+.inner-page :where(input, select, textarea) { border-color: #dde2df !important; border-radius: 10px !important; font: inherit; }
+.inner-page :where(input, select, textarea):focus-visible { outline: 2px solid #708775; outline-offset: 2px; }
+.inner-page :where(label) { font-size: 14px; }
+.inner-page form { max-width: 680px; }
+.inner-page form > button[type="submit"], .inner-page .animated-button[type="submit"] { align-self: flex-start; padding: 12px 22px !important; }
+.quiet-details { padding: 12px 0; color: #59616b; }
+.quiet-details > summary { cursor: pointer; font-size: 14px; font-weight: 600; color: #52695a; line-height: 1.6; }
+.quiet-details[open] > summary { margin-bottom: 14px; }
+.quiet-details :where(p) { overflow-wrap: anywhere; }
+.field-optional { margin-left: 6px; color: #879189; font-size: 12px; font-weight: 400; }
+.compact-record { overflow-wrap: anywhere; }
+.compact-record h3, .compact-record h4 { margin-top: 0; }
+.record-meta, .course-selection { font-size: 13px; color: #7b847d; line-height: 1.7; margin: 8px 0; }
+.inner-page .student-record-details { margin-top: 10px; }
+.inner-page .student-record-details > summary { font-size: 13px; color: #627968; cursor: pointer; }
+.analysis-reference { border-bottom: 1px solid #e3e5e8; }
+.analysis-reference [style] { box-shadow: none; }
+.ai-analysis-panel > .animated-button { padding: 12px 22px !important; }
+.course-group > summary { cursor: pointer; list-style: none; }
+.course-group > summary::-webkit-details-marker { display: none; }
+.course-group > summary::after { content: "+"; margin-left: auto; font-size: 20px; color: #7b847d; }
+.course-group[open] > summary::after { content: "−"; }
+.course-group > summary h3 { font-size: 16px !important; }
+.teacher-inner-page .student-directory { margin: 0; padding: 0; background: transparent; border: 0; }
+.teacher-inner-page .directory-heading h3 { font-size: 16px; font-weight: 600; }
+.teacher-inner-page .directory-heading p { max-width: 600px; font-size: 13px; color: #7b847d; }
+.teacher-inner-page .student-summary-card { box-shadow: none; border-radius: 10px; padding: 16px; gap: 6px; }
+.teacher-inner-page .student-summary-card strong { font-size: 16px; font-weight: 600; }
+.teacher-inner-page .teacher-match-box { padding: 14px !important; border-radius: 10px !important; box-shadow: none; }
+.teacher-inner-page .teacher-match-box h3 { font-size: 14px; }
+.teacher-inner-page .teacher-match-box :where(p) { font-size: 13px; }
+@media (max-width: 640px) {
+  .inner-page { margin-top: 20px; }
+  .inner-page form > div[style*="grid"] { grid-template-columns: 1fr !important; }
+  .inner-page form > button[type="submit"], .ai-analysis-panel > .animated-button { width: 100%; }
+  .inner-page .course-group button { font-size: 13px; }
+}
