@@ -6,10 +6,11 @@ function AiAnalysisPage({ academicProfile, records, teacherSharedFiles = [], onB
   const [message, setMessage] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [extraContext, setExtraContext] = useState("");
+  const [scope, setScope] = useState(null);
+  const [warning, setWarning] = useState("");
 
   async function handleAnalyze() {
     setMessage("");
-    setAnalysis("");
 
     if (!academicProfile) {
       setMessage("선택과목 정보가 없습니다. 먼저 학년과 선택과목을 설정해 주세요.");
@@ -59,6 +60,8 @@ function AiAnalysisPage({ academicProfile, records, teacherSharedFiles = [], onB
       }
 
       setAnalysis(data.analysis || "분석 결과가 비어 있습니다.");
+      setScope(data.scope || null);
+      setWarning(data.warning || "");
     } catch (error) {
       setMessage(error.message || "AI 분석 요청에 실패했습니다.");
     } finally {
@@ -77,16 +80,16 @@ function AiAnalysisPage({ academicProfile, records, teacherSharedFiles = [], onB
       <h2 style={styles.title}>활동 흐름 분석</h2>
 
       <p style={styles.text}>
-        이 기능은 AI가 심화탐구 주제를 대신 정해 주는 기능이 아닙니다.
-        저장된 선택과목과 활동 기록을 바탕으로, 작년 활동이 현재 과목과
-        어떻게 이어질 수 있는지 정리해 줍니다.
+        활동에서 이어지는 질문을 찾고, 선택과목과의 연결과 다음 탐구 방법을
+        구체적인 기록 근거와 함께 정리합니다.
       </p>
 
       <div style={styles.noticeBox}>
         <h3 style={styles.infoTitle}>분석 방식</h3>
         <p style={styles.text}>
-          AI는 업로드된 활동 기록과 아래 보충 입력 내용을 함께 참고합니다.
-          다만 최종 활동 방향과 주제는 학생이 직접 정해야 합니다.
+          최근 등록한 기록 최대 48개의 개요와, 학기·과목을 고려해 고른 최대
+          12개의 본문을 참고합니다. 긴 본문은 앞부분과 끝부분을 발췌하며,
+          첨부파일은 파일명과 설명만 참고합니다. 보충 입력도 함께 분석합니다.
         </p>
       </div>
 
@@ -195,13 +198,19 @@ function AiAnalysisPage({ academicProfile, records, teacherSharedFiles = [], onB
             </span>
           </>
         ) : (
-          "작년 활동과 현재 과목 연결점 찾기"
+          "활동 근거로 다음 탐구 찾기"
         )}
       </button>
 
       {analysis && (
         <div style={styles.resultBox}>
           <h3 style={styles.resultTitle}>활동 흐름 분석 결과</h3>
+          {scope && <p style={styles.text}>
+            기록 개요 {scope.scannedRecords}개 · 본문 발췌 {scope.detailedRecords}개 ·
+            선생님 자료 {scope.teacherMaterials}개를 참고한 결과입니다.
+            {scope.scanLimitReached && " 최근 등록한 48개 기록 범위에서 분석했습니다."}
+          </p>}
+          {warning && <p role="status" style={styles.text}>{warning}</p>}
           <pre style={styles.resultText}>{analysis}</pre>
         </div>
       )}

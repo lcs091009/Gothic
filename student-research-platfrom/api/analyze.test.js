@@ -68,7 +68,7 @@ test("uses stored owner-filtered records and choices, ignoring forged browser re
   assert.match(prompt, /생명과학, 화학/); assert.match(prompt, /효소 실험/); assert.doesNotMatch(prompt, /FORGED|victim/);
   assert.deepEqual(f.queries.find(q => q.table === "research_records").filters, [["user_id", user.id]]);
   assert.deepEqual(f.queries.find(q => q.table === "teacher_shared_files").filters, [["student_email", user.email]]);
-  assert.equal(f.queries.find(q => q.table === "research_records").limit, 12);
+  assert.equal(f.queries.find(q => q.table === "research_records").limit, 48);
 });
 test("fails closed if distributed quota is absent and returns retry header when exhausted", async () => {
   for (const quota of [{ error: { message: "function missing" } }, { data: null }]) {
@@ -102,4 +102,24 @@ test("provider failures do not expose raw contents or secrets and timeouts retur
   assert.equal((await fixture({ fetchError: abort }).call()).code, 504);
   const r = await fixture({ fetchError: new Error("private secret") }).call();
   assert.equal(r.code, 500); assert.doesNotMatch(JSON.stringify(r.body), /private secret/);
+});
+
+test("rejects empty or non-text answers rather than returning success", async () => {
+  for (const content of ["", "  ", null, {}, "<think>unfinished reasoning"]) {
+    const f = fixture({ raw: JSON.stringify({ choices: [{ message: { content } }] }) });
+    assert.equal((await f.call()).code, 502);
+    assert.equal(f.providerCalls.length, 1);
+  }
+});
+
+test("returns source scope, hides reasoning and flags truncated answers without another paid call", async () => {
+  const f = fixture({ raw: JSON.stringify({ choices: [{ finish_reason: "length",
+    message: { content: "<think>private reasoning</think>근거 기반 분석" } }] }) });
+  const r = await f.call();
+  assert.equal(r.code, 200);
+  assert.equal(r.body.analysis, "근거 기반 분석");
+  assert.match(r.body.warning, /일부가 생략/);
+  assert.equal(r.body.scope.detailedRecords, 1);
+  assert.equal(f.providerCalls.length, 1);
+  assert.equal(f.quotaCalls, 1);
 });
