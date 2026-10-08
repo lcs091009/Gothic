@@ -3,13 +3,11 @@ import styles from "../styles/studentStyles";
 export default function StudentPage({ section = "register", onNavigate, grade, setGrade, semester, setSemester, subject, setSubject, title, setTitle, content, setContent, handleSubmitResearchRecord, isUploadDragging, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, openGooglePicker, isPickerLoading, isUploadingFile, isGoogleAuthLoading, driveFileName, driveFileUrl, onClearSelectedFile, isSubmitting, records, handleDeleteResearchRecord, deletingRecordId, loadTeacherSharedFiles, session, isLoadingTeacherSharedFiles, teacherSharedFiles }) {
   return (
           <>
-            {section === "register" && <section style={styles.box}>
-              <h2 style={styles.subTitle}>활동 기록 등록</h2>
+            {section === "register" && <section className="inner-page" style={styles.box}>
+              
 
               <p style={styles.text}>
-                지난 학기나 작년에 했던 수행평가·발표·탐구·독서·동아리 활동을
-                과목별로 등록하세요. 이후 활동 흐름 분석에서 현재 선택과목과
-                연결 가능한 다음 활동 방향을 정리할 수 있습니다.
+                활동의 질문, 방법, 알게 된 점을 짧게 남겨 주세요.
               </p>
 
               <form onSubmit={handleSubmitResearchRecord} style={styles.form}>
@@ -67,7 +65,7 @@ export default function StudentPage({ section = "register", onNavigate, grade, s
                     value={content}
                     onChange={(event) => setContent(event.target.value)}
                     placeholder="무엇을 했는지, 어떤 과목 개념과 연결되었는지, 알게 된 점, 아쉬웠던 점, 새로 생긴 궁금증을 함께 적어 주세요."
-                    rows={7}
+                    rows={5}
                     style={styles.textarea}
                   />
                 </div>
@@ -84,15 +82,10 @@ export default function StudentPage({ section = "register", onNavigate, grade, s
                   onDragLeave={handleUploadDragLeave}
                   onDrop={handleUploadDrop}
                 >
-                  <div className="upload-icon-bubble" aria-hidden="true">
-                    ↑
-                  </div>
-
-                  <label style={styles.label}>Google Drive 파일 선택/업로드</label>
+                  <label style={styles.label}>첨부파일 <span className="field-optional">선택</span></label>
 
                   <p style={styles.smallText}>
-                    버튼을 누르면 기존 Google Drive 파일을 선택할 수 있고, 파일을 이 영역에
-                    끌어다 놓으면 Google Drive에 바로 업로드됩니다.
+                    Drive에서 선택하거나 파일을 여기에 끌어 놓으세요.
                   </p>
 
                   <button
@@ -130,7 +123,7 @@ export default function StudentPage({ section = "register", onNavigate, grade, s
                         </span>
                       </>
                     ) : (
-                      "Google Drive에서 파일 선택/업로드"
+                      "파일 선택"
                     )}
                   </button>
 
@@ -139,8 +132,8 @@ export default function StudentPage({ section = "register", onNavigate, grade, s
                       <p style={styles.fileNameText}>선택된 파일: {driveFileName}</p>
                       <button type="button" className="animated-button" onClick={onClearSelectedFile}
                         disabled={isSubmitting || isUploadingFile || isPickerLoading || isGoogleAuthLoading}
-                        style={{ border: "1px solid #d8dfda", background: "white", color: "#52695a", borderRadius: "10px", padding: "8px 12px", cursor: "pointer" }}>파일 선택 해제</button>
-                      <p style={styles.text}>첨부 선택만 해제하며 Google Drive 원본은 유지됩니다.</p>
+                        title="등록할 첨부만 해제합니다. Google Drive 원본은 유지됩니다." style={{ border: "1px solid #d8dfda", background: "white", color: "#52695a", borderRadius: "10px", padding: "8px 12px", cursor: "pointer" }}>파일 선택 해제</button>
+                      
 
                       {driveFileUrl && (
                         <a
@@ -178,8 +171,8 @@ export default function StudentPage({ section = "register", onNavigate, grade, s
               </form>
             </section>}
 
-            {section === "records" && <section style={styles.box}>
-              <h2 style={styles.subTitle}>내 활동 기록</h2>
+            {section === "records" && <section className="inner-page" style={styles.box}>
+              
 
               {records.length === 0 ? (
                 <div className="student-empty-state">
@@ -189,19 +182,13 @@ export default function StudentPage({ section = "register", onNavigate, grade, s
               ) : (
                 <div style={styles.recordList}>
                   {records.map((record) => (
-                    <article key={record.id} style={styles.recordCard}>
-                      <div style={styles.badgeRow}>
-                        <span style={styles.badge}>{record.grade}</span>
-                        <span style={styles.badge}>{record.semester}</span>
-                        <span style={styles.badge}>{record.subject}</span>
-                      </div>
-
+                    <article className="compact-record" key={record.id} style={styles.recordCard}>
                       <h3 style={styles.recordTitle}>{record.title}</h3>
+                      <p className="record-meta">{[record.grade, record.semester, record.subject].filter(Boolean).join(" · ")}</p>
 
                       <details className="student-record-details">
-                        <summary>활동 내용 보기</summary>
+                        <summary>내용 및 첨부</summary>
                         <p style={styles.recordContent}>{record.content}</p>
-                      </details>
 
                       {record.drive_file_name && (
                         <p style={styles.fileNameText}>
@@ -245,19 +232,19 @@ export default function StudentPage({ section = "register", onNavigate, grade, s
                           "활동 기록 삭제"
                         )}
                       </button>
+                      </details>
                     </article>
                   ))}
                 </div>
               )}
             </section>}
 
-            {section === "materials" && <section className="soft-panel" style={styles.box}>
+            {section === "materials" && <section className="inner-page" style={styles.box}>
               <div style={styles.sharedFileTitleRow}>
                 <div>
-                  <h2 style={styles.subTitle}>선생님이 제공한 내 자료</h2>
+                  
                   <p style={styles.text}>
-                    선생님이 파일명과 학번을 기준으로 연결한 자료입니다. 내가 직접 등록한
-                    활동 기록과는 구분해서 확인하세요.
+                    선생님이 나에게 연결한 자료입니다.
                   </p>
                 </div>
 
@@ -278,7 +265,7 @@ export default function StudentPage({ section = "register", onNavigate, grade, s
                       </span>
                     </>
                   ) : (
-                    "자료 새로고침"
+                    "새로고침"
                   )}
                 </button>
               </div>
@@ -291,14 +278,12 @@ export default function StudentPage({ section = "register", onNavigate, grade, s
               ) : teacherSharedFiles.length === 0 ? (
                 <div style={styles.emptySharedFileBox}>
                   <p style={styles.text}>아직 선생님이 제공한 자료가 없습니다.</p>
-                  <p style={styles.smallText}>
-                    선생님이 학번이 포함된 파일명으로 자료를 등록하면 여기에 표시됩니다.
-                  </p>
+
                 </div>
               ) : (
                 <div style={styles.recordList}>
                   {teacherSharedFiles.map((file) => (
-                    <article className="teacher-card" key={file.id} style={styles.recordCard}>
+                    <article className="compact-record" key={file.id} style={styles.recordCard}>
                       <div style={styles.badgeRow}>
                         <span style={styles.badge}>{file.category || "기타"}</span>
                         <span style={styles.badge}>
@@ -308,12 +293,15 @@ export default function StudentPage({ section = "register", onNavigate, grade, s
 
                       <h3 style={styles.recordTitle}>{file.file_name}</h3>
 
-                      <p style={styles.recordContent}>{file.description}</p>
+                      <details className="quiet-details">
+                        <summary>자료 설명</summary>
+                        <p style={styles.recordContent}>{file.description || "등록된 설명이 없습니다."}</p>
 
                       <p style={styles.fileNameText}>
                         제공한 선생님: {file.teacher_email || "알 수 없음"}
                       </p>
 
+                      </details>
                       {file.file_url && (
                         <a
                           href={file.file_url}
@@ -326,9 +314,7 @@ export default function StudentPage({ section = "register", onNavigate, grade, s
                         </a>
                       )}
 
-                      <p style={styles.dateText}>
-                        등록 시간: {new Date(file.created_at).toLocaleString("ko-KR")}
-                      </p>
+
                     </article>
                   ))}
                 </div>

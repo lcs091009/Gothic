@@ -18,10 +18,10 @@ function getEmptyChoices(groups) {
   }, {});
 }
 
-function ChoiceGroup({ group, selectedSubjects, onToggle }) {
+function ChoiceGroup({ group, selectedSubjects, onToggle, initiallyOpen }) {
   return (
-    <section style={styles.choiceGroup}>
-      <div style={styles.choiceHeader}>
+    <details className="quiet-details course-group" style={styles.choiceGroup} open={initiallyOpen}>
+      <summary style={styles.choiceHeader}>
         <div>
           <h3 style={styles.choiceTitle}>{group.title}</h3>
           <p style={styles.smallText}>
@@ -32,8 +32,8 @@ function ChoiceGroup({ group, selectedSubjects, onToggle }) {
         <strong style={styles.countText}>
           {selectedSubjects.length} / {group.requiredCount}
         </strong>
-      </div>
-
+      </summary>
+      <p className="course-selection">{selectedSubjects.length ? selectedSubjects.join(" · ") : "과목을 선택해 주세요."}</p>
       <div style={styles.subjectGrid}>
         {group.subjects.map((subject) => {
           const isSelected = selectedSubjects.includes(subject);
@@ -54,7 +54,7 @@ function ChoiceGroup({ group, selectedSubjects, onToggle }) {
           );
         })}
       </div>
-    </section>
+    </details>
   );
 }
 
@@ -205,12 +205,10 @@ function GradeSetup({ session, existingAcademicProfile, onSaved }) {
   }
 
   return (
-    <section className="soft-panel grade-setup-panel" style={styles.card}>
-      <h2 style={styles.title}>학년 및 선택과목 설정</h2>
+    <section className="inner-page grade-setup-panel" style={styles.card}>
 
       <p style={styles.text}>
-        현재 학년에 맞는 입학생 교육과정 편제표를 기준으로 선택과목을
-        입력합니다. 이 정보는 AI 심화탐구 주제 추천에 사용됩니다.
+        학년을 고르고, 각 묶음에서 필요한 수만큼 과목을 선택해 주세요.
       </p>
 
       <div style={styles.gradeBox}>
@@ -230,8 +228,8 @@ function GradeSetup({ session, existingAcademicProfile, onSaved }) {
         ))}
       </div>
 
-      <div style={styles.infoBox}>
-        <h3 style={styles.infoTitle}>{curriculum.curriculumLabel}</h3>
+      <details className="quiet-details" style={styles.infoBox}>
+        <summary>{curriculum.curriculumLabel} · 안내</summary>
         <p style={styles.text}>{curriculum.description}</p>
 
         {currentGrade === "1학년" && (
@@ -239,14 +237,16 @@ function GradeSetup({ session, existingAcademicProfile, onSaved }) {
             현재 1학년은 선택과목 입력 없이 저장하고 넘어가면 됩니다.
           </p>
         )}
-      </div>
+      </details>
+      {currentGrade === "1학년" && <p style={styles.text}>1학년은 과목 선택 없이 바로 저장할 수 있습니다.</p>}
 
       {curriculum.groups.length > 0 && (
         <div style={styles.choiceList}>
-          {curriculum.groups.map((group) => (
+          {curriculum.groups.map((group, index) => (
             <ChoiceGroup
               key={group.id}
               group={group}
+              initiallyOpen={index === 0}
               selectedSubjects={choices[group.id] || []}
               onToggle={handleToggle}
             />
@@ -273,7 +273,7 @@ function GradeSetup({ session, existingAcademicProfile, onSaved }) {
             </span>
           </>
         ) : (
-          "선택과목 저장하고 계속하기"
+          "선택과목 저장"
         )}
       </button>
     </section>
@@ -282,11 +282,11 @@ function GradeSetup({ session, existingAcademicProfile, onSaved }) {
 
 const styles = {
   card: {
-    marginTop: "28px",
-    border: "1px solid #e2e8f0",
-    borderRadius: "16px",
-    padding: "24px",
-    backgroundColor: "#f8fafc",
+    marginTop: "20px",
+    border: "none",
+    borderBottom: "1px solid #e3e5e8",
+    padding: "14px 0",
+    backgroundColor: "transparent",
   },
   title: {
     marginTop: 0,
@@ -324,10 +324,10 @@ const styles = {
   },
   infoBox: {
     marginTop: "20px",
-    border: "1px solid #e3e5e8",
-    borderRadius: "14px",
-    padding: "16px",
-    backgroundColor: "#f7f8fa",
+    border: "none",
+    borderBottom: "1px solid #e3e5e8",
+    padding: "14px 0",
+    backgroundColor: "transparent",
   },
   infoTitle: {
     marginTop: 0,
@@ -341,10 +341,11 @@ const styles = {
     gap: "18px",
   },
   choiceGroup: {
-    border: "1px solid #e2e8f0",
-    borderRadius: "16px",
-    padding: "18px",
-    backgroundColor: "white",
+    marginTop: "20px",
+    border: "none",
+    borderBottom: "1px solid #e3e5e8",
+    padding: "14px 0",
+    backgroundColor: "transparent",
   },
   choiceHeader: {
     display: "flex",

@@ -1,7 +1,7 @@
 import { supabase } from "../lib/supabaseClient";
 import { useState } from "react";
 
-function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = [], onBack }) {
+function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = [] }) {
   const [selection, setSelection] = useState(null);
   const selectedIds = selection ?? new Set(records.slice(0, 48).map(record => record.id));
   const selectedRecordIds = records.filter(record => selectedIds.has(record.id)).map(record => record.id);
@@ -88,18 +88,44 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
   const selectedChoices = academicProfile?.selected_choices || {};
 
   return (
-    <section className="soft-panel ai-analysis-panel" style={styles.page}>
-      <button className="animated-button" type="button" onClick={onBack} style={styles.backButton}>
-        ← 활동 기록 화면으로 돌아가기
-      </button>
+    <section className="inner-page ai-analysis-panel" style={styles.page}>
+      <p style={styles.text}>활동을 골라 관심 흐름과 다음 탐구 방향을 살펴보세요.</p>
 
-      <h2 style={styles.title}>활동 흐름 분석</h2>
+      <div style={styles.subjectBox}>
+        <h3 style={styles.infoTitle}>분석할 활동 선택</h3>
+        <p style={styles.text}>제목을 펼쳐 내용을 확인하고 분석에 넣을 활동을 체크해 주세요.</p>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", margin: "12px 0" }}>
+          <button type="button" style={styles.backButton} disabled={isAnalyzing}
+            onClick={() => setSelection(new Set(records.slice(0, 48).map(record => record.id)))}>
+            {records.length > 48 ? "최근 48개 선택" : "전체 선택"}
+          </button>
+          <button type="button" style={styles.backButton} disabled={isAnalyzing}
+            onClick={() => setSelection(new Set())}>전체 해제</button>
+          <span role="status" style={styles.text}>{selectedRecordIds.length}개 선택 / 최대 48개</span>
+        </div>
+        <div style={{ maxHeight: "440px", overflowY: "auto", display: "grid", gap: 0 }}>
+          {records.length === 0 && <p style={styles.text}>저장된 활동 기록이 없습니다.</p>}
+          {records.map(record => (
+            <div key={record.id} style={{ borderBottom: "1px solid #e3e5e8", padding: "12px",
+              background: selectedIds.has(record.id) ? "#f1f5f2" : "white" }}>
+              <label style={{ display: "flex", gap: "10px", alignItems: "center", cursor: "pointer" }}>
+                <input type="checkbox" checked={selectedIds.has(record.id)} disabled={isAnalyzing}
+                  onChange={() => toggleRecord(record.id)} style={{ accentColor: "#627968", width: "18px", height: "18px" }} />
+                <strong>{record.title || "제목 없음"}</strong>
+              </label>
+              <p style={styles.text}>{[record.grade, record.semester, record.subject].filter(Boolean).join(" · ")}</p>
+              <details>
+                <summary style={{ cursor: "pointer", color: "#627968" }}>활동 내용 보기</summary>
+                <p style={{ ...styles.text, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{record.content || "작성된 내용이 없습니다."}</p>
+                {record.drive_file_name && <p style={styles.text}>첨부: {record.drive_file_name}</p>}
+              </details>
+            </div>
+          ))}
+        </div>
+      </div>
 
-      <p style={styles.text}>
-        활동에서 이어지는 질문을 찾고, 선택과목과의 연결과 다음 탐구 방법을
-        구체적인 기록 근거와 함께 정리합니다.
-      </p>
-
+      <details className="quiet-details analysis-reference">
+        <summary>분석 참고 정보 · 선택과목 및 선생님 자료</summary>
       <div style={styles.noticeBox}>
         <h3 style={styles.infoTitle}>분석 방식</h3>
         <p style={styles.text}>
@@ -126,39 +152,6 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
         <div style={styles.infoBox}>
           <h3 style={styles.infoTitle}>활동 기록</h3>
           <p style={styles.text}>저장된 활동 기록 수: {records?.length || 0}개</p>
-        </div>
-      </div>
-
-      <div style={styles.subjectBox}>
-        <h3 style={styles.infoTitle}>분석할 활동 선택</h3>
-        <p style={styles.text}>제목을 펼쳐 내용을 확인하고 분석에 넣을 활동을 체크해 주세요.</p>
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", margin: "12px 0" }}>
-          <button type="button" style={styles.backButton} disabled={isAnalyzing}
-            onClick={() => setSelection(new Set(records.slice(0, 48).map(record => record.id)))}>
-            {records.length > 48 ? "최근 48개 선택" : "전체 선택"}
-          </button>
-          <button type="button" style={styles.backButton} disabled={isAnalyzing}
-            onClick={() => setSelection(new Set())}>전체 해제</button>
-          <span role="status" style={styles.text}>{selectedRecordIds.length}개 선택 / 최대 48개</span>
-        </div>
-        <div style={{ maxHeight: "440px", overflowY: "auto", display: "grid", gap: "10px" }}>
-          {records.length === 0 && <p style={styles.text}>저장된 활동 기록이 없습니다.</p>}
-          {records.map(record => (
-            <div key={record.id} style={{ border: "1px solid #e3e5e8", borderRadius: "12px", padding: "12px",
-              background: selectedIds.has(record.id) ? "#f1f5f2" : "white" }}>
-              <label style={{ display: "flex", gap: "10px", alignItems: "center", cursor: "pointer" }}>
-                <input type="checkbox" checked={selectedIds.has(record.id)} disabled={isAnalyzing}
-                  onChange={() => toggleRecord(record.id)} style={{ accentColor: "#627968", width: "18px", height: "18px" }} />
-                <strong>{record.title || "제목 없음"}</strong>
-              </label>
-              <p style={styles.text}>{[record.grade, record.semester, record.subject].filter(Boolean).join(" · ")}</p>
-              <details>
-                <summary style={{ cursor: "pointer", color: "#627968" }}>활동 내용 보기</summary>
-                <p style={{ ...styles.text, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{record.content || "작성된 내용이 없습니다."}</p>
-                {record.drive_file_name && <p style={styles.text}>첨부: {record.drive_file_name}</p>}
-              </details>
-            </div>
-          ))}
         </div>
       </div>
 
@@ -203,26 +196,24 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
         )}
       </div>
 
-      <div style={styles.extraBox}>
-        <h3 style={styles.infoTitle}>업로드하지 못한 활동 보충 입력</h3>
+      </details>
+
+      <details className="quiet-details analysis-supplement" style={styles.extraBox}>
+        <summary>활동 보충 입력 <span className="field-optional">선택</span></summary>
 
         <p style={styles.text}>
-          파일로 올리지 못한 작년 활동, 발표, 수행평가, 독서, 동아리 활동,
-          선생님 피드백, 느낀 점, 아쉬웠던 점이 있으면 적어 주세요.
+          기록에 없는 활동이나 선생님 피드백을 추가해 주세요.
         </p>
 
         <textarea
           value={extraContext}
           onChange={(event) => setExtraContext(event.target.value)}
-          rows={8}
+          rows={4}
           maxLength={1200}
-          placeholder={`예:
-통합사회 시간에 기후와 지형이 문화 차이에 미치는 영향을 발표했습니다.
-파일은 없지만, 문화 차이를 단순히 국민성으로 설명하면 안 되고 환경 조건도 같이 봐야 한다고 느꼈습니다.
-선생님께서는 사례 비교가 더 있으면 좋겠다고 피드백해 주셨습니다.`}
+          placeholder="예: 발표 후 사례 비교가 더 필요하다는 피드백을 받았습니다."
           style={styles.textarea}
         />
-      </div>
+      </details>
 
       {message && <p style={styles.message}>{message}</p>}
 
@@ -247,7 +238,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
             </span>
           </>
         ) : (
-          "활동 근거로 다음 탐구 찾기"
+          "선택한 활동 분석하기"
         )}
       </button>
 
@@ -270,10 +261,10 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
 const styles = {
   page: {
     marginTop: "28px",
-    border: "1px solid #e3e5e8",
-    borderRadius: "16px",
-    padding: "24px",
-    backgroundColor: "#f7f8fa",
+    border: "none",
+    borderRadius: 0,
+    padding: 0,
+    backgroundColor: "transparent",
   },
   backButton: {
     border: "1px solid #cbd5e1",
@@ -297,10 +288,10 @@ const styles = {
   },
   noticeBox: {
     marginTop: "18px",
-    border: "1px solid #e3e5e8",
-    borderRadius: "14px",
-    padding: "16px",
-    backgroundColor: "#f7f8fa",
+    padding: "12px 0",
+    border: "none",
+    borderBottom: "1px solid #e3e5e8",
+    backgroundColor: "transparent",
   },
   infoGrid: {
     display: "grid",
@@ -309,10 +300,11 @@ const styles = {
     marginTop: "20px",
   },
   infoBox: {
-    border: "1px solid #e3e5e8",
-    borderRadius: "14px",
-    padding: "16px",
-    backgroundColor: "white",
+    marginTop: "18px",
+    padding: "12px 0",
+    border: "none",
+    borderBottom: "1px solid #e3e5e8",
+    backgroundColor: "transparent",
   },
   infoTitle: {
     marginTop: 0,
@@ -321,17 +313,17 @@ const styles = {
   },
   subjectBox: {
     marginTop: "18px",
-    border: "1px solid #e3e5e8",
-    borderRadius: "14px",
-    padding: "16px",
-    backgroundColor: "white",
+    padding: "12px 0",
+    border: "none",
+    borderBottom: "1px solid #e3e5e8",
+    backgroundColor: "transparent",
   },
   extraBox: {
     marginTop: "18px",
-    border: "1px solid #e3e5e8",
-    borderRadius: "14px",
-    padding: "16px",
-    backgroundColor: "white",
+    padding: "12px 0",
+    border: "none",
+    borderBottom: "1px solid #e3e5e8",
+    backgroundColor: "transparent",
   },
   textarea: {
     width: "100%",
