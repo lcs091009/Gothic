@@ -4,8 +4,9 @@
 .inner-page :where(input, select, textarea) { border-color: #dde2df !important; border-radius: 10px !important; font: inherit; }
 .inner-page :where(input, select, textarea):focus-visible { outline: 2px solid #708775; outline-offset: 2px; }
 .inner-page :where(label) { font-size: 14px; }
-.inner-page form { max-width: 680px; }
-.inner-page form > button[type="submit"], .inner-page .animated-button[type="submit"] { align-self: flex-start; padding: 12px 22px !important; }
+.inner-page form { width: 100%; max-width: 680px; margin-left: auto; margin-right: auto; box-sizing: border-box; }
+.student-dashboard .inner-page > p:first-child { max-width: 680px; margin-left: auto; margin-right: auto; }
+.inner-page form > button[type="submit"], .inner-page .animated-button[type="submit"] { align-self: center; padding: 12px 22px !important; }
 .quiet-details { padding: 12px 0; color: #59616b; }
 .quiet-details > summary { cursor: pointer; font-size: 14px; font-weight: 600; color: #52695a; line-height: 1.6; }
 .quiet-details[open] > summary { margin-bottom: 14px; }
@@ -32,6 +33,85 @@
 .teacher-inner-page .teacher-match-box { padding: 14px !important; border-radius: 10px !important; box-shadow: none; }
 .teacher-inner-page .teacher-match-box h3 { font-size: 14px; }
 .teacher-inner-page .teacher-match-box :where(p) { font-size: 13px; }
+
+/* Compact versions of the menu cards, shared by every category screen. */
+.neutral-dashboard .inner-page button:not(.student-summary-card),
+.neutral-dashboard .student-section-header .student-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  box-sizing: border-box;
+  border: 1px solid #dce4de !important;
+  border-radius: 14px !important;
+  padding: 10px 16px !important;
+  background: #fff !important;
+  color: #52695a !important;
+  font-family: inherit;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 1.4;
+  cursor: pointer;
+  box-shadow: none;
+  transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease !important;
+}
+.neutral-dashboard .inner-page button[aria-pressed="true"] {
+  border-color: #8ea796 !important;
+  background: #eef4ef !important;
+  color: #355c50 !important;
+}
+.neutral-dashboard .inner-page button[type="submit"],
+.neutral-dashboard .ai-analysis-panel > button.animated-button,
+.neutral-dashboard .grade-setup-panel > button.animated-button {
+  background: #526f5d !important;
+  color: #fff !important;
+  border-color: #526f5d !important;
+  padding: 12px 22px !important;
+}
+.neutral-dashboard .inner-page .delete-button {
+  color: #a35454 !important;
+  border-color: #eadbdb !important;
+}
+.neutral-dashboard .inner-page button:disabled,
+.neutral-dashboard .student-section-header .student-back:disabled {
+  opacity: .55 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+.neutral-dashboard .inner-page button:focus-visible,
+.neutral-dashboard .student-section-header .student-back:focus-visible {
+  outline: 3px solid #8ea796;
+  outline-offset: 3px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .neutral-dashboard .inner-page button:not(.student-summary-card):hover:not(:disabled),
+  .neutral-dashboard .student-section-header .student-back:hover:not(:disabled) {
+    transform: translateY(-3px);
+    border-color: #9bb3a2 !important;
+    background: #f5f8f5 !important;
+    box-shadow: 0 7px 16px #355c5010 !important;
+  }
+  .neutral-dashboard .inner-page button[type="submit"]:hover:not(:disabled),
+  .neutral-dashboard .ai-analysis-panel > button.animated-button:hover:not(:disabled),
+  .neutral-dashboard .grade-setup-panel > button.animated-button:hover:not(:disabled) {
+    background: #42614e !important;
+  }
+  .neutral-dashboard .inner-page .delete-button:hover:not(:disabled) {
+    background: #fcf6f6 !important;
+    border-color: #d9b8b8 !important;
+  }
+}
+.neutral-dashboard .inner-page button:not(.student-summary-card):active:not(:disabled),
+.neutral-dashboard .student-section-header .student-back:active:not(:disabled) {
+  transform: scale(.98);
+  box-shadow: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .neutral-dashboard .inner-page button:not(.student-summary-card), .neutral-dashboard .student-section-header .student-back { transition: none !important; }
+  .neutral-dashboard .inner-page button:not(.student-summary-card):is(:hover, :active), .neutral-dashboard .student-section-header .student-back:is(:hover, :active) { transform: none !important; }
+}
 @media (max-width: 640px) {
   .inner-page { margin-top: 20px; }
   .inner-page form > div[style*="grid"] { grid-template-columns: 1fr !important; }
