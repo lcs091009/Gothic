@@ -1,6 +1,6 @@
 import styles from "../styles/studentStyles";
 
-export default function StudentPage({ section = "register", onNavigate, grade, setGrade, semester, setSemester, subject, setSubject, title, setTitle, content, setContent, handleSubmitResearchRecord, isUploadDragging, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, openGooglePicker, isPickerLoading, isUploadingFile, isGoogleAuthLoading, driveFileName, driveFileUrl, isSubmitting, records, handleDeleteResearchRecord, deletingRecordId, loadTeacherSharedFiles, session, isLoadingTeacherSharedFiles, teacherSharedFiles }) {
+export default function StudentPage({ section = "register", onNavigate, grade, setGrade, semester, setSemester, subject, setSubject, title, setTitle, content, setContent, handleSubmitResearchRecord, isUploadDragging, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, openGooglePicker, isPickerLoading, isUploadingFile, isGoogleAuthLoading, driveFileName, driveFileUrl, onClearSelectedFile, isSubmitting, records, handleDeleteResearchRecord, deletingRecordId, loadTeacherSharedFiles, session, isLoadingTeacherSharedFiles, teacherSharedFiles }) {
   return (
           <>
             {section === "register" && <section style={styles.box}>
@@ -137,6 +137,10 @@ export default function StudentPage({ section = "register", onNavigate, grade, s
                   {driveFileName && (
                     <div style={styles.selectedFileBox}>
                       <p style={styles.fileNameText}>선택된 파일: {driveFileName}</p>
+                      <button type="button" className="animated-button" onClick={onClearSelectedFile}
+                        disabled={isSubmitting || isUploadingFile || isPickerLoading || isGoogleAuthLoading}
+                        style={{ border: "1px solid #d8dfda", background: "white", color: "#52695a", borderRadius: "10px", padding: "8px 12px", cursor: "pointer" }}>파일 선택 해제</button>
+                      <p style={styles.text}>첨부 선택만 해제하며 Google Drive 원본은 유지됩니다.</p>
 
                       {driveFileUrl && (
                         <a

@@ -1,7 +1,18 @@
 import { supabase } from "../lib/supabaseClient";
 import { useState } from "react";
 
-function AiAnalysisPage({ academicProfile, records, teacherSharedFiles = [], onBack }) {
+function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = [], onBack }) {
+  const [selection, setSelection] = useState(null);
+  const selectedIds = selection ?? new Set(records.slice(0, 48).map(record => record.id));
+  const selectedRecordIds = records.filter(record => selectedIds.has(record.id)).map(record => record.id);
+  function toggleRecord(id) {
+    const next = new Set(selectedRecordIds);
+    if (next.has(id)) next.delete(id);
+    else if (next.size < 48) next.add(id);
+    else { setMessage("한 번에 최대 48개까지 선택할 수 있습니다."); return; }
+    setSelection(next);
+    setMessage("");
+  }
   const [analysis, setAnalysis] = useState("");
   const [message, setMessage] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -22,6 +33,10 @@ function AiAnalysisPage({ academicProfile, records, teacherSharedFiles = [], onB
       return;
     }
 
+    if (!selectedRecordIds.length) {
+      setMessage("분석할 활동을 하나 이상 선택해 주세요.");
+      return;
+    }
     setIsAnalyzing(true);
 
     try {
@@ -38,6 +53,7 @@ function AiAnalysisPage({ academicProfile, records, teacherSharedFiles = [], onB
         },
         body: JSON.stringify({
           extraContext,
+          selectedRecordIds,
         }),
       });
 
@@ -87,7 +103,7 @@ function AiAnalysisPage({ academicProfile, records, teacherSharedFiles = [], onB
       <div style={styles.noticeBox}>
         <h3 style={styles.infoTitle}>분석 방식</h3>
         <p style={styles.text}>
-          최근 등록한 기록 최대 48개의 개요와, 학기·과목을 고려해 고른 최대
+          직접 선택한 기록 최대 48개의 개요와, 학기·과목을 고려해 고른 최대
           12개의 본문을 참고합니다. 긴 본문은 앞부분과 끝부분을 발췌하며,
           첨부파일은 파일명과 설명만 참고합니다. 보충 입력도 함께 분석합니다.
         </p>
@@ -110,6 +126,39 @@ function AiAnalysisPage({ academicProfile, records, teacherSharedFiles = [], onB
         <div style={styles.infoBox}>
           <h3 style={styles.infoTitle}>활동 기록</h3>
           <p style={styles.text}>저장된 활동 기록 수: {records?.length || 0}개</p>
+        </div>
+      </div>
+
+      <div style={styles.subjectBox}>
+        <h3 style={styles.infoTitle}>분석할 활동 선택</h3>
+        <p style={styles.text}>제목을 펼쳐 내용을 확인하고 분석에 넣을 활동을 체크해 주세요.</p>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", margin: "12px 0" }}>
+          <button type="button" style={styles.backButton} disabled={isAnalyzing}
+            onClick={() => setSelection(new Set(records.slice(0, 48).map(record => record.id)))}>
+            {records.length > 48 ? "최근 48개 선택" : "전체 선택"}
+          </button>
+          <button type="button" style={styles.backButton} disabled={isAnalyzing}
+            onClick={() => setSelection(new Set())}>전체 해제</button>
+          <span role="status" style={styles.text}>{selectedRecordIds.length}개 선택 / 최대 48개</span>
+        </div>
+        <div style={{ maxHeight: "440px", overflowY: "auto", display: "grid", gap: "10px" }}>
+          {records.length === 0 && <p style={styles.text}>저장된 활동 기록이 없습니다.</p>}
+          {records.map(record => (
+            <div key={record.id} style={{ border: "1px solid #e3e5e8", borderRadius: "12px", padding: "12px",
+              background: selectedIds.has(record.id) ? "#f1f5f2" : "white" }}>
+              <label style={{ display: "flex", gap: "10px", alignItems: "center", cursor: "pointer" }}>
+                <input type="checkbox" checked={selectedIds.has(record.id)} disabled={isAnalyzing}
+                  onChange={() => toggleRecord(record.id)} style={{ accentColor: "#627968", width: "18px", height: "18px" }} />
+                <strong>{record.title || "제목 없음"}</strong>
+              </label>
+              <p style={styles.text}>{[record.grade, record.semester, record.subject].filter(Boolean).join(" · ")}</p>
+              <details>
+                <summary style={{ cursor: "pointer", color: "#627968" }}>활동 내용 보기</summary>
+                <p style={{ ...styles.text, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{record.content || "작성된 내용이 없습니다."}</p>
+                {record.drive_file_name && <p style={styles.text}>첨부: {record.drive_file_name}</p>}
+              </details>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -181,7 +230,7 @@ function AiAnalysisPage({ academicProfile, records, teacherSharedFiles = [], onB
         className="animated-button"
         type="button"
         onClick={handleAnalyze}
-        disabled={isAnalyzing}
+        disabled={isAnalyzing || selectedRecordIds.length === 0}
         style={{
           ...styles.analyzeButton,
           opacity: isAnalyzing ? 0.72 : 1,
@@ -208,7 +257,7 @@ function AiAnalysisPage({ academicProfile, records, teacherSharedFiles = [], onB
           {scope && <p style={styles.text}>
             기록 개요 {scope.scannedRecords}개 · 본문 발췌 {scope.detailedRecords}개 ·
             선생님 자료 {scope.teacherMaterials}개를 참고한 결과입니다.
-            {scope.scanLimitReached && " 최근 등록한 48개 기록 범위에서 분석했습니다."}
+            {scope.scanLimitReached && " 최대 48개 기록 범위에서 분석했습니다."}
           </p>}
           {warning && <p role="status" style={styles.text}>{warning}</p>}
           <pre style={styles.resultText}>{analysis}</pre>

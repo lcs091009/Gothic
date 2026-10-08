@@ -83,15 +83,23 @@ return async function handler(request, response) {
     if (Buffer.byteLength(JSON.stringify(body)) > MAX_BODY_BYTES) {
       return response.status(413).json({ error: "요청 내용이 너무 큽니다." });
     }
-    const { extraContext = "" } = body;
+    const { extraContext = "", selectedRecordIds } = body;
     if (typeof extraContext !== "string" || extraContext.length > 1200) {
       return response.status(400).json({ error: "보충 입력은 1,200자 이내로 작성해 주세요." });
     }
-    // Fetch the authenticated student's data under RLS; never trust IDs or records from the browser.
+    if (selectedRecordIds !== undefined && (!Array.isArray(selectedRecordIds) ||
+      selectedRecordIds.length < 1 || selectedRecordIds.length > RECORD_SCAN_LIMIT ||
+      selectedRecordIds.some(id => typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) ||
+      new Set(selectedRecordIds).size !== selectedRecordIds.length)) {
+      return response.status(400).json({ error: "분석할 활동을 1~48개 선택해 주세요." });
+    }
+    const selectionSet = selectedRecordIds === undefined ? null : new Set(selectedRecordIds);
+    let recordQuery = client.from("research_records").select("*").eq("user_id", user.id);
+    if (selectedRecordIds !== undefined) recordQuery = recordQuery.in("id", selectedRecordIds);
+    // Resolve selection IDs using the authenticated owner and RLS; never accept browser record contents.
     const [academicResult, recordResult, teacherResult] = await Promise.all([
       client.from("student_academic_profiles").select("*").eq("user_id", user.id).maybeSingle(),
-      client.from("research_records").select("*").eq("user_id", user.id)
-        .order("created_at", { ascending: false }).limit(RECORD_SCAN_LIMIT),
+      recordQuery.order("created_at", { ascending: false }).limit(RECORD_SCAN_LIMIT),
       client.from("teacher_shared_files").select("*").eq("student_email", user.email)
         .order("created_at", { ascending: false }).limit(8),
     ]);
@@ -102,6 +110,10 @@ return async function handler(request, response) {
     const records = recordResult.data || [];
     const teacherSharedFiles = teacherResult.data || [];
     if (!academicProfile) return response.status(400).json({ error: "먼저 학년과 선택과목을 저장해 주세요." });
+    if (selectedRecordIds !== undefined && (records.length !== selectedRecordIds.length ||
+      records.some(record => !selectionSet.has(record.id)))) {
+      return response.status(400).json({ error: "선택한 활동을 확인할 수 없습니다. 기록을 새로 불러온 뒤 다시 선택해 주세요." });
+    }
     if (!records.length) return response.status(400).json({ error: "분석할 활동 기록을 먼저 등록해 주세요." });
     const { data: quota, error: quotaError } = await client.rpc("consume_ai_analysis_quota");
     // Fail closed if the distributed quota function is missing or unavailable.
