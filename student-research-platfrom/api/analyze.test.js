@@ -129,6 +129,7 @@ test("distinguishes provider authentication, model, billing, input and availabil
   for (const [status, code, httpStatus] of [
     [401, "AI_PROVIDER_AUTH", 503], [403, "AI_PROVIDER_AUTH", 503],
     [402, "AI_PROVIDER_BILLING", 503], [404, "AI_PROVIDER_MODEL", 503],
+    [410, "AI_PROVIDER_MODEL_RETIRED", 503],
     [400, "AI_PROVIDER_REQUEST", 502], [413, "AI_PROVIDER_REQUEST", 502],
     [422, "AI_PROVIDER_REQUEST", 502], [500, "AI_PROVIDER_UNAVAILABLE", 502],
   ]) {
@@ -161,4 +162,17 @@ test("trims accidental whitespace around a server key and rejects whitespace-onl
   const empty = fixture({ env: { ...env, NVIDIA_API_KEY: " \n " } });
   assert.equal((await empty.call()).code, 503);
   assert.equal(empty.providerCalls.length, 0);
+});
+
+test("uses a supported instruct model without the retired Nemotron identifier or model-specific thinking switch", async () => {
+  const f = fixture();
+  assert.equal((await f.call()).code, 200);
+  const payload = JSON.parse(f.providerCalls[0].options.body);
+  assert.equal(payload.model, "qwen/qwen3-next-80b-a3b-instruct");
+  assert.equal(payload.temperature, 0.6);
+  assert.ok(payload.max_tokens <= 4096);
+  assert.deepEqual(payload.messages.map(m => m.role), ["system", "user"]);
+  assert.doesNotMatch(payload.messages[0].content, /\/no_think/);
+  assert.match(payload.messages[0].content, /근거 규칙/);
+  assert.equal(f.providerCalls.length, 1);
 });

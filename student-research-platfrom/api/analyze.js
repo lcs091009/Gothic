@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { buildAnalysisContext, RECORD_SCAN_LIMIT, SYSTEM_PROMPT } from "../server/analysisContext.js";
 
 export const MAX_BODY_BYTES = 16_384;
+export const AI_MODEL = "qwen/qwen3-next-80b-a3b-instruct";
 
 export function providerFailure(status) {
   if (status === 401 || status === 403) return {
@@ -20,6 +21,10 @@ export function providerFailure(status) {
   if (status === 404) return {
     status: 503, code: "AI_PROVIDER_MODEL", providerStatus: status,
     error: "설정된 AI 모델을 사용할 수 없습니다(NVIDIA 404). 관리자가 모델 제공 여부와 접근 권한을 확인해야 합니다.",
+  };
+  if (status === 410) return {
+    status: 503, code: "AI_PROVIDER_MODEL_RETIRED", providerStatus: status,
+    error: "설정된 AI 모델의 제공이 종료됐습니다(NVIDIA 410). 관리자가 사용 가능한 모델로 변경해야 합니다.",
   };
   if ([400, 413, 422].includes(status)) return {
     status: 502, code: "AI_PROVIDER_REQUEST", providerStatus: status,
@@ -124,7 +129,7 @@ return async function handler(request, response) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+          model: AI_MODEL,
           messages: [
             {
               role: "system",
@@ -135,8 +140,7 @@ return async function handler(request, response) {
               content: userPrompt,
             },
           ],
-          temperature: 0,
-          top_p: 1,
+          temperature: 0.6,
           max_tokens: 2600,
         }),
       }
