@@ -70,21 +70,25 @@ export default function StudentDirectory({ teacherId, selectionMode = false, sel
   }
   const pages = Math.max(1, Math.ceil(result.count / STUDENT_PAGE_SIZE));
   return <section className={`student-directory ${selectionMode ? "assignment-directory" : ""}`} aria-labelledby="student-directory-title">
-    <header className="directory-heading"><div><h3 id="student-directory-title">{selectionMode ? "학년·반·번호로 선택" : "학생 찾기"}</h3><p>{selectionMode ? "학생 카드를 눌러 선택하세요. 필터를 바꿔도 선택은 유지됩니다." : "원하는 항목만 선택하세요. 학년만 선택하면 해당 학년 전체, 반만 입력하면 전체 학년의 해당 반을 볼 수 있습니다."}</p></div>
-      <button type="button" onClick={() => setRefresh(value => value + 1)} disabled={loading || disabled}>학생 새로고침</button></header>
+    {!selectionMode && <header className="directory-heading"><div><h3 id="student-directory-title">학생 찾기</h3><p>원하는 학년·반·번호만 선택하세요.</p></div>
+      <button type="button" onClick={() => setRefresh(value => value + 1)} disabled={loading || disabled}>새로고침</button></header>}
+    {selectionMode && <h4 id="student-directory-title" className="sr-only">과제를 받을 학생 선택</h4>}
     <div className="student-filters">
       <label>학년<select value={filters.grade} onChange={event => update("grade", event.target.value)}><option value="">전체 학년</option>{[1,2,3].map(grade => <option key={grade} value={grade}>{grade}학년</option>)}</select></label>
       <label>반<input type="number" min="1" max="99" placeholder="전체 반" value={filters.classNumber} onChange={event => update("classNumber", event.target.value)} /></label>
       <label>번호<input type="number" min="1" max="99" placeholder="전체 번호" value={filters.number} onChange={event => update("number", event.target.value)} /></label>
-      <button type="button" disabled={disabled} onClick={() => { setFilters(initialFilters); setPage(0); setSelected(null); }}>전체 보기</button>
+      {!selectionMode && <button type="button" disabled={disabled} onClick={() => { setFilters(initialFilters); setPage(0); setSelected(null); }}>전체 보기</button>}
     </div>
     <p role="status" aria-live="polite">{loading ? "학생을 찾는 중입니다." : `검색된 학생 ${result.count}명`}</p>
     {error && <p role="alert">{error}</p>}
     {selectionMode && <button type="button" disabled={loading || disabled || !result.students.length} onClick={choosePage}>현재 목록 모두 선택 · {result.students.length}명</button>}
     {selectionMessage && <p role="status">{selectionMessage}</p>}
     {!loading && !error && !result.students.length && <p>해당 조건에 맞는 등록 학생이 없습니다.</p>}
-    <div className="student-card-grid" aria-busy={loading}>{result.students.map(student => <button type="button" className="student-summary-card" key={student.id}
-      aria-haspopup={selectionMode ? undefined : "dialog"} aria-pressed={selectionMode ? selectedIds.has(student.id) : undefined} disabled={disabled || (selectionMode && !student.email)} onClick={() => selectionMode ? choose(student) : setSelected(student)}><strong>{student.name || "이름 미등록"}</strong><span>{placement(student)}</span><small>학번 {student.student_number || "미등록"}</small><span className="student-card-action">{selectionMode ? selectedIds.has(student.id) ? "✓ 선택됨" : "＋ 선택" : "상세 정보 보기 →"}</span></button>)}</div>
+    {selectionMode ? <div className="recipient-list" aria-busy={loading}>{result.students.map(student => <label key={student.id} className={`recipient-row ${selectedIds.has(student.id) ? "is-selected" : ""}`}>
+      <input type="checkbox" checked={selectedIds.has(student.id)} disabled={disabled || !student.email} onChange={() => choose(student)} />
+      <strong>{student.name || "이름 미등록"}</strong><span>{placement(student)}</span>
+    </label>)}</div> : <div className="student-card-grid" aria-busy={loading}>{result.students.map(student => <button type="button" className="student-summary-card" key={student.id}
+      aria-haspopup="dialog" disabled={disabled} onClick={() => setSelected(student)}><strong>{student.name || "이름 미등록"}</strong><span>{placement(student)}</span><small>학번 {student.student_number || "미등록"}</small><span className="student-card-action">상세 정보 보기 →</span></button>)}</div>}
     {!loading && !error && result.count > STUDENT_PAGE_SIZE && <nav className="student-pagination" aria-label="학생 목록 페이지">
       <button type="button" disabled={page === 0 || disabled} onClick={() => setPage(value => value - 1)}>이전</button><span>{page + 1} / {pages}</span>
       <button type="button" disabled={page + 1 >= pages || disabled} onClick={() => setPage(value => value + 1)}>다음</button></nav>}
