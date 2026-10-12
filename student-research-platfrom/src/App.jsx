@@ -36,7 +36,7 @@ function App() {
   const [isLogoutHovered, setIsLogoutHovered] = useState(false);
   const sectionTitleRef = useRef(null);
 
-  const { session, isLoading, signInWithGoogle, signOut: authSignOut } = useAuth(setMessage);
+  const { session, isLoading, isSigningIn, signInWithGoogle, signOut: authSignOut } = useAuth(setMessage);
   const { profile, records, teacherSharedFiles, academicProfile, setAcademicProfile,
     isAcademicProfileLoading, isLoadingTeacherSharedFiles, loadResearchRecords, loadTeacherSharedFiles
   } = useStudentData(session, setMessage);
@@ -168,7 +168,7 @@ async function handleDeleteResearchRecord(recordId) {
     );
   }
 
-  if (!session) return <HomePage signInWithGoogle={signInWithGoogle} message={message} />;
+  if (!session) return <HomePage signInWithGoogle={signInWithGoogle} isSigningIn={isSigningIn} message={message} />;
 
   return (
     <main ref={pageRef} className={`dashboard-page neutral-dashboard ${profile?.role === "student" ? "student-dashboard" : profile?.role === "teacher" ? "teacher-dashboard" : ""}`} style={styles.page}>

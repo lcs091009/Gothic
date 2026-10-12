@@ -1,10 +1,15 @@
-import { useEffect, useState } from "react";
-import { supabase, isSupabaseConfigured, getFriendlySupabaseError } from "../lib/supabaseClient";
+import { useEffect, useRef, useState } from "react";
+import { supabase, isSupabaseConfigured, supabaseConfigError, getFriendlySupabaseError } from "../lib/supabaseClient";
+import { googleLoginOptions, googleLoginError, googleCallbackError } from "../lib/googleLogin";
 
 export function useAuth(setMessage) {
   const [session, setSession] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const signingIn = useRef(false);
   useEffect(() => {
+    const callbackError = googleCallbackError(window.location);
+    if (callbackError) setMessage(callbackError);
     if (!isSupabaseConfigured()) { setIsLoading(false); return; }
     let active = true;
     let authEventReceived = false;
@@ -25,13 +30,15 @@ export function useAuth(setMessage) {
   }, [setMessage]);
 
   async function signInWithGoogle() {
+    if (signingIn.current) return;
     setMessage("");
-    if (!supabase) return;
+    if (!supabase) { setMessage(supabaseConfigError); return; }
+    signingIn.current = true; setIsSigningIn(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({ provider: "google",
-        options: { redirectTo: window.location.origin } });
+      const { error } = await supabase.auth.signInWithOAuth(googleLoginOptions(window.location.origin));
       if (error) throw error;
-    } catch (error) { setMessage(getFriendlySupabaseError(error)); }
+    } catch (error) { setMessage(googleLoginError(error)); }
+    finally { signingIn.current = false; setIsSigningIn(false); }
   }
   async function signOut() {
     try {
@@ -41,5 +48,5 @@ export function useAuth(setMessage) {
       return true;
     } catch (error) { setMessage(getFriendlySupabaseError(error)); return false; }
   }
-  return { session, isLoading, signInWithGoogle, signOut };
+  return { session, isLoading, isSigningIn, signInWithGoogle, signOut };
 }
