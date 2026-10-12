@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { uploadDriveFile, shareDriveFile, MAX_DRIVE_UPLOAD_BYTES, DRIVE_CHUNK_BYTES, mergeDriveAttachments } from "./googleDriveFiles.js";
+import { uploadDriveFile, shareDriveFile, MAX_DRIVE_UPLOAD_BYTES, DRIVE_CHUNK_BYTES, mergeDriveAttachments, shareDriveFileWithTokenRefresh } from "./googleDriveFiles.js";
 test("native files upload as resumable raw data and produce a usable attachment URL",async()=>{
  const file=Object.assign(new Blob(["report"],{type:"application/pdf"}),{name:"과제.pdf"});const calls=[];
  const result=await uploadDriveFile(file,"test-token",{fetchImpl:async(url,options)=>{
@@ -13,9 +13,11 @@ test("oversized files and foreign upload endpoints are rejected without leaking 
  let calls=0;await assert.rejects(uploadDriveFile({name:"big",size:MAX_DRIVE_UPLOAD_BYTES+1},"token",{fetchImpl:async()=>{calls++;}}),/500MB/);assert.equal(calls,0);
  await assert.rejects(uploadDriveFile({name:"file",size:1},"token",{fetchImpl:async()=>{calls++;return{ok:true,headers:{get:()=>"https://foreign.test/upload"}};}}),/연결/);assert.equal(calls,1);
 });
+const sharingRead = (url, permissions = [], canShare = true) => ({ ok:true,json:async()=>url.includes("/permissions?") ? {permissions} : {name:"과제.pdf",capabilities:{canShare}} });
 test("sharing grants only named recipients reader access, with notifications off, in sequence",async()=>{
  let active=0;const calls=[];const completed=new Set();
  await shareDriveFile("file123",["a@example.test","b@example.test","a@example.test"],"token",{completed,fetchImpl:async(url,options)=>{
+  if(options.method==="GET")return sharingRead(url);
   assert.equal(active,0);active++;await Promise.resolve();calls.push({url,body:JSON.parse(options.body)});active--;return{ok:true};
  }});
  assert.equal(calls.length,2);assert.ok(calls.every(c=>c.body.type==="user"&&c.body.role==="reader"));assert.ok(calls.every(c=>c.url.includes("sendNotificationEmail=false")));assert.equal(completed.size,2);
@@ -23,9 +25,9 @@ test("sharing grants only named recipients reader access, with notifications off
 });
 test("partial sharing failures keep successful recipients for retry and stop before remaining recipients",async()=>{
  const completed=new Set();const calls=[];
- await assert.rejects(shareDriveFile("file123",["a@example.test","b@example.test","c@example.test"],"token",{completed,fetchImpl:async(url,options)=>{calls.push(JSON.parse(options.body).emailAddress);return{ok:calls.length===1};}}),/열람 권한/);
+ await assert.rejects(shareDriveFile("file123",["a@example.test","b@example.test","c@example.test"],"token",{completed,fetchImpl:async(url,options)=>{if(options.method==="GET")return sharingRead(url);calls.push(JSON.parse(options.body).emailAddress);return{ok:calls.length===1,status:500};}}),/공유/);
  assert.deepEqual(calls,["a@example.test","b@example.test"]);assert.deepEqual([...completed],["a@example.test"]);
- const retry=[];await shareDriveFile("file123",["a@example.test","b@example.test","c@example.test"],"token",{completed,fetchImpl:async(url,options)=>{retry.push(JSON.parse(options.body).emailAddress);return{ok:true};}});
+ const retry=[];await shareDriveFile("file123",["a@example.test","b@example.test","c@example.test"],"token",{completed,fetchImpl:async(url,options)=>{if(options.method==="GET")return sharingRead(url);retry.push(JSON.parse(options.body).emailAddress);return{ok:true};}});
  assert.deepEqual(retry,["b@example.test","c@example.test"]);
 });
 
@@ -67,4 +69,34 @@ test("an interrupted first chunk with no received bytes retries within the same 
   if(calls===3)return{ok:false,status:308,headers:{get:()=>null}};
   assert.equal(options.body,file);return{ok:true,json:async()=>({id:"file"})};
  }});assert.equal(calls,4);
+});
+
+test("existing owner and writer recipients are not downgraded or recreated even without canShare",async()=>{
+ const permissions=[{type:"user",role:"owner",emailAddress:"owner@example.test"},{type:"user",role:"writer",emailAddress:"writer@example.test"}];
+ const completed=new Set();let writes=0;
+ await shareDriveFile("file123",["owner@example.test","writer@example.test"],"token",{completed,fetchImpl:async(url,options)=>{if(options.method!=="GET")writes++;return sharingRead(url,permissions,false);}});
+ assert.equal(writes,0);assert.equal(completed.size,2);
+});
+test("files that cannot be shared fail before attempting recipient permission writes",async()=>{
+ let writes=0;await assert.rejects(shareDriveFile("file123",["student@example.test"],"token",{fetchImpl:async(url,options)=>{if(options.method!=="GET")writes++;return sharingRead(url,[],false);}}),error=>error.scope==="driveSharing"&&/canShare=false/.test(error.message));assert.equal(writes,0);
+});
+test("policy rejection identifies safe provider status and reason, without leaking provider text",async()=>{
+ await assert.rejects(shareDriveFile("file123",["student@example.test"],"token",{fetchImpl:async(url,options)=>options.method==="GET" ? sharingRead(url) : {ok:false,status:400,json:async()=>({error:{message:"PRIVATE_TOKEN",errors:[{reason:"invalidSharingRequest",message:"PRIVATE_TOKEN"}]}})}}),error=>/Google 400.*invalidSharingRequest/.test(error.message)&&!error.message.includes("PRIVATE_TOKEN"));
+});
+test("a reported failure after a successful share is verified and accepted",async()=>{
+ let reads=0;
+ await shareDriveFile("file123",["student@example.test"],"token",{fetchImpl:async(url,options)=>{
+  if(options.method==="GET"){if(url.includes("/permissions?"))reads++;return sharingRead(url,reads>1?[{type:"user",role:"reader",emailAddress:"student@example.test"}]:[]);}
+  return{ok:false,status:400,json:async()=>({error:{errors:[{reason:"invalidSharingRequest"}]}})};
+ }});assert.equal(reads,2);
+});
+test("expired credentials refresh once; permanently invalid credentials never loop",async()=>{
+ let refreshes=0;
+ const token=await shareDriveFileWithTokenRefresh("file123",["student@example.test"],"old",async()=>{refreshes++;return"new";},{fetchImpl:async(url,options)=>{
+  if(options.headers.Authorization==="Bearer old")return{ok:false,status:401,json:async()=>({})};
+  return options.method==="GET"?sharingRead(url):{ok:true};
+ }});assert.equal(token,"new");assert.equal(refreshes,1);
+ refreshes=0;let calls=0;
+ await assert.rejects(shareDriveFileWithTokenRefresh("file123",["student@example.test"],"old",async()=>{refreshes++;return"new";},{fetchImpl:async()=>{calls++;return{ok:false,status:401,json:async()=>({})};}}));
+ assert.equal(refreshes,1);assert.equal(calls,2);
 });
