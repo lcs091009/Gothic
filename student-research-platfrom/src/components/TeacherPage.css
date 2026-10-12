@@ -38,3 +38,24 @@
 .assignment-directory .student-summary-card:active:not(:disabled) { transform: scale(.98); }
 @media (max-width:640px) { .assignment-directory .student-filters { grid-template-columns: repeat(3,minmax(0,1fr)); } .assignment-directory .student-filters > button { grid-column: 1/-1; } .assignment-option-row { grid-template-columns: 1fr; } .assignment-send-bar > button { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { .assignment-directory .student-summary-card { transition: none; } .assignment-directory .student-summary-card:is(:hover,:active) { transform: none; } }
+.recipient-picker { border: 1px solid #e0e7e1; border-radius: 14px; padding: 12px 16px; }
+.recipient-picker > summary { display: flex; align-items: center; justify-content: space-between; list-style: none; }
+.recipient-picker > summary::after { content: "+"; }
+.recipient-picker[open] > summary::after { content: "−"; }
+.recipient-picker .student-filters { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.recipient-list { max-height: 240px; overflow: auto; margin-top: 12px; }
+.recipient-row { display: flex; align-items: center; gap: 12px; padding: 11px 8px; border-bottom: 1px solid #edf0ed; cursor: pointer; border-radius: 8px; transition: background-color 160ms; }
+.recipient-row strong { font-size: 14px; font-weight: 600; }
+.recipient-row > span { margin-left: auto; color: #7b847d; font-size: 12px; }
+.recipient-row.is-selected { background: #eef4ef; }
+.assignment-step .recipient-row input { flex: 0 0 17px; width: 17px; height: 17px; padding: 0; accent-color: #526f5d; }
+.recipient-selection-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 13px; color: #627968; }
+.assignment-attachment { padding: 16px; border: 1px dashed #dce4de; border-radius: 14px; margin-top: 18px; transition: border-color 160ms, background-color 160ms; }
+.assignment-attachment.is-dragging { border-color: #708775; background: #eef4ef; }
+.assignment-attachment p { color: #7b847d; font-size: 12px; margin: 10px 0 0; }
+.attachment-actions, .attachment-selected { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.attachment-selected { margin-top: 12px; font-size: 13px; overflow-wrap: anywhere; }
+.attachment-selected > span { flex: 1; min-width: 0; }
+@media (hover:hover) { .recipient-row:hover { background: #f5f8f5; } }
+@media (max-width:640px) { .recipient-picker { padding: 12px; } .recipient-row { gap: 8px; } .recipient-row > span { font-size: 11px; } }
+@media (prefers-reduced-motion:reduce) { .recipient-row, .assignment-attachment { transition: none; } }

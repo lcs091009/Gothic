@@ -1,7 +1,7 @@
 import { supabase } from "../lib/supabaseClient.js";
 
 export const MAX_ASSIGNMENT_RECIPIENTS = 100;
-export function buildAssignmentRows({ teacher, students, title, description, category = "탐구", fileUrl = "", dueDate = "" }, makeId = () => crypto.randomUUID()) {
+export function buildAssignmentRows({ teacher, students, title, description, category = "탐구", fileUrl = "", fileId = "", dueDate = "" }, makeId = () => crypto.randomUUID()) {
   if (!teacher?.id || !teacher?.email) throw new Error("다시 로그인해 주세요.");
   if (!Array.isArray(students) || !students.length || students.length > MAX_ASSIGNMENT_RECIPIENTS) throw new Error("받을 학생을 1~100명 선택해 주세요.");
   if (!title?.trim() || title.trim().length > 160) throw new Error("과제 제목을 160자 이내로 입력해 주세요.");
@@ -20,7 +20,7 @@ export function buildAssignmentRows({ teacher, students, title, description, cat
     return { id: makeId(), teacher_id: teacher.id, teacher_email: teacher.email,
       student_number: student.student_number || null, student_email: student.email,
       file_name: title.trim(), description: dueDate ? `제출 기한: ${dueDate}\n\n${description.trim()}` : description.trim(),
-      file_url: link || null, file_id: null, category, match_status: "matched" };
+      file_url: link || null, file_id: fileId || null, category, match_status: "matched" };
   });
 }
 // Retry the same draft IDs after an uncertain network response, without making
