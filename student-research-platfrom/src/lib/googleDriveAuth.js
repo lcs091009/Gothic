@@ -3,7 +3,7 @@ export const AUTH_TIMEOUT_MS = 120_000;
 
 // Google reports popup closure itself. Browser focus/visibility changes do not
 // prove a popup closed: account selection and consent can also cause them.
-export function requestDriveAccessToken({ oauth2, clientId, forceConsent = false, signal,
+export function requestDriveAccessToken({ oauth2, clientId, forceConsent = false, selectAccount = false, signal,
   setTimer = setTimeout, clearTimer = clearTimeout }) {
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -29,6 +29,8 @@ export function requestDriveAccessToken({ oauth2, clientId, forceConsent = false
             finish(response?.error === "access_denied"
               ? "Google Drive 접근을 승인하지 않았습니다. 파일을 선택하려면 권한을 승인해 주세요."
               : "Google Drive 권한 요청에 실패했습니다. 다시 시도해 주세요.");
+          } else if (typeof response.scope === "string" && !response.scope.split(/\s+/).some(scope => scope === DRIVE_SCOPE || scope === "https://www.googleapis.com/auth/drive")) {
+            finish("Google Drive 파일 권한이 승인되지 않았습니다. Google 계정을 다시 연결하고 Drive 접근을 승인해 주세요.");
           } else finish(null, response);
         },
         error_callback(error) {
@@ -39,7 +41,7 @@ export function requestDriveAccessToken({ oauth2, clientId, forceConsent = false
               : "Google 로그인 창에서 오류가 발생했습니다. 다시 시도해 주세요.");
         },
       });
-      client.requestAccessToken({ prompt: forceConsent ? "consent" : "" });
+      client.requestAccessToken({ prompt: [forceConsent ? "consent" : "", selectAccount ? "select_account" : ""].filter(Boolean).join(" ") });
     } catch {
       finish("Google 로그인 창을 여는 중 오류가 발생했습니다.");
     }

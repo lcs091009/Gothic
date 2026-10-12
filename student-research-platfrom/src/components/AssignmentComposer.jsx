@@ -14,6 +14,7 @@ export default function AssignmentComposer({ session, isSubmitting, onBusyChange
   const [description, setDescription] = useState(restored.current.description);
   const [category, setCategory] = useState(restored.current.category);
   const [message, setMessage] = useState("");
+  const [sharingError, setSharingError] = useState(false);
   const fileInput = useRef(null);
   const drive = useGoogleDrive({ setMessage, userId: session?.user?.id, multiple: true, initialAttachments: restored.current.attachments });
   const [shareProgress, setShareProgress] = useState("");
@@ -39,7 +40,7 @@ export default function AssignmentComposer({ session, isSubmitting, onBusyChange
   async function submit(event) {
     event.preventDefault();
     if (busy.current || fileBusy) return;
-    setMessage("");
+    setMessage(""); setSharingError(false);
     const draft = { teacher: session?.user ? { id: session.user.id, email: session.user.email } : null, students, title, description, category, fileUrl: drive.driveFileUrl || fileUrl, fileId: drive.driveFileId, attachments: drive.attachments, dueDate };
     const key = assignmentDeliveryKey(draft);
     busy.current = true;
@@ -61,7 +62,8 @@ export default function AssignmentComposer({ session, isSubmitting, onBusyChange
       clearAssignmentDraft(userId);
       await onSent(students.length);
     } catch (error) {
-      setMessage(`${getFriendlySupabaseError(error)} 입력을 유지했으니 확인 후 다시 전달해 주세요.`);
+      setSharingError(error.scope === "driveSharing");
+      setMessage(getFriendlySupabaseError(error));
     } finally { busy.current = false; onBusyChange(false); setShareProgress(""); }
   }
   return <form className="assignment-composer" onSubmit={submit}>
@@ -108,5 +110,8 @@ export default function AssignmentComposer({ session, isSubmitting, onBusyChange
       </div>
     </fieldset>
     {message && <p role="status" className="assignment-error">{message}</p>}
+    {sharingError && <div className="attachment-links"><button type="button" disabled={fileBusy || isSubmitting} onClick={drive.reconnectGoogleDrive}>Google 계정 다시 연결</button>{drive.attachments.map(file =>
+      <a key={file.id} href={file.url} target="_blank" rel="noreferrer">{file.name} · Drive에서 공유 설정 확인 ↗</a>
+    )}</div>}
   </form>;
 }

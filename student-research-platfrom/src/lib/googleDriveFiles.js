@@ -39,17 +39,73 @@ export async function uploadDriveFile(file, token, { fetchImpl = fetch, signal, 
   if (!/^[\w-]+$/.test(result?.id || "")) throw new Error("업로드한 파일을 확인하지 못했습니다.");
   return { id: result.id, name: result.name || file.name, url: result.webViewLink || `https://drive.google.com/file/d/${result.id}/view` };
 }
+const knownSharingReasons = new Set(["authError", "invalidSharingRequest", "domainPolicy", "insufficientFilePermissions", "insufficientPermissions", "sharingRateLimitExceeded", "rateLimitExceeded", "userRateLimitExceeded", "notFound"]);
+export async function driveSharingError(response, context = "") {
+  let body; try { body = await response.json(); } catch { body = null; }
+  const original = body?.error?.errors?.[0]?.reason;
+  const reason = knownSharingReasons.has(original) ? original : "unknown";
+  let message;
+  if (response.status === 401 || reason === "authError") message = "Google 인증이 만료됐습니다. Google Drive를 다시 연결해 주세요.";
+  else if (reason === "domainPolicy") message = "학교 Google 관리자가 이 앱의 Drive 접근을 제한했습니다. 관리자에게 앱 접근 허용을 요청해 주세요.";
+  else if (reason === "invalidSharingRequest") message = "Google이 학생 계정 공유를 거부했습니다. 학생 Google 이메일과 파일 소유 계정의 외부 공유 허용 설정을 확인해 주세요.";
+  else if (reason === "insufficientFilePermissions") message = "이 Google 계정에는 파일을 다른 학생에게 공유할 권한이 없습니다. 소유자 계정으로 파일을 선택하거나 컴퓨터에서 원본을 첨부해 주세요.";
+  else if (reason === "insufficientPermissions") message = "Google Drive 권한 승인이 부족합니다. 파일을 다시 선택하고 Drive 권한을 승인해 주세요.";
+  else if (response.status === 429 || ["sharingRateLimitExceeded", "rateLimitExceeded", "userRateLimitExceeded"].includes(reason)) message = "Google 공유 요청 한도에 도달했습니다. 잠시 후 다시 전달해 주세요.";
+  else if (response.status === 404 || reason === "notFound") message = "현재 Google 계정에서 파일을 찾을 수 없습니다. 해당 파일이 있는 계정으로 다시 선택해 주세요.";
+  else message = "Google 파일 공유에 실패했습니다. 파일 소유 계정과 공유 설정을 확인해 주세요.";
+  const error = new Error(`${context ? `${context}: ` : ""}${message} [Google ${response.status} · ${reason}]`);
+  error.status = response.status; error.reason = reason; error.scope = "driveSharing";
+  return error;
+}
+function permissionCovers(permission, email) {
+  if (permission.deleted || !["owner", "organizer", "fileOrganizer", "writer", "commenter", "reader"].includes(permission.role)) return false;
+  return permission.type === "anyone" || (permission.type === "user" && permission.emailAddress?.toLowerCase() === email.toLowerCase()) ||
+    (permission.type === "domain" && email.toLowerCase().endsWith(`@${permission.domain?.toLowerCase()}`));
+}
+// Read all explicit permission pages; never downgrade an existing collaborator.
+async function filePermissions(fileId, token, fetchImpl, signal) {
+  const permissions = []; let pageToken;
+  do {
+    const url = new URL(`${endpoint}/drive/v3/files/${encodeURIComponent(fileId)}/permissions`);
+    url.searchParams.set("supportsAllDrives", "true"); url.searchParams.set("pageSize", "100");
+    url.searchParams.set("fields", "nextPageToken,permissions(type,emailAddress,domain,role,deleted)");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+    const response = await fetchImpl(url.href, { method: "GET", signal, headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok) throw await driveSharingError(response);
+    const data = await response.json(); permissions.push(...(data.permissions || [])); pageToken = data.nextPageToken;
+  } while (pageToken);
+  return permissions;
+}
 // Google does not support concurrent permission changes on the same file.
 export async function shareDriveFile(fileId, emails, token, { fetchImpl = fetch, signal, completed = new Set(), onProgress = () => {} } = {}) {
-  if (!/^[\w-]+$/.test(fileId || "") || !Array.isArray(emails) || emails.length > 100 || emails.some(email => typeof email !== "string" || !email.includes("@"))) throw new Error("파일과 받을 학생을 다시 확인해 주세요.");
-  const recipients = [...new Set(emails)];
+  if (!/^[\w-]+$/.test(fileId || "") || !Array.isArray(emails) || emails.length > 100 || emails.some(email => typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))) throw new Error("파일과 받을 학생을 다시 확인해 주세요.");
+  const recipients = [...new Set(emails.map(email => email.trim().toLowerCase()))];
+  if (recipients.every(email => completed.has(email))) { onProgress(recipients.length, recipients.length); return; }
+  const metadataResponse = await fetchImpl(`${endpoint}/drive/v3/files/${encodeURIComponent(fileId)}?supportsAllDrives=true&fields=name,capabilities(canShare)`, {
+    method: "GET", signal, headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!metadataResponse.ok) throw await driveSharingError(metadataResponse);
+  const metadata = await metadataResponse.json();
+  const permissions = await filePermissions(fileId, token, fetchImpl, signal);
+  for (const email of recipients) if (permissions.some(permission => permissionCovers(permission, email))) completed.add(email);
+  if (metadata.capabilities?.canShare === false && recipients.some(email => !completed.has(email))) {
+    const error = new Error(`${metadata.name || "첨부파일"}: 현재 Google 계정에 공유 권한이 없습니다. 파일 소유자 계정으로 다시 선택하거나 컴퓨터에서 원본을 첨부해 주세요. [Google · canShare=false]`);
+    error.scope = "driveSharing"; throw error;
+  }
   for (const [index, email] of recipients.entries()) {
     if (!completed.has(email)) {
       const response = await fetchImpl(`${endpoint}/drive/v3/files/${encodeURIComponent(fileId)}/permissions?sendNotificationEmail=false&supportsAllDrives=true`, {
         method: "POST", signal, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ type: "user", role: "reader", emailAddress: email }),
       });
-      if (!response.ok) throw new Error("학생에게 파일 열람 권한을 주지 못했습니다. 공유 가능한 Google 계정의 파일인지 확인하고 다시 전달해 주세요.");
+      if (!response.ok) {
+        const error = await driveSharingError(response, `${metadata.name || "첨부파일"} → ${email}`);
+        // Google can return an error after granting permission. Verify once.
+        if ([400,409].includes(response.status)) {
+          const refreshed = await filePermissions(fileId, token, fetchImpl, signal);
+          if (!refreshed.some(permission => permissionCovers(permission, email))) throw error;
+        } else throw error;
+      }
       completed.add(email);
     }
     onProgress(index + 1, recipients.length);
@@ -64,4 +120,14 @@ export function mergeDriveAttachments(existing, incoming) {
   }
   if (files.size > MAX_DRIVE_ATTACHMENTS) throw new Error(`파일은 최대 ${MAX_DRIVE_ATTACHMENTS}개까지 첨부할 수 있습니다.`);
   return [...files.values()];
+}
+
+export async function shareDriveFileWithTokenRefresh(fileId, emails, token, refreshToken, options) {
+  try { await shareDriveFile(fileId, emails, token, options); return token; }
+  catch (error) {
+    if (error.status !== 401 && error.reason !== "authError") throw error;
+    const nextToken = await refreshToken();
+    await shareDriveFile(fileId, emails, nextToken, options);
+    return nextToken;
+  }
 }
