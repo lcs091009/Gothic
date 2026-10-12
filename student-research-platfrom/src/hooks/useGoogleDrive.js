@@ -4,13 +4,14 @@ import { requestDriveAccessToken } from "../lib/googleDriveAuth";
 import { getGooglePickerConfigError } from "../lib/googlePickerConfig";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export function useGoogleDrive({ setMessage, userId, multiple = false }) {
-  const [attachments, setAttachments] = useState([]);
-  const attachmentsRef = useRef([]);
+export function useGoogleDrive({ setMessage, userId, multiple = false, initialAttachments = [] }) {
+  const [attachments, setAttachments] = useState(() => mergeDriveAttachments([], initialAttachments));
+  const attachmentsRef = useRef(attachments);
+  const attachmentOwner = useRef(userId);
   const [fileProgress, setFileProgress] = useState("");
-  const [driveFileId, setDriveFileId] = useState("");
-  const [driveFileName, setDriveFileName] = useState("");
-  const [driveFileUrl, setDriveFileUrl] = useState("");
+  const [driveFileId, setDriveFileId] = useState(attachments[0]?.id || "");
+  const [driveFileName, setDriveFileName] = useState(attachments[0]?.name || "");
+  const [driveFileUrl, setDriveFileUrl] = useState(attachments[0]?.url || "");
   const [isPickerLoading, setIsPickerLoading] = useState(false);
   const [isGoogleAuthLoading, setIsGoogleAuthLoading] = useState(false);
   const [isUploadDragging, setIsUploadDragging] = useState(false);
@@ -25,7 +26,7 @@ export function useGoogleDrive({ setMessage, userId, multiple = false }) {
   const googleAccessTokenRef = useRef("");
   const googleTokenExpiresAtRef = useRef(0);
   const googleAuthRequestRef = useRef(null);
-  const clearDriveSession = useCallback(() => {
+  const clearDriveSession = useCallback(({ keepAttachments = false } = {}) => {
     fileOperation.current?.abort();
     sharedRecipients.current.clear();
     googleAccessTokenRef.current = "";
@@ -35,13 +36,16 @@ export function useGoogleDrive({ setMessage, userId, multiple = false }) {
     for (const key of ["googleDriveAccessToken", "googleDriveTokenExpiresAt", "googleDriveUserId"]) {
       window.sessionStorage.removeItem(key);
     }
-    attachmentsRef.current = []; setAttachments([]);
-    setDriveFileId(""); setDriveFileName(""); setDriveFileUrl("");
+    if (!keepAttachments) {
+      attachmentsRef.current = []; setAttachments([]);
+      setDriveFileId(""); setDriveFileName(""); setDriveFileUrl("");
+    }
   }, []);
   useEffect(() => {
     mounted.current = true;
     if (import.meta.env.VITE_GOOGLE_CLIENT_ID) loadScript("https://accounts.google.com/gsi/client").catch(() => {});
-    if (window.sessionStorage.getItem("googleDriveUserId") !== userId) clearDriveSession();
+    if (window.sessionStorage.getItem("googleDriveUserId") !== userId) clearDriveSession({ keepAttachments: attachmentOwner.current === userId });
+    attachmentOwner.current = userId;
     return () => { mounted.current = false; fileOperation.current?.abort(); googleAccessTokenRef.current = ""; googleAuthRequestRef.current?.abort(); };
   }, [userId, clearDriveSession]);
 

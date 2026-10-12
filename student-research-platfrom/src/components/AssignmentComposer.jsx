@@ -1,42 +1,73 @@
-import { useRef, useState } from "react";
+import { readAssignmentDraft, writeAssignmentDraft, clearAssignmentDraft, assignmentDeliveryKey } from "../lib/assignmentDraft";
+import { useEffect, useRef, useState } from "react";
 import { useGoogleDrive } from "../hooks/useGoogleDrive";
 import StudentDirectory from "./StudentDirectory";
 import { buildAssignmentRows, deliverAssignmentRows, MAX_ASSIGNMENT_RECIPIENTS } from "../services/teacherAssignments";
 import { getFriendlySupabaseError } from "../lib/supabaseClient";
 
 export default function AssignmentComposer({ session, isSubmitting, onBusyChange, onSent }) {
-  const [students, setStudents] = useState([]);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("탐구");
+  const userId = session?.user?.id;
+  const restored = useRef(null);
+  if (!restored.current) restored.current = readAssignmentDraft(userId);
+  const [students, setStudents] = useState(restored.current.students);
+  const [title, setTitle] = useState(restored.current.title);
+  const [description, setDescription] = useState(restored.current.description);
+  const [category, setCategory] = useState(restored.current.category);
   const [message, setMessage] = useState("");
   const fileInput = useRef(null);
-  const drive = useGoogleDrive({ setMessage, userId: session?.user?.id, multiple: true });
+  const drive = useGoogleDrive({ setMessage, userId: session?.user?.id, multiple: true, initialAttachments: restored.current.attachments });
   const [shareProgress, setShareProgress] = useState("");
   const fileBusy = drive.isUploadingFile || drive.isGoogleAuthLoading || drive.isPickerLoading;
-  const [fileUrl, setFileUrl] = useState("");
-  const [dueDate, setDueDate] = useState("");
+  const [fileUrl, setFileUrl] = useState(restored.current.fileUrl);
+  const [dueDate, setDueDate] = useState(restored.current.dueDate);
   const pending = useRef(null);
   const busy = useRef(false);
+  const delivered = useRef(false);
+  const delivery = useRef(restored.current.delivery);
+  const [saved, setSaved] = useState(null);
+  const snapshot = useRef(null);
+  snapshot.current = {students, title, description, category, fileUrl, dueDate, attachments: drive.attachments, delivery: delivery.current};
+  useEffect(() => {
+    const timer = setTimeout(() => { if (!delivered.current) setSaved(writeAssignmentDraft(userId, snapshot.current)); }, 300);
+    return () => clearTimeout(timer);
+  }, [userId, students, title, description, category, fileUrl, dueDate, drive.attachments]);
+  useEffect(() => {
+    const flush = () => { if (!delivered.current) writeAssignmentDraft(userId, snapshot.current); };
+    window.addEventListener("pagehide", flush);
+    return () => { window.removeEventListener("pagehide", flush); flush(); };
+  }, [userId]);
   async function submit(event) {
     event.preventDefault();
     if (busy.current || fileBusy) return;
     setMessage("");
     const draft = { teacher: session?.user ? { id: session.user.id, email: session.user.email } : null, students, title, description, category, fileUrl: drive.driveFileUrl || fileUrl, fileId: drive.driveFileId, attachments: drive.attachments, dueDate };
-    const key = JSON.stringify(draft);
+    const key = assignmentDeliveryKey(draft);
     busy.current = true;
     onBusyChange(true);
     try {
-      if (pending.current?.key !== key) pending.current = { key, rows: buildAssignmentRows(draft) };
+      if (pending.current?.key !== key) {
+        let index = 0;
+        const savedIds = delivery.current?.key === key && delivery.current.ids.length === students.length ? delivery.current.ids : null;
+        const rows = buildAssignmentRows(draft, () => savedIds?.[index++] || crypto.randomUUID());
+        pending.current = { key, rows };
+        delivery.current = { key, ids: rows.map(row => row.id) };
+        snapshot.current = { ...snapshot.current, delivery: delivery.current };
+        setSaved(writeAssignmentDraft(userId, snapshot.current));
+      }
       if (drive.driveFileId) await drive.shareSelectedFile(students.map(student => student.email), (done, total) => setShareProgress(`파일 공유 ${done}/${total}`));
       await deliverAssignmentRows(pending.current.rows);
       pending.current = null;
+      delivered.current = true;
+      clearAssignmentDraft(userId);
       await onSent(students.length);
     } catch (error) {
       setMessage(`${getFriendlySupabaseError(error)} 입력을 유지했으니 확인 후 다시 전달해 주세요.`);
     } finally { busy.current = false; onBusyChange(false); setShareProgress(""); }
   }
   return <form className="assignment-composer" onSubmit={submit}>
+    <p className="assignment-draft-status" role="status" style={{color: saved === false ? "#a35454" : "#7b847d", fontSize: "12px", margin: 0}}>
+      {saved === false ? "임시 저장을 사용할 수 없습니다. 현재 화면에서 작성을 마쳐 주세요." : "이 기기에 자동 저장 · 같은 계정으로 30일 동안 이어서 작성할 수 있습니다."}
+    </p>
     <fieldset disabled={isSubmitting} className="assignment-fields">
       <section className="assignment-step">
         <header><span className="assignment-step-number">1</span><h3>받을 학생</h3><span className="assignment-count" role="status">{students.length}명 선택</span></header>
