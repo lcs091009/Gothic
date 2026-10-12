@@ -245,17 +245,29 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
       {analysis && (
         <div style={styles.resultBox}>
           <h3 style={styles.resultTitle}>활동 흐름 분석 결과</h3>
-          {scope && <p style={styles.text}>
-            기록 개요 {scope.scannedRecords}개 · 본문 발췌 {scope.detailedRecords}개 ·
-            선생님 자료 {scope.teacherMaterials}개를 참고한 결과입니다.
-            {scope.scanLimitReached && " 최대 48개 기록 범위에서 분석했습니다."}
-          </p>}
+          {scope && <details className="quiet-details">
+            <summary>분석 범위 · 활동 {scope.scannedRecords}개</summary>
+            <p style={styles.text}>기록 개요 {scope.scannedRecords}개 · 본문 발췌 {scope.detailedRecords}개 · 선생님 자료 {scope.teacherMaterials}개
+              {scope.scanLimitReached && " · 최대 48개 범위"}</p>
+          </details>}
           {warning && <p role="status" style={styles.text}>{warning}</p>}
-          <pre style={styles.resultText}>{analysis}</pre>
+          <AnalysisText text={analysis} />
         </div>
       )}
     </section>
   );
+}
+
+// Render provider text safely as text nodes; keep unexpected/legacy lines intact.
+export function AnalysisText({ text }) {
+  return <div style={styles.resultText}>
+    {text.split(/\r?\n/).filter(line => line.trim()).map((line, index) => {
+      const heading = line.trim().replace(/^#{1,3}\s+/, "").replace(/^\*\*(.+)\*\*$/, "$1");
+      return /^[1-4]\. (핵심 흐름|교과 연결|다음 탐구|기록 보완과 바로 할 일)$/.test(heading)
+        ? <h4 key={index} style={styles.analysisHeading}>{heading}</h4>
+        : <p key={index} style={styles.analysisLine}>{line}</p>;
+    })}
+  </div>;
 }
 
 const styles = {
@@ -383,6 +395,8 @@ const styles = {
     marginTop: 0,
     color: "#0f172a",
   },
+  analysisHeading: { margin: "22px 0 10px", color: "#355c50", fontSize: "16px", fontWeight: 650 },
+  analysisLine: { margin: "6px 0", whiteSpace: "pre-wrap", overflowWrap: "anywhere" },
   resultText: {
     whiteSpace: "pre-wrap",
     wordBreak: "keep-all",
