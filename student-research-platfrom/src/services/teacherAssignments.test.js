@@ -58,3 +58,10 @@ test("history groups one batch while keeping distinct deliveries with the same t
  const result=groupAssignmentDeliveries([...rows,later]);assert.equal(result.length,2);assert.equal(result[0].recipients.length,2);assert.equal(result[1].recipients.length,1);
  assert.deepEqual(result[0].recipients.map(r=>r.email),draft.students.map(s=>s.email));
 });
+
+test("all validated attachments are stored per recipient, with legacy first-link compatibility",()=>{
+ const attachments=Array.from({length:20},(_,i)=>({id:`file${i}`,name:`자료${i}.pdf`,url:`https://drive.google.com/file/d/file${i}/view`}));
+ const rows=buildAssignmentRows({...draft,attachments,fileUrl:attachments[0].url,fileId:attachments[0].id},()=>crypto.randomUUID());
+ assert.equal(rows[0].attachments.length,20);assert.deepEqual(rows[0].attachments,rows[1].attachments);assert.equal(rows[0].file_id,"file0");
+ for(const files of [[...attachments,{id:"extra",url:"https://example.test"}],[{id:"bad",url:"javascript:alert(1)"}],[attachments[0],attachments[0]]])assert.throws(()=>buildAssignmentRows({...draft,attachments:files}));
+});

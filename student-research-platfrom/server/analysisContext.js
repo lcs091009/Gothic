@@ -91,6 +91,7 @@ export function buildAnalysisContext(academicProfile, records, teacherFiles, ext
     activities: activityData,
     teacherMaterials: teacherFiles.slice(0, 8).map((f, index) => ({
       ref: `T${index + 1}`, fileName: clip(f.file_name), category: clip(f.category),
+      attachmentNames: Array.isArray(f.attachments) ? f.attachments.slice(0, 10).map(file => clip(file.name, 100)) : [],
       description: excerpt(f.description, 800) || "설명 없음", bodyAvailable: false,
     })),
     studentSupplement: clip(extraContext, 1200) || "없음",
