@@ -1,10 +1,13 @@
-import { uploadDriveFile, shareDriveFile } from "../lib/googleDriveFiles";
+import { uploadDriveFile, shareDriveFile, mergeDriveAttachments, MAX_DRIVE_ATTACHMENTS } from "../lib/googleDriveFiles";
 const scriptRequests = new Map();
 import { requestDriveAccessToken } from "../lib/googleDriveAuth";
 import { getGooglePickerConfigError } from "../lib/googlePickerConfig";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export function useGoogleDrive({ setMessage, userId }) {
+export function useGoogleDrive({ setMessage, userId, multiple = false }) {
+  const [attachments, setAttachments] = useState([]);
+  const attachmentsRef = useRef([]);
+  const [fileProgress, setFileProgress] = useState("");
   const [driveFileId, setDriveFileId] = useState("");
   const [driveFileName, setDriveFileName] = useState("");
   const [driveFileUrl, setDriveFileUrl] = useState("");
@@ -32,6 +35,7 @@ export function useGoogleDrive({ setMessage, userId }) {
     for (const key of ["googleDriveAccessToken", "googleDriveTokenExpiresAt", "googleDriveUserId"]) {
       window.sessionStorage.removeItem(key);
     }
+    attachmentsRef.current = []; setAttachments([]);
     setDriveFileId(""); setDriveFileName(""); setDriveFileUrl("");
   }, []);
   useEffect(() => {
@@ -125,6 +129,16 @@ async function getGoogleAccessToken({ forceConsent = false } = {}) {
   }
 }
 
+function appendFiles(files) {
+  const next = multiple ? mergeDriveAttachments(attachmentsRef.current, files) : mergeDriveAttachments([], files.slice(0, 1));
+  attachmentsRef.current = next; setAttachments(next);
+  const first = next[0]; setDriveFileId(first?.id || ""); setDriveFileName(first?.name || ""); setDriveFileUrl(first?.url || "");
+}
+function removeAttachment(id) {
+  const next = attachmentsRef.current.filter(file => file.id !== id);
+  attachmentsRef.current = next; setAttachments(next);
+  const first = next[0]; setDriveFileId(first?.id || ""); setDriveFileName(first?.name || ""); setDriveFileUrl(first?.url || "");
+}
 async function openGooglePicker() {
   const googleApiKey = import.meta.env.VITE_GOOGLE_API_KEY;
   const googleAppId = import.meta.env.VITE_GOOGLE_APP_ID;
@@ -152,7 +166,7 @@ async function openGooglePicker() {
       .setIncludeFolders(true)
       .setSelectFolderEnabled(false);
 
-    const picker = new window.google.picker.PickerBuilder()
+    const builder = new window.google.picker.PickerBuilder()
       .setOAuthToken(accessToken)
       .setDeveloperKey(googleApiKey)
       .setAppId(googleAppId)
@@ -161,17 +175,11 @@ async function openGooglePicker() {
       .setCallback((data) => {
         if (!mounted.current || userId !== currentUserRef.current) return;
         if (data.action === window.google.picker.Action.PICKED) {
-          const file = data.docs[0];
+          try {
+            appendFiles((data.docs || []).map(file => ({ id: file.id, name: file.name || file.title, url: file.url })));
+            setMessage(`${attachmentsRef.current.length}개 파일을 첨부했습니다.`);
+          } catch (error) { setMessage(error.message); }
 
-          setDriveFileId(file.id || "");
-          setDriveFileName(file.name || file.title || "");
-          setDriveFileUrl(file.url || "");
-
-          setMessage(
-            `Google Drive 파일이 선택되었습니다: ${
-              file.name || file.title || "파일명 없음"
-            }`
-          );
         }
 
         if (
@@ -189,8 +197,9 @@ async function openGooglePicker() {
           });
         }
       })
-      .build();
-
+      ;
+    if (multiple) builder.enableFeature(window.google.picker.Feature.MULTISELECT_ENABLED);
+    const picker = builder.build();
     picker.setVisible(true);
 
     window.requestAnimationFrame(() => {
@@ -214,8 +223,11 @@ async function openGooglePicker() {
   }
 }
 
-async function uploadDroppedFileToGoogleDrive(file) {
-  if (!file || uploadLock.current) return;
+async function uploadDroppedFileToGoogleDrive(input) {
+  const files = Array.isArray(input) ? input : [input];
+  const selected = multiple ? files.filter(Boolean) : files.filter(Boolean).slice(0, 1);
+  if (!selected.length || uploadLock.current) return;
+  if (multiple && attachmentsRef.current.length + selected.length > MAX_DRIVE_ATTACHMENTS) { setMessage(`파일은 최대 ${MAX_DRIVE_ATTACHMENTS}개까지 첨부할 수 있습니다.`); return; }
   uploadLock.current = true;
   setMessage(""); setIsUploadingFile(true);
   const owner = userId;
@@ -223,23 +235,33 @@ async function uploadDroppedFileToGoogleDrive(file) {
   try {
     const accessToken = await getGoogleAccessToken();
     if (!mounted.current || owner !== currentUserRef.current) throw new Error("계정이 변경되었습니다.");
-    const result = await uploadDriveFile(file, accessToken, { signal: controller.signal });
-    if (!mounted.current || owner !== currentUserRef.current) return;
-    setDriveFileId(result.id); setDriveFileName(result.name); setDriveFileUrl(result.url);
-    setMessage(`첨부 완료: ${result.name}`);
-  } catch (error) { if (mounted.current && owner === currentUserRef.current) setMessage(error.name === "AbortError" ? "업로드가 취소되었습니다." : error.message || "파일 업로드에 실패했습니다."); }
-  finally { uploadLock.current = false; setIsUploadingFile(false); }
+    for (const [index, file] of selected.entries()) {
+      setFileProgress(`${index + 1}/${selected.length} · ${file.name}`);
+      const result = await uploadDriveFile(file, accessToken, { signal: controller.signal,
+        onProgress: (done, total) => { if (mounted.current) setFileProgress(`${index + 1}/${selected.length} · ${Math.round(done / (total || 1) * 100)}%`); } });
+      if (!mounted.current || owner !== currentUserRef.current) return;
+      appendFiles([result]);
+    }
+    setMessage(`${attachmentsRef.current.length}개 파일을 첨부했습니다.`);
+  } catch (error) { if (mounted.current && owner === currentUserRef.current) setMessage(error.name === "AbortError" ? "업로드를 중단했습니다. 완료한 첨부는 유지됩니다." : error.message || "파일 업로드에 실패했습니다."); }
+  finally { uploadLock.current = false; setIsUploadingFile(false); setFileProgress(""); }
 }
+
 async function shareSelectedFile(emails, onProgress) {
-  if (!driveFileId) return;
+  const files = multiple ? attachmentsRef.current : [{ id: driveFileId }];
+  if (!files.length || !files[0].id) return;
   const owner = userId;
   const controller = new AbortController(); fileOperation.current = controller;
   const token = await getGoogleAccessToken();
   if (!mounted.current || owner !== currentUserRef.current) throw new Error("계정이 변경되었습니다.");
-  if (!sharedRecipients.current.has(driveFileId)) sharedRecipients.current.set(driveFileId, new Set());
-  const timeout = setTimeout(() => controller.abort(), 120_000);
+
+  const timeout = setTimeout(() => controller.abort(), 600_000);
   try {
-    await shareDriveFile(driveFileId, emails, token, { signal: controller.signal, completed: sharedRecipients.current.get(driveFileId), onProgress });
+    for (const [index, file] of files.entries()) {
+      if (!sharedRecipients.current.has(file.id)) sharedRecipients.current.set(file.id, new Set());
+      await shareDriveFile(file.id, emails, token, { signal: controller.signal, completed: sharedRecipients.current.get(file.id),
+        onProgress: (done, total) => onProgress?.(index * total + done, files.length * total) });
+    }
   } catch (error) {
     if (error.name === "AbortError") throw new Error("파일 공유 시간이 초과됐습니다. 다시 전달하면 완료된 학생은 건너뜁니다.");
     throw error;
@@ -266,9 +288,9 @@ function handleUploadDrop(event) {
   event.preventDefault();
   setIsUploadDragging(false);
 
-  const droppedFile = event.dataTransfer.files?.[0];
+  const droppedFile = Array.from(event.dataTransfer.files || []);
 
-  if (!droppedFile) {
+  if (!droppedFile.length) {
     setMessage("드롭된 파일을 찾지 못했습니다.");
     return;
   }
@@ -277,5 +299,5 @@ function handleUploadDrop(event) {
 }
 
 
-  return { driveFileId, driveFileName, driveFileUrl, isPickerLoading, isGoogleAuthLoading, isUploadDragging, isUploadingFile, setDriveFileId, setDriveFileName, setDriveFileUrl, openGooglePicker, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, clearDriveSession, uploadLocalFile: uploadDroppedFileToGoogleDrive, shareSelectedFile };
+  return { driveFileId, driveFileName, driveFileUrl, isPickerLoading, isGoogleAuthLoading, isUploadDragging, isUploadingFile, setDriveFileId, setDriveFileName, setDriveFileUrl, openGooglePicker, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, clearDriveSession, uploadLocalFile: uploadDroppedFileToGoogleDrive, shareSelectedFile, attachments, removeAttachment, fileProgress, cancelUpload: () => fileOperation.current?.abort() };
 }

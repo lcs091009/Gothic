@@ -1,3 +1,4 @@
+import AttachmentLinks from "../components/AttachmentLinks";
 import styles from "../styles/studentStyles";
 
 export default function StudentPage({ section = "register", onNavigate, grade, setGrade, semester, setSemester, subject, setSubject, title, setTitle, content, setContent, handleSubmitResearchRecord, isUploadDragging, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, openGooglePicker, isPickerLoading, isUploadingFile, isGoogleAuthLoading, driveFileName, driveFileUrl, onClearSelectedFile, isSubmitting, records, handleDeleteResearchRecord, deletingRecordId, loadTeacherSharedFiles, session, isLoadingTeacherSharedFiles, teacherSharedFiles }) {
@@ -302,17 +303,7 @@ export default function StudentPage({ section = "register", onNavigate, grade, s
                       </p>
 
                       </details>
-                      {file.file_url && (
-                        <a
-                          href={file.file_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="teacher-link"
-                          style={styles.link}
-                        >
-                          선생님 제공 파일 열기
-                        </a>
-                      )}
+                <AttachmentLinks file={file} />
 
 
                     </article>

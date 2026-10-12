@@ -1,3 +1,4 @@
+import AttachmentLinks from "./AttachmentLinks";
 import StudentDirectory from "./StudentDirectory";
 import AssignmentComposer from "./AssignmentComposer";
 import { groupAssignmentDeliveries } from "../services/teacherAssignments";
@@ -163,17 +164,7 @@ function TeacherPage({ session }) {
 
                 <details className="quiet-details"><summary>자료 설명</summary><p style={styles.cardDescription}>{file.description}</p></details>
 
-                {file.file_url && (
-                  <a
-                    className="teacher-link"
-                    href={file.file_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={styles.link}
-                  >
-                    파일 열기
-                  </a>
-                )}
+                <AttachmentLinks file={file} />
 
                 <p style={styles.dateText}>
                   등록 시간: {new Date(file.created_at).toLocaleString("ko-KR")}
