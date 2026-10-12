@@ -116,7 +116,7 @@ function TeacherPage({ session }) {
 
       <div key={currentSection} className={`student-view ${currentSection !== "menu" ? "inner-page teacher-inner-page" : ""}`}>
       {currentSection === "students" && <StudentDirectory teacherId={session?.user?.id} />}
-      {currentSection === "register" && <AssignmentComposer session={session} isSubmitting={isSubmitting} onBusyChange={setIsSubmitting} onSent={handleAssignmentSent} />}
+      {currentSection === "register" && <AssignmentComposer key={session?.user?.id} session={session} isSubmitting={isSubmitting} onBusyChange={setIsSubmitting} onSent={handleAssignmentSent} />}
 
       {currentSection === "files" && <section style={styles.listBox}>
         <div style={styles.listTitleRow}>
