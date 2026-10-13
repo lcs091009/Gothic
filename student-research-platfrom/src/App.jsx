@@ -7,6 +7,7 @@ import HomePage from "./pages/HomePage";
 import StudentPage from "./pages/StudentPage";
 import StudentHome from "./pages/StudentHome";
 import { studentCategories } from "./config/studentCategories";
+import { schoolEmailDomain } from "./config/school";
 import styles from "./styles/appStyles";
 import "./styles/neutralTheme.css";
 import "./styles/innerPages.css";
@@ -316,8 +317,17 @@ async function handleDeleteResearchRecord(recordId) {
           <section style={styles.box}>
             <h2 style={styles.subTitle}>권한 확인 필요</h2>
             <p style={styles.text}>
-              이 계정은 학생 이메일 형식이 아닙니다. 현재 단계에서는 학생
-              계정만 탐구 기록을 등록할 수 있습니다.
+              로그인한 계정({profile.email || session?.user?.email})에는 아직
+              사용 권한이 없습니다.
+            </p>
+            <p style={styles.text}>
+              <strong>선생님</strong>: 교사 권한은 관리자가 지정합니다. 관리자에게
+              위 이메일을 알려 교사 지정을 요청한 뒤 다시 로그인해 주세요.
+            </p>
+            <p style={styles.text}>
+              <strong>학생</strong>: 학교 계정(예: 26-10315@{schoolEmailDomain})으로
+              로그인해야 합니다. 다른 계정이라면 로그아웃 후 학교 계정으로 다시
+              로그인해 주세요.
             </p>
           </section>
         )}
