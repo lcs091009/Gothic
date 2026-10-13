@@ -2,12 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { googleLoginOptions, googleLoginError, googleCallbackError } from "./googleLogin.js";
 
-test("login uses Google account selection without requesting Drive access", () => {
+test("login combines Google account selection with limited file access", () => {
   const args = googleLoginOptions("https://example.com");
   assert.equal(args.provider, "google");
   assert.equal(args.options.redirectTo, "https://example.com");
   assert.equal(args.options.queryParams.prompt, "select_account");
-  assert.equal(args.options.scopes, undefined);
+  assert.equal(args.options.scopes, "https://www.googleapis.com/auth/drive.file");
 });
 test("OAuth failures use safe guidance rather than provider details", () => {
   assert.match(googleLoginError({ code: "provider_disabled" }), /설정/);

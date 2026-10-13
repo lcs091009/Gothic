@@ -1,5 +1,6 @@
 export function googleLoginOptions(origin) {
   return { provider: "google", options: { redirectTo: origin,
+    scopes: "https://www.googleapis.com/auth/drive.file",
     queryParams: { prompt: "select_account" } } };
 }
 
