@@ -1,6 +1,7 @@
 import AttachmentLinks from "./AttachmentLinks";
 import StudentDirectory from "./StudentDirectory";
 import AssignmentComposer from "./AssignmentComposer";
+import { useScopedMessage } from "../hooks/useScopedMessage";
 import { groupAssignmentDeliveries } from "../services/teacherAssignments";
 import "../pages/StudentHome.css";
 import "./TeacherPage.css";
@@ -34,13 +35,17 @@ function TeacherPage({ session }) {
   const [sharedFiles, setSharedFiles] = useState([]);
 
   const assignmentGroups = useMemo(() => groupAssignmentDeliveries(sharedFiles), [sharedFiles]);
-  const [message, setMessage] = useState("");
+  const messageScope = section => `${session?.user?.id || "guest"}:${section}`;
+  const { message, setMessage, transitionMessage } = useScopedMessage(messageScope(currentSection));
+  const messageRef = useRef(setMessage);
+  messageRef.current = setMessage;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
 
-  const loadSharedFiles = useCallback(async () => {
+  const loadSharedFiles = useCallback(async (reportOverride) => {
+    const reportMessage = typeof reportOverride === "function" ? reportOverride : messageRef.current;
     if (!isSupabaseConfigured()) {
-      setMessage(supabaseConfigError || "Supabase 설정이 필요합니다.");
+      reportMessage(supabaseConfigError || "Supabase 설정이 필요합니다.");
       return;
     }
 
@@ -60,13 +65,13 @@ function TeacherPage({ session }) {
       );
 
       if (error) {
-        setMessage(getFriendlySupabaseError(error));
+        reportMessage(getFriendlySupabaseError(error));
         return;
       }
 
       setSharedFiles(data || []);
     } catch (error) {
-      setMessage(getFriendlySupabaseError(error));
+      reportMessage(getFriendlySupabaseError(error));
     } finally {
       setIsLoadingFiles(false);
     }
@@ -79,9 +84,9 @@ function TeacherPage({ session }) {
   }, [session?.user?.id, loadSharedFiles]);
 
   async function handleAssignmentSent(count) {
-    setMessage(`${count}명에게 과제를 전달했습니다.`);
+    const report = transitionMessage(messageScope("files"), `${count}명에게 과제를 전달했습니다.`);
     setCurrentSection("files");
-    await loadSharedFiles();
+    await loadSharedFiles(report);
   }
 
   return (
