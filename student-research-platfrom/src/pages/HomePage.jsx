@@ -64,7 +64,7 @@ return (
           <div className="login-hero">
             <img src="/research-logo.svg" alt="활동 연결 노트 로고" className="login-logo" />
             <p className="student-eyebrow">기록에서 다음 탐구로</p>
-            <h1 id="login-title">나의 활동을 이어 가는 곳</h1>
+            <h1 id="login-title">학생 자율 탐구 도우미</h1>
             <p className="student-intro">
               탐구를 기록하고, 활동을 연결하고, 함께 자료를 나누세요.
             </p>
