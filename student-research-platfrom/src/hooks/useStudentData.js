@@ -10,9 +10,12 @@ export function useStudentData(session, setMessage) {
   const [isAcademicProfileLoading, setIsAcademicProfileLoading] = useState(false);
   const [isLoadingTeacherSharedFiles, setIsLoadingTeacherSharedFiles] = useState(false);
   const userRef = useRef(null);
+  const messageRef = useRef(setMessage);
+  messageRef.current = setMessage;
   userRef.current = session?.user?.id;
   const user = session?.user;
   useEffect(() => {
+    const reportMessage = messageRef.current;
     let active = true;
     setProfile(null); setRecords([]); setTeacherSharedFiles([]); setAcademicProfile(null);
     if (!user) { setIsAcademicProfileLoading(false); return; }
@@ -26,11 +29,11 @@ export function useStudentData(session, setMessage) {
         const [a, r, t] = await Promise.all([fetchAcademicProfile(user.id),
           fetchResearchRecords(user.id), fetchTeacherSharedFiles(user.email)]);
         if (active) { setAcademicProfile(a); setRecords(r || []); setTeacherSharedFiles(t || []); }
-      } catch (error) { if (active) setMessage(getFriendlySupabaseError(error)); }
+      } catch (error) { if (active) reportMessage(getFriendlySupabaseError(error)); }
       finally { if (active) setIsAcademicProfileLoading(false); }
     })();
     return () => { active = false; };
-  }, [user, setMessage]);
+  }, [user]);
 
   async function loadResearchRecords(userId) {
     const data = await fetchResearchRecords(userId);

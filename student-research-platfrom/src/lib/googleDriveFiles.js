@@ -2,6 +2,23 @@ export const MAX_DRIVE_ATTACHMENTS = 20;
 export const DRIVE_CHUNK_BYTES = 8 * 1024 * 1024;
 export const MAX_DRIVE_UPLOAD_BYTES = 500 * 1024 * 1024;
 const endpoint = "https://www.googleapis.com";
+// Check newly picked files with the exact Picker token before displaying them
+// as ready. At most four read requests run together, with no permission writes.
+export async function validatePickedFiles(files, token, { fetchImpl = fetch, signal } = {}) {
+  if (!files.length || files.length > MAX_DRIVE_ATTACHMENTS || files.some(file => !/^[\w-]+$/.test(file.id || ""))) throw new Error("선택한 파일을 다시 확인해 주세요.");
+  for (let offset = 0; offset < files.length; offset += 4) {
+    await Promise.all(files.slice(offset, offset + 4).map(async file => {
+      const response = await fetchImpl(`${endpoint}/drive/v3/files/${encodeURIComponent(file.id)}?supportsAllDrives=true&fields=id`, {
+        signal, headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        const error = await driveSharingError(response, file.name || "첨부파일");
+        if (response.status === 404) error.message = `${file.name || "첨부파일"}: Google 선택창에서 선택했지만 앱의 파일 접근 권한을 확인하지 못했습니다. Picker 프로젝트 번호와 OAuth 클라이언트가 같은 Google Cloud 프로젝트인지 확인해야 합니다. 파일 삭제나 학교 공유 차단으로 단정할 수 없습니다. [Google 404 · notFound · 파일 선택 확인]`;
+        error.stage = "pickerAccess"; throw error;
+      }
+    }));
+  }
+}
 export async function uploadDriveFile(file, token, { fetchImpl = fetch, signal, onProgress = () => {} } = {}) {
   if (!file?.name || !Number.isFinite(file.size) || file.size > MAX_DRIVE_UPLOAD_BYTES) throw new Error("500MB 이하의 파일을 선택해 주세요.");
   const type = file.type || "application/octet-stream";

@@ -1,4 +1,5 @@
 import { useAuth } from "./hooks/useAuth";
+import { useScopedMessage } from "./hooks/useScopedMessage";
 import { useStudentData } from "./hooks/useStudentData";
 import { saveResearchRecord, deleteResearchRecord } from "./services/dataService";
 import { useGoogleDrive } from "./hooks/useGoogleDrive";
@@ -29,14 +30,15 @@ function App() {
   const [content, setContent] = useState("");
   const [deletingRecordId, setDeletingRecordId] = useState(null);
 
-  const [message, setMessage] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const pageRef = useRef(null);
   const [currentPage, setCurrentPage] = useState("home");
   const [isLogoutHovered, setIsLogoutHovered] = useState(false);
   const sectionTitleRef = useRef(null);
 
-  const { session, isLoading, isSigningIn, signInWithGoogle, signOut: authSignOut } = useAuth(setMessage);
+  const { session, isLoading, isSigningIn, signInWithGoogle, signOut: authSignOut } = useAuth(setAuthMessage);
+  const { message, setMessage } = useScopedMessage(`${session?.user?.id || "guest"}:${currentPage}`);
   const { profile, records, teacherSharedFiles, academicProfile, setAcademicProfile,
     isAcademicProfileLoading, isLoadingTeacherSharedFiles, loadResearchRecords, loadTeacherSharedFiles
   } = useStudentData(session, setMessage);
@@ -168,7 +170,7 @@ async function handleDeleteResearchRecord(recordId) {
     );
   }
 
-  if (!session) return <HomePage signInWithGoogle={signInWithGoogle} isSigningIn={isSigningIn} message={message} />;
+  if (!session) return <HomePage signInWithGoogle={signInWithGoogle} isSigningIn={isSigningIn} message={authMessage} />;
 
   return (
     <main ref={pageRef} className={`dashboard-page neutral-dashboard ${profile?.role === "student" ? "student-dashboard" : profile?.role === "teacher" ? "teacher-dashboard" : ""}`} style={styles.page}>
@@ -324,7 +326,7 @@ async function handleDeleteResearchRecord(recordId) {
           <TeacherPage session={session} />
         )}
 
-        {message && <p style={styles.message}>{message}</p>}
+        {(message || authMessage) && <p style={styles.message}>{message || authMessage}</p>}
       </section>
     </main>
   );

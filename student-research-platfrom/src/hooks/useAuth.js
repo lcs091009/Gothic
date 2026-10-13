@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase, isSupabaseConfigured, supabaseConfigError, getFriendlySupabaseError } from "../lib/supabaseClient";
 import { googleLoginOptions, googleLoginError, googleCallbackError } from "../lib/googleLogin";
+import { cacheLoginDriveToken } from "../lib/loginDriveToken";
 
 export function useAuth(setMessage) {
   const [session, setSession] = useState(null);
@@ -16,12 +17,18 @@ export function useAuth(setMessage) {
     // Do not await Supabase operations inside its synchronous auth callback.
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       authEventReceived = true;
-      if (active) { setSession(nextSession); setIsLoading(false); }
+      if (active) {
+        void cacheLoginDriveToken(nextSession, import.meta.env.VITE_GOOGLE_CLIENT_ID).catch(() => {});
+        setSession(nextSession); setIsLoading(false);
+      }
     });
     supabase.auth.getSession().then(({ data, error }) => {
       if (!active || authEventReceived) return;
       if (error) setMessage(getFriendlySupabaseError(error));
-      else setSession(data.session);
+      else {
+        void cacheLoginDriveToken(data.session, import.meta.env.VITE_GOOGLE_CLIENT_ID).catch(() => {});
+        setSession(data.session);
+      }
       setIsLoading(false);
     }).catch((error) => {
       if (active) { setMessage(getFriendlySupabaseError(error)); setIsLoading(false); }
