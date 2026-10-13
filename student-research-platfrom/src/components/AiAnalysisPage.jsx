@@ -16,6 +16,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
     setMessage("");
   }
   const [analysis, setAnalysis] = useState("");
+  const [exploration, setExploration] = useState(null);
   const [message, setMessage] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [extraContext, setExtraContext] = useState("");
@@ -59,8 +60,8 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
       return;
     }
     setIsAnalyzing(true);
-    setAnalysis(""); setScope(null); setWarning(""); setWorkspace(true);
-    setResultInputs({records:records.filter(record=>selectedIds.has(record.id)),files:selectedFiles});
+    setAnalysis(""); setExploration(null); setScope(null); setWarning(""); setWorkspace(true);
+    setResultInputs({records:records.filter(record=>selectedIds.has(record.id)),files:selectedFiles,extraContext});
     const controller = new AbortController(); requestRef.current = controller;
 
     try {
@@ -105,6 +106,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
       }
 
       setAnalysis(data.analysis || "분석 결과가 비어 있습니다.");
+      setExploration(data.exploration || null);
       setScope(data.scope || null);
       setWarning(data.warning || "");
     } catch (error) {
@@ -117,6 +119,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
   const selectedChoices = academicProfile?.selected_choices || {};
 
   if (workspace) return <AnalysisWorkspace analysis={analysis} loading={isAnalyzing} message={message} scope={scope} warning={warning}
+    exploration={exploration} extraContext={resultInputs?.extraContext || ""}
     records={resultInputs?.records || []} files={resultInputs?.files || []}
     onBack={()=>{requestRef.current?.abort(); requestRef.current=null; setIsAnalyzing(false); setWorkspace(false); setMessage("");}}
     onRetry={handleAnalyze} />;
