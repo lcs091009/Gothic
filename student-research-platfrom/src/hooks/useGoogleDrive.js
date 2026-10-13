@@ -1,8 +1,9 @@
-import { uploadDriveFile, shareDriveFileWithTokenRefresh, mergeDriveAttachments, MAX_DRIVE_ATTACHMENTS } from "../lib/googleDriveFiles";
+import { uploadDriveFile, shareDriveFileWithTokenRefresh, mergeDriveAttachments, validatePickedFiles, MAX_DRIVE_ATTACHMENTS } from "../lib/googleDriveFiles";
 const scriptRequests = new Map();
 import { requestDriveAccessToken } from "../lib/googleDriveAuth";
 import { getGooglePickerConfigError } from "../lib/googlePickerConfig";
 import { getDriveAccount, assertDriveAccount } from "../lib/googleDriveAccount";
+import { pendingLoginDriveToken } from "../lib/loginDriveToken";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useGoogleDrive({ setMessage, userId, multiple = false, initialAttachments = [] }) {
@@ -48,7 +49,7 @@ export function useGoogleDrive({ setMessage, userId, multiple = false, initialAt
   useEffect(() => {
     mounted.current = true;
     if (import.meta.env.VITE_GOOGLE_CLIENT_ID) loadScript("https://accounts.google.com/gsi/client").catch(() => {});
-    if (window.sessionStorage.getItem("googleDriveUserId") !== userId || window.sessionStorage.getItem("googleDriveClientId") !== import.meta.env.VITE_GOOGLE_CLIENT_ID) clearDriveSession({ keepAttachments: attachmentOwner.current === userId });
+    if (userId && window.sessionStorage.getItem("googleDriveUserId") && (window.sessionStorage.getItem("googleDriveUserId") !== userId || window.sessionStorage.getItem("googleDriveClientId") !== import.meta.env.VITE_GOOGLE_CLIENT_ID)) clearDriveSession({ keepAttachments: attachmentOwner.current === userId });
     attachmentOwner.current = userId;
     return () => { mounted.current = false; fileOperation.current?.abort(); googleAccessTokenRef.current = ""; googleAuthRequestRef.current?.abort(); };
   }, [userId, clearDriveSession]);
@@ -88,7 +89,14 @@ async function getGoogleAccessToken({ forceConsent = false, selectAccount = fals
     );
   }
 
-  await loadScript("https://accounts.google.com/gsi/client");
+  const loginToken = pendingLoginDriveToken(userId);
+  if (loginToken && !forceConsent && !selectAccount) {
+    if (!await loginToken) throw new Error("Google Drive 접근 승인이 필요합니다. Google Drive 버튼을 다시 눌러 주세요.");
+    // The verified token is now cached; no new authorization popup is needed.
+  }
+
+  // Safari requires authorization to start in the original button gesture.
+  // If the SDK is still loading, prepare it and ask for a fresh click instead.
 
   if (!mounted.current || userId !== currentUserRef.current) throw new Error("계정이 변경되었습니다. 다시 선택해 주세요.");
   const now = Date.now();
@@ -118,6 +126,15 @@ async function getGoogleAccessToken({ forceConsent = false, selectAccount = fals
   }
 
   googleAuthRequestRef.current?.abort();
+  if (!window.google?.accounts?.oauth2) {
+    await loadScript("https://accounts.google.com/gsi/client");
+    throw new Error("Google 연결 준비가 끝났습니다. 버튼을 다시 눌러 주세요.");
+  }
+  if (navigator.userActivation && !navigator.userActivation.isActive) {
+    const error = new Error("Google 인증을 갱신해야 합니다. ‘Google Drive’ 또는 ‘Google 계정 다시 연결’ 버튼을 눌러 주세요. 첨부와 입력은 유지됩니다.");
+    error.scope = "driveSharing";
+    throw error;
+  }
   const controller = new AbortController();
   googleAuthRequestRef.current = controller;
   try {
@@ -158,12 +175,12 @@ function removeAttachment(id) {
   attachmentsRef.current = next; setAttachments(next);
   const first = next[0]; setDriveFileId(first?.id || ""); setDriveFileName(first?.name || ""); setDriveFileUrl(first?.url || "");
 }
-async function openGooglePicker() {
+async function openGooglePicker({ uploadFirst = false } = {}) {
   const googleApiKey = import.meta.env.VITE_GOOGLE_API_KEY;
   const googleAppId = import.meta.env.VITE_GOOGLE_APP_ID;
-  const configError = getGooglePickerConfigError({ googleApiKey, googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID });
-  if (configError || !/^\d+$/.test(googleAppId || "")) {
-    setMessage(configError || "Google 파일 선택 서비스 설정이 필요합니다. 관리자에게 문의해 주세요.");
+  const configError = getGooglePickerConfigError({ googleApiKey, googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID, googleAppId });
+  if (configError) {
+    setMessage(configError);
     return;
   }
   pickerScrollYRef.current = window.scrollY;
@@ -190,15 +207,21 @@ async function openGooglePicker() {
       .setOAuthToken(accessToken)
       .setDeveloperKey(googleApiKey)
       .setAppId(googleAppId)
-      .addView(docsView)
-      .addView(uploadView)
-      .setCallback((data) => {
+      .addView(uploadFirst ? uploadView : docsView)
+      .addView(uploadFirst ? docsView : uploadView)
+      .setCallback(async (data) => {
         if (!mounted.current || userId !== currentUserRef.current) return;
         if (data.action === window.google.picker.Action.PICKED) {
           try {
-            appendFiles((data.docs || []).map(file => ({ id: file.id, name: file.name || file.title, url: file.url, accountId: pickerAccount.id })));
+            const files = (data.docs || []).map(file => ({ id: file.id, name: file.name || file.title, url: file.url, accountId: pickerAccount.id }));
+            mergeDriveAttachments(multiple ? attachmentsRef.current : [], files);
+            setMessage("선택한 파일의 접근 권한을 확인하고 있습니다…");
+            const controller = new AbortController(); fileOperation.current = controller;
+            await validatePickedFiles(files, accessToken, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]) });
+            if (!mounted.current || userId !== currentUserRef.current) return;
+            appendFiles(files);
             setMessage(`${attachmentsRef.current.length}개 파일을 첨부했습니다.`);
-          } catch (error) { setMessage(error.message); }
+          } catch (error) { if (mounted.current && userId === currentUserRef.current) setMessage(error.name === "AbortError" ? "파일 접근 확인을 완료하지 못했습니다. 다시 선택해 주세요." : error.message); }
 
         }
 

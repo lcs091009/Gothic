@@ -52,6 +52,18 @@
 .recipient-selection-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 13px; color: #627968; }
 .assignment-attachment { padding: 16px; border: 1px dashed #dce4de; border-radius: 14px; margin-top: 18px; transition: border-color 160ms, background-color 160ms; }
 .assignment-attachment.is-dragging { border-color: #708775; background: #eef4ef; }
+.file-ownership-notice { margin-top: 20px; padding: 20px 22px; background: #edf4ec; border: 1px solid #cfdfce; border-radius: 18px; box-shadow: 0 5px 18px #4265430b; }
+.file-ownership-heading { display: flex; align-items: center; gap: 12px; color: #365843; }
+.file-ownership-heading svg { width: 28px; height: 28px; flex-shrink: 0; }
+.file-ownership-heading h4 { margin: 0; font-size: clamp(18px, 3vw, 22px); line-height: 1.45; letter-spacing: -.5px; }
+.file-ownership-notice p { color: #52695a; font-size: 14px; line-height: 1.7; margin: 10px 0 0; }
+.file-ownership-notice details { margin-top: 14px; }
+.file-ownership-notice summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 12px; color: #365843; background: #ffffffa6; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 160ms, transform 160ms; }
+.file-ownership-notice summary:hover { background: #fff; transform: translateY(-1px); }
+.file-ownership-notice summary:focus-visible { outline: 3px solid #648675; outline-offset: 3px; }
+.file-ownership-notice details[open] summary { background: #fff; }
+@media (max-width:640px) { .file-ownership-notice { padding: 16px; } }
+@media (prefers-reduced-motion:reduce) { .file-ownership-notice summary { transition: none; transform: none; } }
 .assignment-attachment p { color: #7b847d; font-size: 12px; margin: 10px 0 0; }
 .attachment-actions, .attachment-selected { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .attachment-selected { margin-top: 12px; font-size: 13px; overflow-wrap: anywhere; }

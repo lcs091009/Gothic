@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { PGlite } from "@electric-sql/pglite";
-import { buildAssignmentRows, deliverAssignmentRows, groupAssignmentDeliveries } from "./teacherAssignments.js";
+import { buildAssignmentRows, deliverAssignmentRows, groupAssignmentDeliveries, recallAssignmentRows } from "./teacherAssignments.js";
 const draft = { teacher: { id: "teacher", email: "teacher@example.test" },
   students: [{ id: "student1", email: "27-10101@example.test", student_number: "10101" }, { id: "student2", email: "27-10102@example.test", student_number: "10102" }],
   title: " 실험 결과 비교 ", description: " 본인의 결과와 오차 원인을 정리해 주세요. " };
@@ -64,4 +64,16 @@ test("all validated attachments are stored per recipient, with legacy first-link
  const rows=buildAssignmentRows({...draft,attachments,fileUrl:attachments[0].url,fileId:attachments[0].id},()=>crypto.randomUUID());
  assert.equal(rows[0].attachments.length,20);assert.deepEqual(rows[0].attachments,rows[1].attachments);assert.equal(rows[0].file_id,"file0");
  for(const files of [[...attachments,{id:"extra",url:"https://example.test"}],[{id:"bad",url:"javascript:alert(1)"}],[attachments[0],attachments[0]]])assert.throws(()=>buildAssignmentRows({...draft,attachments:files}));
+});
+
+test("history keeps each recipient row id so one delivery can be recalled",()=>{
+ let id=0;const rows=buildAssignmentRows(draft,()=>`row-${++id}`).map(row=>({...row,created_at:"2026-10-12T01:00:00Z"}));
+ assert.deepEqual(groupAssignmentDeliveries(rows)[0].recipients.map(r=>r.id),["row-1","row-2"]);
+});
+test("recall deletes only the given rows of the signed-in teacher and reports the removed count",async()=>{
+ const calls=[];
+ const client={from(table){assert.equal(table,"teacher_shared_files");const q={delete(){calls.push("delete");return q;},in(c,v){calls.push(["in",c,v]);return q;},eq(c,v){calls.push(["eq",c,v]);return q;},async select(c){calls.push(["select",c]);return {data:[{id:"row-1"}],error:null};}};return q;}};
+ assert.equal(await recallAssignmentRows(["row-1","row-2"],"teacher",client),1);
+ assert.deepEqual(calls,["delete",["in","id",["row-1","row-2"]],["eq","teacher_id","teacher"],["select","id"]]);
+ for(const [ids,teacher] of [[[], "teacher"],[["row-1"],""],[[""],"teacher"],[null,"teacher"]]) await assert.rejects(recallAssignmentRows(ids,teacher,client));
 });

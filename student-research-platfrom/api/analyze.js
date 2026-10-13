@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { buildAnalysisContext, RECORD_SCAN_LIMIT, SYSTEM_PROMPT } from "../server/analysisContext.js";
+import { MAX_ANALYSIS_FILES, MAX_ANALYSIS_MATERIALS, selectTeacherMaterials } from "../src/lib/analysisMaterials.js";
+import { EXPLORATION_MARKER, CHOICE_FORMAT, validExplorationPath, explorationPrompt, parseExploration, readableReferences } from "../server/exploration.js";
 
 export const MAX_BODY_BYTES = 16_384;
 export const AI_MODEL = "nvidia/nemotron-3-super-120b-a12b";
@@ -83,7 +85,17 @@ return async function handler(request, response) {
     if (Buffer.byteLength(JSON.stringify(body)) > MAX_BODY_BYTES) {
       return response.status(413).json({ error: "요청 내용이 너무 큽니다." });
     }
-    const { extraContext = "", selectedRecordIds } = body;
+    const { extraContext = "", selectedRecordIds, selectedTeacherFiles, explorationPath } = body;
+    if (explorationPath !== undefined && !validExplorationPath(explorationPath)) {
+      return response.status(400).json({error:"탐구 질문은 최근 12단계, 각 400자 이내로 전달해 주세요."});
+    }
+    const uuid = id => typeof id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (selectedTeacherFiles !== undefined && (!Array.isArray(selectedTeacherFiles) || selectedTeacherFiles.length > MAX_ANALYSIS_FILES ||
+        selectedTeacherFiles.some(item=>!item || !uuid(item.materialId) || typeof item.attachmentId !== "string" || !/^[\w-]{1,200}$/.test(item.attachmentId)) ||
+        new Set(selectedTeacherFiles.map(item=>`${item.materialId}:${item.attachmentId}`)).size !== selectedTeacherFiles.length ||
+        new Set(selectedTeacherFiles.map(item=>item.materialId)).size > MAX_ANALYSIS_MATERIALS)) {
+      return response.status(400).json({error:"선생님 자료는 최대 8개 과제에서 첨부 20개까지 선택할 수 있습니다."});
+    }
     if (typeof extraContext !== "string" || extraContext.length > 1200) {
       return response.status(400).json({ error: "보충 입력은 1,200자 이내로 작성해 주세요." });
     }
@@ -95,20 +107,29 @@ return async function handler(request, response) {
     }
     const selectionSet = selectedRecordIds === undefined ? null : new Set(selectedRecordIds);
     let recordQuery = client.from("research_records").select("*").eq("user_id", user.id);
+    const materialIds = selectedTeacherFiles === undefined ? null : [...new Set(selectedTeacherFiles.map(item=>item.materialId))];
+    let teacherQuery = client.from("teacher_shared_files").select("*").eq("student_email", user.email);
+    if (materialIds?.length) teacherQuery = teacherQuery.in("id",materialIds);
     if (selectedRecordIds !== undefined) recordQuery = recordQuery.in("id", selectedRecordIds);
     // Resolve selection IDs using the authenticated owner and RLS; never accept browser record contents.
     const [academicResult, recordResult, teacherResult] = await Promise.all([
       client.from("student_academic_profiles").select("*").eq("user_id", user.id).maybeSingle(),
       recordQuery.order("created_at", { ascending: false }).limit(RECORD_SCAN_LIMIT),
-      client.from("teacher_shared_files").select("*").eq("student_email", user.email)
-        .order("created_at", { ascending: false }).limit(8),
+      materialIds?.length === 0 ? Promise.resolve({data:[],error:null}) : teacherQuery.order("created_at", { ascending: false }).limit(8),
     ]);
     if (academicResult.error || recordResult.error || teacherResult.error) {
       return response.status(503).json({ error: "저장된 활동 자료를 불러오지 못했습니다." });
     }
     const academicProfile = academicResult.data;
     const records = recordResult.data || [];
-    const teacherSharedFiles = teacherResult.data || [];
+    let teacherSharedFiles = teacherResult.data || [];
+    if (materialIds && (teacherSharedFiles.length !== materialIds.length || teacherSharedFiles.some(material=>!materialIds.includes(material.id)))) {
+      return response.status(400).json({error:"선택한 선생님 자료에 접근할 수 없습니다. 자료를 다시 선택해 주세요."});
+    }
+    if (selectedTeacherFiles !== undefined) {
+      try { teacherSharedFiles = selectTeacherMaterials(teacherSharedFiles,selectedTeacherFiles); }
+      catch (error) { return response.status(400).json({error:error.message}); }
+    }
     if (!academicProfile) return response.status(400).json({ error: "먼저 학년과 선택과목을 저장해 주세요." });
     if (selectedRecordIds !== undefined && (records.length !== selectedRecordIds.length ||
       records.some(record => !selectionSet.has(record.id)))) {
@@ -128,6 +149,7 @@ return async function handler(request, response) {
     const { userPrompt, scope } = buildAnalysisContext(
       academicProfile, records, teacherSharedFiles, extraContext
     );
+    scope.teacherAttachments = teacherSharedFiles.reduce((sum,material)=>sum+(material.attachments?.length || (material.file_id ? 1 : 0)),0);
 
     const controller = new AbortController();
     timeoutId = setTimeout(() => controller.abort(), 45000);
@@ -148,8 +170,8 @@ return async function handler(request, response) {
           body: JSON.stringify({
             model,
             messages: [
-              { role: "system", content: SYSTEM_PROMPT },
-              { role: "user", content: userPrompt },
+              { role: "system", content: explorationPath !== undefined ? explorationPrompt(SYSTEM_PROMPT) : SYSTEM_PROMPT + `\n4개 분석 항목이 끝나면 별도 줄에 ${EXPLORATION_MARKER}를 쓰고 다음 탐구 주제 선택을 위한 JSON을 덧붙인다. ${CHOICE_FORMAT}` },
+              { role: "user", content: userPrompt + (explorationPath !== undefined ? `\n학생이 선택한 질문 경로(수행 결과가 아님): ${JSON.stringify(explorationPath)}` : "") },
             ],
             temperature: 0.6,
             max_tokens: 4200,
@@ -200,8 +222,13 @@ return async function handler(request, response) {
     if (!text) return response.status(502).json({
       error: "AI 분석 결과가 비어 있습니다. 잠시 후 다시 시도해 주세요.",
     });
+    const parts = text.split(EXPLORATION_MARKER);
+    const exploration = parseExploration(explorationPath !== undefined ? text : parts[1] || "");
+    if (explorationPath !== undefined && !exploration) return response.status(502).json({error:"심화 질문의 형식을 확인하지 못했습니다. 이전 선택은 유지되며 다시 시도할 수 있습니다."});
+    const readable = value=>readableReferences(value,records,teacherSharedFiles);
     return response.status(200).json({
-      analysis: text,
+      analysis: explorationPath !== undefined ? "" : readable(parts[0].trim()),
+      exploration: exploration ? {intro:readable(exploration.intro),choices:exploration.choices.map(c=>Object.fromEntries(Object.entries(c).map(([key,value])=>[key, key === "question" ? readable(value).slice(0,400) : readable(value)])))} : null,
       scope,
       providerModel: usedModel,
       fallbackUsed: usedModel === AI_FALLBACK_MODEL,

@@ -4,6 +4,10 @@ import { createAnalyzeHandler, MAX_BODY_BYTES } from "./analyze.js";
 
 const env = { SUPABASE_URL: "https://test.supabase.co", SUPABASE_PUBLISHABLE_KEY: "public-test", NVIDIA_API_KEY: "fake-test-only" };
 const user = { id: "student-1", email: "27-1234@gochon.hs.kr", email_confirmed_at: "2026-01-01" };
+const materialId = "00000000-0000-4000-8000-000000000001";
+const explorationReply = {intro:"온도 효과를 비교해 볼 수 있어요. [R1]",choices:[
+  {title:"반복 측정",question:"반복 횟수에 따라 결과는 얼마나 달라질까?",why:"측정 신뢰성 확인",method:"같은 조건에서 반복해 분포 비교"},
+  {title:"조건 비교",question:"다른 온도에서도 비슷한 결과가 나올까?",why:"조건 확장",method:"온도별 대조 조건과 결과 표 비교"}]};
 function fixture(overrides = {}) {
   const tables = {
     profiles: { data: { role: "student" } },
@@ -251,4 +255,53 @@ test("missing, deleted or inaccessible selected IDs fail without falling back to
     assert.equal(f.quotaCalls, 0);
     assert.equal(f.providerCalls.length, 0);
   }
+});
+
+test("selected teacher attachments resolve by recipient and IDs using only stored data", async () => {
+  const f=fixture({tables:{teacher_shared_files:{data:[{id:materialId,file_name:"교사 과제",description:"실험 조건 비교",attachments:[{id:"chosen-file",name:"선택 안내"},{id:"unchecked-file",name:"EXCLUDED"}]}]}}});
+  const r=await f.call({body:{extraContext:"",selectedTeacherFiles:[{materialId,attachmentId:"chosen-file"}],teacherMaterials:[{description:"FORGED"}]}});
+  assert.equal(r.code,200);
+  const q=f.queries.find(query=>query.table==="teacher_shared_files");
+  assert.ok(q.filters.some(([column,value])=>column==="student_email"&&value===user.email));
+  assert.deepEqual(q.in,["id",[materialId]]);
+  const prompt=JSON.parse(f.providerCalls[0].options.body).messages[1].content;
+  assert.match(prompt,/실험 조건 비교|선택 안내/);
+  assert.doesNotMatch(prompt,/EXCLUDED|FORGED/);
+  assert.equal(r.body.scope.teacherAttachments,1);
+});
+test("explicit no-teacher-file selection does not silently include shared materials",async()=>{
+  const f=fixture({tables:{teacher_shared_files:{data:[{id:materialId,description:"MUST_NOT_INCLUDE"}]}}});
+  const r=await f.call({body:{selectedTeacherFiles:[]}});
+  assert.equal(r.code,200);
+  assert.doesNotMatch(JSON.parse(f.providerCalls[0].options.body).messages[1].content,/MUST_NOT_INCLUDE/);
+  assert.equal(r.body.scope.teacherMaterials,0);
+});
+test("missing and forged teacher file choices fail before quota and provider calls",async()=>{
+  for(const data of [[],[{id:materialId,attachments:[{id:"different"}]}]]) {
+    const f=fixture({tables:{teacher_shared_files:{data}}});
+    const r=await f.call({body:{selectedTeacherFiles:[{materialId,attachmentId:"missing"}]}});
+    assert.equal(r.code,400);assert.equal(f.quotaCalls,0);assert.equal(f.providerCalls.length,0);
+  }
+  for(const selectedTeacherFiles of [[{materialId:"not-uuid",attachmentId:"file"}],[{materialId,attachmentId:"a"},{materialId,attachmentId:"a"}],Array.from({length:21},(_,i)=>({materialId,attachmentId:`file-${i}`}))]) {
+    const f=fixture();assert.equal((await f.call({body:{selectedTeacherFiles}})).code,400);
+    assert.equal(f.quotaCalls,0);assert.equal(f.providerCalls.length,0);
+  }
+});
+
+test("exploration uses authenticated stored evidence and bounded selection path",async()=>{
+  const f=fixture({raw:JSON.stringify({choices:[{message:{content:JSON.stringify(explorationReply)}}]})});
+  const r=await f.call({body:{extraContext:"",explorationPath:["온도는 어떤 영향을 줄까?"],records:[{title:"FORGED"}]}});
+  assert.equal(r.code,200);assert.equal(r.body.analysis,"");assert.match(r.body.exploration.intro,/효소 실험/);assert.doesNotMatch(r.body.exploration.intro,/R1/);
+  assert.equal(f.quotaCalls,1);
+  const messages=JSON.parse(f.providerCalls[0].options.body).messages;
+  assert.match(messages[1].content,/온도는 어떤 영향을 줄까/);assert.doesNotMatch(messages[1].content,/FORGED/);
+  assert.match(messages[0].content,/JSON만 출력/);
+  for(const path of [null,[""],Array(13).fill("질문"),["x".repeat(401)]]) {
+    const invalid=fixture();assert.equal((await invalid.call({body:{explorationPath:path}})).code,400);assert.equal(invalid.quotaCalls,0);
+  }
+});
+test("initial analysis separates topic cards and replaces readable evidence without exposing JSON",async()=>{
+  const f=fixture({raw:JSON.stringify({choices:[{message:{content:"1. 핵심 흐름\n온도 비교 [R1]\n<<<EXPLORATION>>>\n"+JSON.stringify(explorationReply)}}]})});
+  const r=await f.call();assert.equal(r.code,200);assert.match(r.body.analysis,/효소 실험/);assert.doesNotMatch(r.body.analysis,/EXPLORATION|choices|R1/);assert.equal(r.body.exploration.choices.length,2);
+  const malformed=fixture();assert.equal((await malformed.call({body:{explorationPath:[]}})).code,502);
 });

@@ -1,7 +1,8 @@
 import AttachmentLinks from "./AttachmentLinks";
 import StudentDirectory from "./StudentDirectory";
 import AssignmentComposer from "./AssignmentComposer";
-import { groupAssignmentDeliveries } from "../services/teacherAssignments";
+import { useScopedMessage } from "../hooks/useScopedMessage";
+import { groupAssignmentDeliveries, recallAssignmentRows } from "../services/teacherAssignments";
 import "../pages/StudentHome.css";
 import "./TeacherPage.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -34,13 +35,18 @@ function TeacherPage({ session }) {
   const [sharedFiles, setSharedFiles] = useState([]);
 
   const assignmentGroups = useMemo(() => groupAssignmentDeliveries(sharedFiles), [sharedFiles]);
-  const [message, setMessage] = useState("");
+  const messageScope = section => `${session?.user?.id || "guest"}:${section}`;
+  const { message, setMessage, transitionMessage } = useScopedMessage(messageScope(currentSection));
+  const messageRef = useRef(setMessage);
+  messageRef.current = setMessage;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [recallingId, setRecallingId] = useState(null);
 
-  const loadSharedFiles = useCallback(async () => {
+  const loadSharedFiles = useCallback(async (reportOverride) => {
+    const reportMessage = typeof reportOverride === "function" ? reportOverride : messageRef.current;
     if (!isSupabaseConfigured()) {
-      setMessage(supabaseConfigError || "Supabase 설정이 필요합니다.");
+      reportMessage(supabaseConfigError || "Supabase 설정이 필요합니다.");
       return;
     }
 
@@ -60,13 +66,13 @@ function TeacherPage({ session }) {
       );
 
       if (error) {
-        setMessage(getFriendlySupabaseError(error));
+        reportMessage(getFriendlySupabaseError(error));
         return;
       }
 
       setSharedFiles(data || []);
     } catch (error) {
-      setMessage(getFriendlySupabaseError(error));
+      reportMessage(getFriendlySupabaseError(error));
     } finally {
       setIsLoadingFiles(false);
     }
@@ -78,10 +84,33 @@ function TeacherPage({ session }) {
     }
   }, [session?.user?.id, loadSharedFiles]);
 
+  async function handleRecall(group) {
+    const ids = group.recipients.map(recipient => recipient.id).filter(Boolean);
+    const confirmed = window.confirm(
+      `‘${group.file_name}’ 과제를 학생 ${ids.length}명에게서 회수할까요?
+학생 화면에서 사라지며 되돌릴 수 없습니다.
+이미 공유한 Google Drive 파일의 보기 권한은 자동으로 해제되지 않습니다.`
+    );
+    if (!confirmed) return;
+    setRecallingId(group.id);
+    setMessage("");
+    try {
+      const removed = await recallAssignmentRows(ids, session?.user?.id);
+      setMessage(removed === ids.length
+        ? `${removed}명에게서 과제를 회수했습니다.`
+        : `${removed}/${ids.length}명에게서 회수했습니다. 나머지는 이미 삭제됐거나 권한이 없습니다.`);
+      await loadSharedFiles();
+    } catch (error) {
+      setMessage(getFriendlySupabaseError(error));
+    } finally {
+      setRecallingId(null);
+    }
+  }
+
   async function handleAssignmentSent(count) {
-    setMessage(`${count}명에게 과제를 전달했습니다.`);
+    const report = transitionMessage(messageScope("files"), `${count}명에게 과제를 전달했습니다.`);
     setCurrentSection("files");
-    await loadSharedFiles();
+    await loadSharedFiles(report);
   }
 
   return (
@@ -169,6 +198,16 @@ function TeacherPage({ session }) {
                 <p style={styles.dateText}>
                   등록 시간: {new Date(file.created_at).toLocaleString("ko-KR")}
                 </p>
+
+                <button
+                  type="button"
+                  className="student-back"
+                  style={styles.recallButton}
+                  disabled={recallingId !== null || isLoadingFiles}
+                  onClick={() => handleRecall(file)}
+                >
+                  {recallingId === file.id ? "회수 중…" : "과제 회수"}
+                </button>
               </article>
             ))}
           </div>
@@ -438,6 +477,10 @@ const styles = {
     color: "#355c50",
     fontWeight: 650,
     textDecoration: "none",
+  },
+  recallButton: {
+    marginTop: "10px",
+    color: "#a35454",
   },
   dateText: {
     marginTop: "12px",

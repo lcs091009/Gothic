@@ -1,5 +1,7 @@
 import { supabase } from "../lib/supabaseClient";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { materialOptions } from "../lib/analysisMaterials";
+import AnalysisWorkspace from "./AnalysisWorkspace";
 
 function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = [] }) {
   const [selection, setSelection] = useState(null);
@@ -14,13 +16,33 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
     setMessage("");
   }
   const [analysis, setAnalysis] = useState("");
+  const [exploration, setExploration] = useState(null);
   const [message, setMessage] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [extraContext, setExtraContext] = useState("");
   const [scope, setScope] = useState(null);
   const [warning, setWarning] = useState("");
+  const [workspace, setWorkspace] = useState(false);
+  const [resultInputs, setResultInputs] = useState(null);
+  const [teacherSelection, setTeacherSelection] = useState(new Set());
+  const options = materialOptions(teacherSharedFiles);
+  const selectedFiles = options.filter(file=>teacherSelection.has(file.key));
+  const requestRef = useRef(null);
+  useEffect(()=>()=>requestRef.current?.abort(),[]);
+  function toggleTeacherFile(file) {
+    const next = new Set(selectedFiles.map(item=>item.key));
+    if (next.has(file.key)) next.delete(file.key);
+    else {
+      if (next.size >= 20 || new Set([...selectedFiles.map(item=>item.materialId),file.materialId]).size > 8) {
+        setMessage("선생님 자료는 최대 8개 과제에서 첨부 20개까지 선택할 수 있습니다."); return;
+      }
+      next.add(file.key);
+    }
+    setTeacherSelection(next); setMessage("");
+  }
 
   async function handleAnalyze() {
+    if (requestRef.current) return;
     setMessage("");
 
     if (!academicProfile) {
@@ -38,14 +60,20 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
       return;
     }
     setIsAnalyzing(true);
+    setAnalysis(""); setExploration(null); setScope(null); setWarning(""); setWorkspace(true);
+    setResultInputs({records:records.filter(record=>selectedIds.has(record.id)),files:selectedFiles,extraContext});
+    const controller = new AbortController(); requestRef.current = controller;
 
     try {
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (controller.signal.aborted) return;
       if (sessionError || !sessionData?.session?.access_token) {
         setMessage("로그인이 만료되었습니다. 다시 로그인해 주세요.");
         return;
       }
+      if (controller.signal.aborted) return;
       const response = await fetch("/api/analyze", {
+        signal: controller.signal,
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -54,10 +82,12 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
         body: JSON.stringify({
           extraContext,
           selectedRecordIds,
+          selectedTeacherFiles: selectedFiles.map(file=>({materialId:file.materialId,attachmentId:file.id})),
         }),
       });
 
       const rawText = await response.text();
+      if (controller.signal.aborted) return;
 
       let data = null;
 
@@ -76,23 +106,30 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
       }
 
       setAnalysis(data.analysis || "분석 결과가 비어 있습니다.");
+      setExploration(data.exploration || null);
       setScope(data.scope || null);
       setWarning(data.warning || "");
     } catch (error) {
-      setMessage(error.message || "AI 분석 요청에 실패했습니다.");
+      if (error.name !== "AbortError") setMessage(error.message || "AI 분석 요청에 실패했습니다.");
     } finally {
-      setIsAnalyzing(false);
+      if (requestRef.current === controller) { requestRef.current = null; setIsAnalyzing(false); }
     }
   }
 
   const selectedChoices = academicProfile?.selected_choices || {};
 
+  if (workspace) return <AnalysisWorkspace analysis={analysis} loading={isAnalyzing} message={message} scope={scope} warning={warning}
+    exploration={exploration} extraContext={resultInputs?.extraContext || ""}
+    records={resultInputs?.records || []} files={resultInputs?.files || []}
+    onBack={()=>{requestRef.current?.abort(); requestRef.current=null; setIsAnalyzing(false); setWorkspace(false); setMessage("");}}
+    onRetry={handleAnalyze} />;
+
   return (
     <section className="inner-page ai-analysis-panel" style={styles.page}>
       <p style={styles.text}>활동을 골라 관심 흐름과 다음 탐구 방향을 살펴보세요.</p>
 
-      <div style={styles.subjectBox}>
-        <h3 style={styles.infoTitle}>분석할 활동 선택</h3>
+      <details className="quiet-details" style={styles.subjectBox} open>
+        <summary>분석할 활동 선택 <span className="field-optional">· {selectedRecordIds.length}개 선택</span></summary>
         <p style={styles.text}>제목을 펼쳐 내용을 확인하고 분석에 넣을 활동을 체크해 주세요.</p>
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", margin: "12px 0" }}>
           <button type="button" style={styles.backButton} disabled={isAnalyzing}
@@ -122,7 +159,19 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
             </div>
           ))}
         </div>
-      </div>
+      </details>
+
+      <details className="quiet-details" style={styles.subjectBox}>
+        <summary>선생님 첨부파일 선택 <span className="field-optional">· {selectedFiles.length}개 선택</span></summary>
+        <p style={styles.text}>파일명과 선생님 안내를 분석에 반영합니다. 파일 본문은 읽지 않으며, 필요한 내용은 아래 보충 입력에 적어 주세요.</p>
+        <div className="analysis-material-actions"><span>{selectedFiles.length}개 선택 / 최대 20개</span>
+          <button type="button" disabled={isAnalyzing || !selectedFiles.length} onClick={()=>setTeacherSelection(new Set())}>선택 해제</button></div>
+        {!options.length && <p style={styles.text}>아직 전달받은 선생님 자료가 없습니다.</p>}
+        <div className="analysis-material-list">{options.map(file=><div className={`analysis-material ${teacherSelection.has(file.key) ? "is-selected" : ""}`} key={file.key}>
+          <label><input type="checkbox" checked={teacherSelection.has(file.key)} disabled={isAnalyzing} onChange={()=>toggleTeacherFile(file)} /><span><strong>{file.name}</strong><small>{file.title}</small></span></label>
+          <details><summary>자료 안내 확인</summary><p>{file.description || "선생님이 작성한 안내가 없습니다."}</p>{/^https?:\/\//.test(file.url) && <a href={file.url} target="_blank" rel="noreferrer">파일 열기 ↗</a>}</details>
+        </div>)}</div>
+      </details>
 
       <details className="quiet-details analysis-reference">
         <summary>분석 참고 정보 · 선택과목 및 선생님 자료</summary>
@@ -242,18 +291,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
         )}
       </button>
 
-      {analysis && (
-        <div style={styles.resultBox}>
-          <h3 style={styles.resultTitle}>활동 흐름 분석 결과</h3>
-          {scope && <details className="quiet-details">
-            <summary>분석 범위 · 활동 {scope.scannedRecords}개</summary>
-            <p style={styles.text}>기록 개요 {scope.scannedRecords}개 · 본문 발췌 {scope.detailedRecords}개 · 선생님 자료 {scope.teacherMaterials}개
-              {scope.scanLimitReached && " · 최대 48개 범위"}</p>
-          </details>}
-          {warning && <p role="status" style={styles.text}>{warning}</p>}
-          <AnalysisText text={analysis} />
-        </div>
-      )}
+      {analysis && <button type="button" className="student-back" onClick={()=>setWorkspace(true)} style={{marginTop:16}}>이전 분석 결과 다시 보기 ↗</button>}
     </section>
   );
 }

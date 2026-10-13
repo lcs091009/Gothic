@@ -19,7 +19,16 @@ test('returns null for a plausible key and client id', () => {
   const error = getGooglePickerConfigError({
     googleApiKey: 'AIza' + 'a'.repeat(35),
     googleClientId: '1234567890-example.apps.googleusercontent.com',
+    googleAppId: '1234567890',
   });
 
   assert.equal(error, null);
+});
+
+test('rejects missing project number, project names and OAuth client IDs used as Picker App ID', () => {
+  for (const googleAppId of ['', 'school-project', '1234567890-example.apps.googleusercontent.com']) {
+    const error = getGooglePickerConfigError({ googleApiKey: 'AIza' + 'a'.repeat(35),
+      googleClientId: '1234567890-example.apps.googleusercontent.com', googleAppId });
+    assert.match(error, /숫자 프로젝트 번호/);
+  }
 });

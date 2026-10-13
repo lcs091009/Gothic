@@ -46,7 +46,17 @@ export function groupAssignmentDeliveries(files) {
   for (const file of files) {
     const key = JSON.stringify([file.teacher_id, file.file_name, file.description, file.file_url, file.category, file.match_status, file.attachments || [], file.created_at ?? file.id]);
     if (!groups.has(key)) groups.set(key, { ...file, recipients: [] });
-    groups.get(key).recipients.push({ email: file.student_email, number: file.student_number });
+    groups.get(key).recipients.push({ id: file.id, email: file.student_email, number: file.student_number });
   }
   return [...groups.values()];
+}
+
+// Recall one grouped delivery. Scoped to the teacher's own rows (RLS also enforces
+// this) and reports how many rows were actually removed.
+export async function recallAssignmentRows(ids, teacherId, client = supabase) {
+  if (!client) throw new Error("서비스 연결 설정이 필요합니다.");
+  if (!teacherId || !Array.isArray(ids) || !ids.length || ids.some(id => typeof id !== "string" || !id)) throw new Error("회수할 과제를 다시 확인해 주세요.");
+  const { data, error } = await client.from("teacher_shared_files").delete().in("id", ids).eq("teacher_id", teacherId).select("id");
+  if (error) throw error;
+  return (data || []).length;
 }
