@@ -125,8 +125,8 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
     <section className="inner-page ai-analysis-panel" style={styles.page}>
       <p style={styles.text}>활동을 골라 관심 흐름과 다음 탐구 방향을 살펴보세요.</p>
 
-      <div style={styles.subjectBox}>
-        <h3 style={styles.infoTitle}>분석할 활동 선택</h3>
+      <details className="quiet-details" style={styles.subjectBox} open>
+        <summary>분석할 활동 선택 <span className="field-optional">· {selectedRecordIds.length}개 선택</span></summary>
         <p style={styles.text}>제목을 펼쳐 내용을 확인하고 분석에 넣을 활동을 체크해 주세요.</p>
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", margin: "12px 0" }}>
           <button type="button" style={styles.backButton} disabled={isAnalyzing}
@@ -156,10 +156,10 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
             </div>
           ))}
         </div>
-      </div>
+      </details>
 
-      <section style={styles.subjectBox}>
-        <h3 style={styles.infoTitle}>분석에 참고할 선생님 첨부파일 <span className="field-optional">선택</span></h3>
+      <details className="quiet-details" style={styles.subjectBox}>
+        <summary>선생님 첨부파일 선택 <span className="field-optional">· {selectedFiles.length}개 선택</span></summary>
         <p style={styles.text}>파일명과 선생님 안내를 분석에 반영합니다. 파일 본문은 읽지 않으며, 필요한 내용은 아래 보충 입력에 적어 주세요.</p>
         <div className="analysis-material-actions"><span>{selectedFiles.length}개 선택 / 최대 20개</span>
           <button type="button" disabled={isAnalyzing || !selectedFiles.length} onClick={()=>setTeacherSelection(new Set())}>선택 해제</button></div>
@@ -168,7 +168,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
           <label><input type="checkbox" checked={teacherSelection.has(file.key)} disabled={isAnalyzing} onChange={()=>toggleTeacherFile(file)} /><span><strong>{file.name}</strong><small>{file.title}</small></span></label>
           <details><summary>자료 안내 확인</summary><p>{file.description || "선생님이 작성한 안내가 없습니다."}</p>{/^https?:\/\//.test(file.url) && <a href={file.url} target="_blank" rel="noreferrer">파일 열기 ↗</a>}</details>
         </div>)}</div>
-      </section>
+      </details>
 
       <details className="quiet-details analysis-reference">
         <summary>분석 참고 정보 · 선택과목 및 선생님 자료</summary>
