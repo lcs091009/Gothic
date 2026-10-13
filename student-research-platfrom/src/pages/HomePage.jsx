@@ -13,7 +13,7 @@ const studentRecordPreview = [
 ];
 
 
-export default function HomePage({ signInWithGoogle, message }) {
+export default function HomePage({ signInWithGoogle, isSigningIn = false, message }) {
 return (
       <main className="student-dashboard neutral-landing login-page">
         <div
@@ -58,18 +58,28 @@ return (
         <section className="dashboard-card login-shell" aria-labelledby="login-title">
           <header className="student-header">
             <p className="login-brand">활동 연결 노트</p>
-            <button type="button" className="student-back" onClick={signInWithGoogle}>로그인</button>
+            <span className="login-brand-note">학생 · 선생님</span>
           </header>
 
           <div className="login-hero">
             <img src="/research-logo.svg" alt="활동 연결 노트 로고" className="login-logo" />
-            <p className="student-eyebrow">작년 활동 기반 과목 연결</p>
-            <h1 id="login-title">활동 연결 노트</h1>
+            <p className="student-eyebrow">기록에서 다음 탐구로</p>
+            <h1 id="login-title">나의 활동을 이어 가는 곳</h1>
             <p className="student-intro">
-              작년 활동과 현재 선택과목을 연결해 다음 활동 방향을 정리합니다.
-              생기부나 보고서를 대신 작성하지 않고, 학생이 스스로 과목 안에서
-              이어갈 활동을 설계하도록 돕습니다.
+              탐구를 기록하고, 활동을 연결하고, 함께 자료를 나누세요.
             </p>
+            <div className="login-action">
+              <button type="button" className="google-sign-in" onClick={signInWithGoogle} disabled={isSigningIn} aria-busy={isSigningIn}>
+                <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true">
+                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z" />
+                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6C44.4 38.04 46.98 31.86 46.98 24.55Z" />
+                  <path fill="#FBBC05" d="M10.53 28.59A14.41 14.41 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.19A23.86 23.86 0 0 0 0 24c0 3.87.93 7.53 2.56 10.78l7.97-6.19Z" />
+                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.91-5.8l-7.73-6c-2.15 1.45-4.92 2.3-8.18 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48Z" />
+                </svg>
+                <span>{isSigningIn ? "Google로 연결 중…" : "Google로 계속하기"}</span>
+              </button>
+              <p className="login-account-hint">학교 Google 계정으로 로그인해 주세요.</p>
+            </div>
             {message && <p className="login-message" role="status">{message}</p>}
           </div>
 
@@ -85,6 +95,7 @@ return (
               </article>
             ))}
           </div>
+          <p className="login-footer">학생은 활동 기록과 분석을, 선생님은 학생 조회와 과제 전달을 이용할 수 있습니다.</p>
         </section>
       </main>
     );
