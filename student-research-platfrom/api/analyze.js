@@ -152,7 +152,7 @@ return async function handler(request, response) {
               { role: "user", content: userPrompt },
             ],
             temperature: 0.6,
-            max_tokens: 2600,
+            max_tokens: 4200,
             stream: false,
             ...(model === AI_MODEL
               ? { reasoning_effort: "none" }
