@@ -2,6 +2,7 @@ import { uploadDriveFile, shareDriveFileWithTokenRefresh, mergeDriveAttachments,
 const scriptRequests = new Map();
 import { requestDriveAccessToken } from "../lib/googleDriveAuth";
 import { getGooglePickerConfigError } from "../lib/googlePickerConfig";
+import { getDriveAccount, assertDriveAccount } from "../lib/googleDriveAccount";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useGoogleDrive({ setMessage, userId, multiple = false, initialAttachments = [] }) {
@@ -26,14 +27,17 @@ export function useGoogleDrive({ setMessage, userId, multiple = false, initialAt
   const googleAccessTokenRef = useRef("");
   const googleTokenExpiresAtRef = useRef(0);
   const googleAuthRequestRef = useRef(null);
+  const driveAccount = useRef(null);
+  const identityToken = useRef("");
   const clearDriveSession = useCallback(({ keepAttachments = false } = {}) => {
     fileOperation.current?.abort();
     sharedRecipients.current.clear();
     googleAccessTokenRef.current = "";
     googleTokenExpiresAtRef.current = 0;
+    driveAccount.current = null; identityToken.current = "";
     googleAuthRequestRef.current?.abort();
     googleAuthRequestRef.current = null;
-    for (const key of ["googleDriveAccessToken", "googleDriveTokenExpiresAt", "googleDriveUserId"]) {
+    for (const key of ["googleDriveAccessToken", "googleDriveTokenExpiresAt", "googleDriveUserId", "googleDriveAccountEmail", "googleDriveClientId"]) {
       window.sessionStorage.removeItem(key);
     }
     if (!keepAttachments) {
@@ -44,7 +48,7 @@ export function useGoogleDrive({ setMessage, userId, multiple = false, initialAt
   useEffect(() => {
     mounted.current = true;
     if (import.meta.env.VITE_GOOGLE_CLIENT_ID) loadScript("https://accounts.google.com/gsi/client").catch(() => {});
-    if (window.sessionStorage.getItem("googleDriveUserId") !== userId) clearDriveSession({ keepAttachments: attachmentOwner.current === userId });
+    if (window.sessionStorage.getItem("googleDriveUserId") !== userId || window.sessionStorage.getItem("googleDriveClientId") !== import.meta.env.VITE_GOOGLE_CLIENT_ID) clearDriveSession({ keepAttachments: attachmentOwner.current === userId });
     attachmentOwner.current = userId;
     return () => { mounted.current = false; fileOperation.current?.abort(); googleAccessTokenRef.current = ""; googleAuthRequestRef.current?.abort(); };
   }, [userId, clearDriveSession]);
@@ -88,7 +92,7 @@ async function getGoogleAccessToken({ forceConsent = false, selectAccount = fals
 
   if (!mounted.current || userId !== currentUserRef.current) throw new Error("계정이 변경되었습니다. 다시 선택해 주세요.");
   const now = Date.now();
-  const savedToken = window.sessionStorage.getItem("googleDriveUserId") === userId
+  const savedToken = window.sessionStorage.getItem("googleDriveUserId") === userId && window.sessionStorage.getItem("googleDriveClientId") === googleClientId
     ? window.sessionStorage.getItem("googleDriveAccessToken") || "" : "";
   const savedExpiresAt = Number(
     window.sessionStorage.getItem("googleDriveTokenExpiresAt") || 0
@@ -105,6 +109,11 @@ async function getGoogleAccessToken({ forceConsent = false, selectAccount = fals
     googleTokenExpiresAtRef.current > now + 60_000;
 
   if (hasValidToken && !forceConsent && !selectAccount) {
+    if (identityToken.current !== googleAccessTokenRef.current) {
+      driveAccount.current = await getDriveAccount(googleAccessTokenRef.current, { signal: AbortSignal.timeout(15_000) });
+      if (!mounted.current || userId !== currentUserRef.current) throw new Error("계정이 변경되었습니다.");
+      identityToken.current = googleAccessTokenRef.current;
+    }
     return googleAccessTokenRef.current;
   }
 
@@ -117,14 +126,20 @@ async function getGoogleAccessToken({ forceConsent = false, selectAccount = fals
       oauth2: window.google.accounts.oauth2,
       clientId: googleClientId,
       forceConsent, selectAccount,
+      loginHint: window.sessionStorage.getItem("googleDriveAccountEmail") || "",
       signal: controller.signal,
     });
     if (!mounted.current || owner !== currentUserRef.current) throw new Error("계정이 변경되었습니다. 다시 선택해 주세요.");
     const accessToken = tokenResponse.access_token;
+    const account = await getDriveAccount(accessToken, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]) });
+    if (!mounted.current || owner !== currentUserRef.current) throw new Error("계정이 변경되었습니다. 다시 선택해 주세요.");
+    driveAccount.current = account; identityToken.current = accessToken;
     const expiresAt = Date.now() + Number(tokenResponse.expires_in || 3600) * 1000;
     googleAccessTokenRef.current = accessToken;
     googleTokenExpiresAtRef.current = expiresAt;
     window.sessionStorage.setItem("googleDriveUserId", userId);
+    window.sessionStorage.setItem("googleDriveClientId", googleClientId);
+    window.sessionStorage.setItem("googleDriveAccountEmail", account.email);
     window.sessionStorage.setItem("googleDriveAccessToken", accessToken);
     window.sessionStorage.setItem("googleDriveTokenExpiresAt", String(expiresAt));
     return accessToken;
@@ -159,6 +174,7 @@ async function openGooglePicker() {
 
   try {
     const accessToken = await getGoogleAccessToken();
+    const pickerAccount = driveAccount.current;
     await loadGooglePickerLibraries();
 
     setIsGoogleAuthLoading(false);
@@ -180,7 +196,7 @@ async function openGooglePicker() {
         if (!mounted.current || userId !== currentUserRef.current) return;
         if (data.action === window.google.picker.Action.PICKED) {
           try {
-            appendFiles((data.docs || []).map(file => ({ id: file.id, name: file.name || file.title, url: file.url })));
+            appendFiles((data.docs || []).map(file => ({ id: file.id, name: file.name || file.title, url: file.url, accountId: pickerAccount.id })));
             setMessage(`${attachmentsRef.current.length}개 파일을 첨부했습니다.`);
           } catch (error) { setMessage(error.message); }
 
@@ -238,13 +254,14 @@ async function uploadDroppedFileToGoogleDrive(input) {
   const controller = new AbortController(); fileOperation.current = controller;
   try {
     const accessToken = await getGoogleAccessToken();
+    const uploadAccount = driveAccount.current;
     if (!mounted.current || owner !== currentUserRef.current) throw new Error("계정이 변경되었습니다.");
     for (const [index, file] of selected.entries()) {
       setFileProgress(`${index + 1}/${selected.length} · ${file.name}`);
       const result = await uploadDriveFile(file, accessToken, { signal: controller.signal,
         onProgress: (done, total) => { if (mounted.current) setFileProgress(`${index + 1}/${selected.length} · ${Math.round(done / (total || 1) * 100)}%`); } });
       if (!mounted.current || owner !== currentUserRef.current) return;
-      appendFiles([result]);
+      appendFiles([{ ...result, accountId: uploadAccount.id }]);
     }
     setMessage(`${attachmentsRef.current.length}개 파일을 첨부했습니다.`);
   } catch (error) { if (mounted.current && owner === currentUserRef.current) setMessage(error.name === "AbortError" ? "업로드를 중단했습니다. 완료한 첨부는 유지됩니다." : error.message || "파일 업로드에 실패했습니다."); }
@@ -257,6 +274,7 @@ async function shareSelectedFile(emails, onProgress) {
   const owner = userId;
   const controller = new AbortController(); fileOperation.current = controller;
   let token = await getGoogleAccessToken();
+  assertDriveAccount(driveAccount.current, files);
   if (!mounted.current || owner !== currentUserRef.current) throw new Error("계정이 변경되었습니다.");
 
   const timeout = setTimeout(() => controller.abort(), 600_000);
@@ -265,11 +283,15 @@ async function shareSelectedFile(emails, onProgress) {
       if (!sharedRecipients.current.has(file.id)) sharedRecipients.current.set(file.id, new Set());
       const options = { signal: controller.signal, completed: sharedRecipients.current.get(file.id),
         onProgress: (done, total) => onProgress?.(index * total + done, files.length * total) };
-      token = await shareDriveFileWithTokenRefresh(file.id, emails, token, async () => {
+      try { token = await shareDriveFileWithTokenRefresh(file.id, emails, token, async () => {
         const nextToken = await getGoogleAccessToken({ forceConsent: true });
+        assertDriveAccount(driveAccount.current, files);
         if (!mounted.current || owner !== currentUserRef.current) throw new Error("계정이 변경되었습니다.");
         return nextToken;
-      }, options);
+      }, options); } catch (error) {
+        if (error.scope === "driveSharing" && file.name && !error.message.startsWith(`${file.name}:`)) error.message = `${file.name}: ${error.message}`;
+        throw error;
+      }
 
     }
   } catch (error) {

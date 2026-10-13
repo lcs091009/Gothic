@@ -3,7 +3,7 @@ export const AUTH_TIMEOUT_MS = 120_000;
 
 // Google reports popup closure itself. Browser focus/visibility changes do not
 // prove a popup closed: account selection and consent can also cause them.
-export function requestDriveAccessToken({ oauth2, clientId, forceConsent = false, selectAccount = false, signal,
+export function requestDriveAccessToken({ oauth2, clientId, forceConsent = false, selectAccount = false, loginHint = "", signal,
   setTimer = setTimeout, clearTimer = clearTimeout }) {
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -24,6 +24,7 @@ export function requestDriveAccessToken({ oauth2, clientId, forceConsent = false
         client_id: clientId,
         scope: DRIVE_SCOPE,
         include_granted_scopes: false,
+        ...(loginHint && !selectAccount ? { login_hint: loginHint } : {}),
         callback(response) {
           if (response?.error || !response?.access_token) {
             finish(response?.error === "access_denied"
