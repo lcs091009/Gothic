@@ -4,6 +4,7 @@ import { createAnalyzeHandler, MAX_BODY_BYTES } from "./analyze.js";
 
 const env = { SUPABASE_URL: "https://test.supabase.co", SUPABASE_PUBLISHABLE_KEY: "public-test", NVIDIA_API_KEY: "fake-test-only" };
 const user = { id: "student-1", email: "27-1234@gochon.hs.kr", email_confirmed_at: "2026-01-01" };
+const materialId = "00000000-0000-4000-8000-000000000001";
 function fixture(overrides = {}) {
   const tables = {
     profiles: { data: { role: "student" } },
@@ -250,5 +251,36 @@ test("missing, deleted or inaccessible selected IDs fail without falling back to
     assert.equal((await f.call({ body: { selectedRecordIds: [selectedId] } })).code, 400);
     assert.equal(f.quotaCalls, 0);
     assert.equal(f.providerCalls.length, 0);
+  }
+});
+
+test("selected teacher attachments resolve by recipient and IDs using only stored data", async () => {
+  const f=fixture({tables:{teacher_shared_files:{data:[{id:materialId,file_name:"교사 과제",description:"실험 조건 비교",attachments:[{id:"chosen-file",name:"선택 안내"},{id:"unchecked-file",name:"EXCLUDED"}]}]}}});
+  const r=await f.call({body:{extraContext:"",selectedTeacherFiles:[{materialId,attachmentId:"chosen-file"}],teacherMaterials:[{description:"FORGED"}]}});
+  assert.equal(r.code,200);
+  const q=f.queries.find(query=>query.table==="teacher_shared_files");
+  assert.ok(q.filters.some(([column,value])=>column==="student_email"&&value===user.email));
+  assert.deepEqual(q.in,["id",[materialId]]);
+  const prompt=JSON.parse(f.providerCalls[0].options.body).messages[1].content;
+  assert.match(prompt,/실험 조건 비교|선택 안내/);
+  assert.doesNotMatch(prompt,/EXCLUDED|FORGED/);
+  assert.equal(r.body.scope.teacherAttachments,1);
+});
+test("explicit no-teacher-file selection does not silently include shared materials",async()=>{
+  const f=fixture({tables:{teacher_shared_files:{data:[{id:materialId,description:"MUST_NOT_INCLUDE"}]}}});
+  const r=await f.call({body:{selectedTeacherFiles:[]}});
+  assert.equal(r.code,200);
+  assert.doesNotMatch(JSON.parse(f.providerCalls[0].options.body).messages[1].content,/MUST_NOT_INCLUDE/);
+  assert.equal(r.body.scope.teacherMaterials,0);
+});
+test("missing and forged teacher file choices fail before quota and provider calls",async()=>{
+  for(const data of [[],[{id:materialId,attachments:[{id:"different"}]}]]) {
+    const f=fixture({tables:{teacher_shared_files:{data}}});
+    const r=await f.call({body:{selectedTeacherFiles:[{materialId,attachmentId:"missing"}]}});
+    assert.equal(r.code,400);assert.equal(f.quotaCalls,0);assert.equal(f.providerCalls.length,0);
+  }
+  for(const selectedTeacherFiles of [[{materialId:"not-uuid",attachmentId:"file"}],[{materialId,attachmentId:"a"},{materialId,attachmentId:"a"}],Array.from({length:21},(_,i)=>({materialId,attachmentId:`file-${i}`}))]) {
+    const f=fixture();assert.equal((await f.call({body:{selectedTeacherFiles}})).code,400);
+    assert.equal(f.quotaCalls,0);assert.equal(f.providerCalls.length,0);
   }
 });
