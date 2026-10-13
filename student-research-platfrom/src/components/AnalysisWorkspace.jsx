@@ -1,21 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import { analysisSections } from "../lib/analysisSections";
 import "./AnalysisWorkspace.css";
+import ExplorationPage from "./ExplorationPage";
 
-export default function AnalysisWorkspace({analysis,loading,message,scope,warning,records,files,onBack,onRetry}) {
+export default function AnalysisWorkspace({analysis,loading,message,scope,warning,records,files,onBack,onRetry,exploration,extraContext}) {
   const [active,setActive]=useState(0);
+  const [exploring,setExploring]=useState(false);
   const heading=useRef(null);
   useEffect(()=>{heading.current?.focus();},[]);
-  useEffect(()=>{setActive(0);},[analysis]);
+  useEffect(()=>{setActive(0);setExploring(false);},[analysis]);
+  useEffect(()=>{heading.current?.focus();},[active,exploring]);
   const sections=analysisSections(analysis);
   const subjects=new Map();
   for(const record of records) { const name=record.subject || "과목 미입력";subjects.set(name,(subjects.get(name)||0)+1); }
+  if(exploring) return <ExplorationPage seed={exploration} records={records} files={files} extraContext={extraContext} onBack={()=>setExploring(false)} />;
   return <section className="analysis-workspace">
     <aside className="analysis-workspace-nav">
       <button type="button" onClick={onBack}>← 자료 선택</button>
       <p className="student-eyebrow">나의 탐구 연결</p><h2 ref={heading} tabIndex={-1}>분석 작업실</h2>
       <nav aria-label="분석 항목">{sections.map((section,index)=><button key={section.number} type="button" disabled={loading || !analysis}
         aria-pressed={active===index} onClick={()=>setActive(index)}><span>{String(section.number).padStart(2,"0")}</span>{section.title}</button>)}</nav>
+      <button className="exploration-entry" type="button" disabled={loading || !analysis} onClick={()=>setExploring(true)}>탐구 주제 고르기 →</button>
       <p className="workspace-caption">선택한 기록 {records.length}개<br />선생님 첨부 {files.length}개</p>
     </aside>
     <div className="analysis-workspace-main">
@@ -33,7 +38,7 @@ export default function AnalysisWorkspace({analysis,loading,message,scope,warnin
       </article>}
       <details className="analysis-evidence"><summary>분석 근거와 과목별 활동 보기</summary>
         <div className="analysis-subject-chart" aria-label="선택 활동의 과목별 개수">{[...subjects].map(([subject,count])=><div key={subject}><span>{subject}</span><div className="analysis-bar-track"><span style={{width:`${count/Math.max(1,records.length)*100}%`}} /></div><strong>{count}개</strong></div>)}</div>
-        <ol className="analysis-record-timeline">{records.map((record,index)=><li key={record.id}><small>[R{index+1}] · {[record.grade,record.semester,record.subject].filter(Boolean).join(" · ")}</small><strong>{record.title || "제목 없음"}</strong><details><summary>기록 내용</summary><p>{record.content || "작성한 내용이 없습니다."}</p></details></li>)}</ol>
+        <ol className="analysis-record-timeline">{records.map(record=><li key={record.id}><small>{[record.grade,record.semester,record.subject].filter(Boolean).join(" · ")}</small><strong>{record.title || "제목 없음"}</strong><details><summary>기록 내용</summary><p>{record.content || "작성한 내용이 없습니다."}</p></details></li>)}</ol>
         {!!files.length && <div className="analysis-source-files"><h4>선택한 선생님 첨부</h4>{files.map(file=><p key={file.key}>{file.name} · {file.title}</p>)}<small>파일명·선생님 안내만 참고하며 첨부 본문은 읽지 않습니다.</small></div>}
         {scope && <p className="workspace-caption">서버 분석 범위: 활동 개요 {scope.scannedRecords}개 · 본문 발췌 {scope.detailedRecords}개 · 선생님 자료 {scope.teacherMaterials}개</p>}
       </details>
