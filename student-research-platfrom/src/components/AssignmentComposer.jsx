@@ -85,6 +85,7 @@ export default function AssignmentComposer({ session, isSubmitting, onBusyChange
         <input id="assignment-title" value={title} onChange={event => setTitle(event.target.value)} required maxLength={160} placeholder="예: 실험 결과를 비교하고 한계 정리하기" />
         <label htmlFor="assignment-description">안내</label>
         <textarea id="assignment-description" value={description} onChange={event => setDescription(event.target.value)} required maxLength={4000} rows={4} placeholder="무엇을 하고, 어떤 결과물을 제출할지 적어 주세요." />
+        <p className="field-optional">Google Docs·Sheets도 학생의 보기 권한이 필요합니다. Drive에서 선택한 파일은 전달할 때 자동으로 권한을 부여하며, 실패하면 Drive의 공유 설정과 학교 공유 제한을 확인해 주세요.</p>
         <div className={`assignment-attachment ${drive.isUploadDragging ? "is-dragging" : ""}`} onDragOver={event => { event.preventDefault(); if (!isSubmitting && !fileBusy) drive.handleUploadDragOver(event); }} onDragLeave={drive.handleUploadDragLeave} onDrop={event => { event.preventDefault(); if (!isSubmitting && !fileBusy) drive.handleUploadDrop(event); }}>
           <input ref={fileInput} type="file" multiple hidden aria-label="컴퓨터에서 첨부파일 선택" onChange={event => { const file = Array.from(event.target.files || []); event.target.value = ""; if (file.length) drive.uploadLocalFile(file); }} />
           <div className="attachment-actions">
@@ -94,11 +95,11 @@ export default function AssignmentComposer({ session, isSubmitting, onBusyChange
           <p>{fileBusy ? drive.fileProgress || "Google 파일 연결 중…" : "여러 파일을 끌어 놓을 수 있습니다. 파일당 500MB · 최대 20개."}</p>
           {drive.isUploadingFile && <button type="button" onClick={drive.cancelUpload}>업로드 중단</button>}
           {drive.attachments.map(file => <div key={file.id} className="attachment-selected"><span>{file.name}</span><button type="button" disabled={fileBusy} onClick={() => drive.removeAttachment(file.id)} aria-label={`${file.name} 첨부 해제`}>×</button></div>)}
-          {drive.driveFileId && <p>전달할 때 선택한 학생에게 모든 첨부파일의 열람 권한을 부여합니다.</p>}
         </div>
         <details className="quiet-details assignment-options"><summary>기한·종류·직접 입력한 링크 <span className="field-optional">선택</span></summary>
           <div className="assignment-option-row"><label>제출 기한<input type="date" value={dueDate} onChange={event => setDueDate(event.target.value)} /></label>
             <label>종류<select value={category} onChange={event => setCategory(event.target.value)}>{["탐구", "수행평가", "독서", "동아리", "수업 중 발표", "기타"].map(item => <option key={item}>{item}</option>)}</select></label></div>
+          <p className="field-optional">직접 입력한 링크는 자동으로 공유되지 않습니다. Drive의 ‘공유’에서 받을 학생에게 ‘뷰어’ 권한을 먼저 주세요.</p>
           <label>자료 링크<input type="url" value={fileUrl} maxLength={2048} onChange={event => setFileUrl(event.target.value)} placeholder="https://…" /></label>
         </details>
       </section>
