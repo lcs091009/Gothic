@@ -70,10 +70,12 @@ test("history keeps each recipient row id so one delivery can be recalled",()=>{
  let id=0;const rows=buildAssignmentRows(draft,()=>`row-${++id}`).map(row=>({...row,created_at:"2026-10-12T01:00:00Z"}));
  assert.deepEqual(groupAssignmentDeliveries(rows)[0].recipients.map(r=>r.id),["row-1","row-2"]);
 });
-test("recall deletes only the given rows of the signed-in teacher and reports the removed count",async()=>{
+test("recall verifies all requested rows are absent, including already-removed recipients",async()=>{
  const calls=[];
- const client={from(table){assert.equal(table,"teacher_shared_files");const q={delete(){calls.push("delete");return q;},in(c,v){calls.push(["in",c,v]);return q;},eq(c,v){calls.push(["eq",c,v]);return q;},async select(c){calls.push(["select",c]);return {data:[{id:"row-1"}],error:null};}};return q;}};
- assert.equal(await recallAssignmentRows(["row-1","row-2"],"teacher",client),1);
- assert.deepEqual(calls,["delete",["in","id",["row-1","row-2"]],["eq","teacher_id","teacher"],["select","id"]]);
+ const remaining=new Set(["row-1"]);
+ const client={from(table){assert.equal(table,"teacher_shared_files");let deleting=false,ids=[],owner;const q={delete(){deleting=true;calls.push("delete");return q;},in(c,v){ids=v;calls.push(["in",c,v]);return q;},eq(c,v){owner=v;calls.push(["eq",c,v]);return q;},select(c){calls.push(["select",c]);return q;},then(resolve,reject){assert.equal(owner,"teacher");const data=ids.filter(id=>remaining.has(id)).map(id=>({id}));if(deleting)for(const {id} of data)remaining.delete(id);return Promise.resolve({data,error:null}).then(resolve,reject);}};return q;}};
+ assert.equal(await recallAssignmentRows(["row-1","row-2"],"teacher",client),2);
+ assert.equal(remaining.size,0);
+ assert.deepEqual(calls,["delete",["in","id",["row-1","row-2"]],["eq","teacher_id","teacher"],["select","id"],["select","id"],["in","id",["row-1","row-2"]],["eq","teacher_id","teacher"]]);
  for(const [ids,teacher] of [[[], "teacher"],[["row-1"],""],[[""],"teacher"],[null,"teacher"]]) await assert.rejects(recallAssignmentRows(ids,teacher,client));
 });
