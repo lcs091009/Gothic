@@ -84,7 +84,18 @@ export default function AssignmentComposer({ session, isSubmitting, onBusyChange
         <input id="assignment-title" value={title} onChange={event => setTitle(event.target.value)} required maxLength={160} placeholder="예: 실험 결과를 비교하고 한계 정리하기" />
         <label htmlFor="assignment-description">안내</label>
         <textarea id="assignment-description" value={description} onChange={event => setDescription(event.target.value)} required maxLength={4000} rows={4} placeholder="무엇을 하고, 어떤 결과물을 제출할지 적어 주세요." />
-        <p className="field-optional">Google Docs·Sheets도 학생의 보기 권한이 필요합니다. Drive에서 선택한 파일은 전달할 때 자동으로 권한을 부여하며, 실패하면 Drive의 공유 설정과 학교 공유 제한을 확인해 주세요.</p>
+        <aside className="file-ownership-notice" aria-labelledby="file-ownership-title">
+          <div className="file-ownership-heading">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6l-8-3Z M8 12l3 3 5-6" /></svg>
+            <h4 id="file-ownership-title">파일 소유 계정으로 첨부하세요</h4>
+          </div>
+          <p>파일을 볼 수 있어도 학생에게 공유할 권한은 없을 수 있습니다.</p>
+          <details>
+            <summary>내 파일인지 확인하는 방법 <span aria-hidden="true">↗</span></summary>
+            <p>Drive에서 파일의 ‘공유’를 열고 본인 이메일 옆 ‘소유자’를 확인하세요. 편집자는 다른 사람에게 공유하도록 허용된 파일만 사용할 수 있습니다.</p>
+            <p>PDF·Docs·Sheets 모두 같은 기준입니다. 전달 시 선택한 학생에게 보기 권한을 부여하며, 학교 공유 제한이 있으면 관리자 확인이 필요합니다.</p>
+          </details>
+        </aside>
         <div className={`assignment-attachment ${drive.isUploadDragging ? "is-dragging" : ""}`} onDragOver={event => { event.preventDefault(); if (!isSubmitting && !fileBusy) drive.handleUploadDragOver(event); }} onDragLeave={drive.handleUploadDragLeave} onDrop={event => { event.preventDefault(); if (!isSubmitting && !fileBusy) drive.handleUploadDrop(event); }}>
           <div className="attachment-actions">
             <button type="button" disabled={fileBusy} onClick={() => drive.openGooglePicker({ uploadFirst: true })}>컴퓨터 파일 첨부 <span aria-hidden="true">↑</span></button>
