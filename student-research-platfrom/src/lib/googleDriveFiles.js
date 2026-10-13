@@ -51,7 +51,7 @@ export async function driveSharingError(response, context = "") {
   else if (reason === "insufficientFilePermissions") message = "이 Google 계정에는 파일을 다른 학생에게 공유할 권한이 없습니다. 소유자 계정으로 파일을 선택하거나 컴퓨터에서 원본을 첨부해 주세요.";
   else if (reason === "insufficientPermissions") message = "Google Drive 권한 승인이 부족합니다. 파일을 다시 선택하고 Drive 권한을 승인해 주세요.";
   else if (response.status === 429 || ["sharingRateLimitExceeded", "rateLimitExceeded", "userRateLimitExceeded"].includes(reason)) message = "Google 공유 요청 한도에 도달했습니다. 잠시 후 다시 전달해 주세요.";
-  else if (response.status === 404 || reason === "notFound") message = "현재 Google 계정에서 파일을 찾을 수 없습니다. 해당 파일이 있는 계정으로 다시 선택해 주세요.";
+  else if (response.status === 404 || reason === "notFound") message = "앱이 이 파일을 읽을 수 없습니다. 파일이 있어도 앱 접근 권한 또는 Drive 연결 설정 때문에 발생할 수 있습니다. Google 계정을 다시 연결한 뒤 파일을 다시 선택해 주세요.";
   else message = "Google 파일 공유에 실패했습니다. 파일 소유 계정과 공유 설정을 확인해 주세요.";
   const error = new Error(`${context ? `${context}: ` : ""}${message} [Google ${response.status} · ${reason}]`);
   error.status = response.status; error.reason = reason; error.scope = "driveSharing";
@@ -116,7 +116,7 @@ export function mergeDriveAttachments(existing, incoming) {
   const files = new Map(existing.map(file => [file.id, file]));
   for (const file of incoming) {
     if (!/^[\w-]+$/.test(file.id || "")) continue;
-    files.set(file.id, { id: file.id, name: file.name || "파일", url: file.url || `https://drive.google.com/file/d/${file.id}/view` });
+    files.set(file.id, { id: file.id, name: file.name || "파일", url: file.url || `https://drive.google.com/file/d/${file.id}/view`, ...(typeof file.accountId === "string" && file.accountId.length <= 200 ? { accountId: file.accountId } : {}) });
   }
   if (files.size > MAX_DRIVE_ATTACHMENTS) throw new Error(`파일은 최대 ${MAX_DRIVE_ATTACHMENTS}개까지 첨부할 수 있습니다.`);
   return [...files.values()];
