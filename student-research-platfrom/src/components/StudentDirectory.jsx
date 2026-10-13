@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { directoryError, fetchStudents, fetchStudentDetails, STUDENT_PAGE_SIZE } from "../services/studentDirectory";
 import "./StudentDirectory.css";
+import StudentPlacementCards from "./StudentPlacementCards";
 const initialFilters = { grade: "", classNumber: "", number: "" };
 function placement(student) {
   return student.directory_grade ? `${student.directory_grade}학년 ${student.directory_class}반 ${student.directory_number}번` : "학년·반·번호 확인 필요";
@@ -53,7 +54,7 @@ export default function StudentDirectory({ teacherId, selectionMode = false, sel
     }, 250);
     return () => { active = false; clearTimeout(timer); };
   }, [filters, page, refresh, teacherId]);
-  function update(key, value) { setFilters(previous => ({ ...previous, [key]: value })); setPage(0); setSelected(null); }
+  function updateFilters(next) { setFilters(next); setPage(0); setSelected(null); }
   const selectedIds = new Set(selectedStudents.map(student => student.id));
   const [selectionMessage, setSelectionMessage] = useState("");
   function choose(student) {
@@ -73,12 +74,8 @@ export default function StudentDirectory({ teacherId, selectionMode = false, sel
     {!selectionMode && <header className="directory-heading"><div><h3 id="student-directory-title">학생 찾기</h3><p>원하는 학년·반·번호만 선택하세요.</p></div>
       <button type="button" onClick={() => setRefresh(value => value + 1)} disabled={loading || disabled}>새로고침</button></header>}
     {selectionMode && <h4 id="student-directory-title" className="sr-only">과제를 받을 학생 선택</h4>}
-    <div className="student-filters">
-      <label>학년<select value={filters.grade} onChange={event => update("grade", event.target.value)}><option value="">전체 학년</option>{[1,2,3].map(grade => <option key={grade} value={grade}>{grade}학년</option>)}</select></label>
-      <label>반<input type="number" min="1" max="99" placeholder="전체 반" value={filters.classNumber} onChange={event => update("classNumber", event.target.value)} /></label>
-      <label>번호<input type="number" min="1" max="99" placeholder="전체 번호" value={filters.number} onChange={event => update("number", event.target.value)} /></label>
-      {!selectionMode && <button type="button" disabled={disabled} onClick={() => { setFilters(initialFilters); setPage(0); setSelected(null); }}>전체 보기</button>}
-    </div>
+    <StudentPlacementCards filters={filters} onChange={updateFilters} disabled={disabled} />
+    <button type="button" disabled={disabled} onClick={()=>updateFilters(initialFilters)}>조건 초기화</button>
     <p role="status" aria-live="polite">{loading ? "학생을 찾는 중입니다." : `검색된 학생 ${result.count}명`}</p>
     {error && <p role="alert">{error}</p>}
     {selectionMode && <button type="button" disabled={loading || disabled || !result.students.length} onClick={choosePage}>현재 목록 모두 선택 · {result.students.length}명</button>}

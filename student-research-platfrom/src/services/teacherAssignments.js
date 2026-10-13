@@ -55,8 +55,17 @@ export function groupAssignmentDeliveries(files) {
 // this) and reports how many rows were actually removed.
 export async function recallAssignmentRows(ids, teacherId, client = supabase) {
   if (!client) throw new Error("서비스 연결 설정이 필요합니다.");
-  if (!teacherId || !Array.isArray(ids) || !ids.length || ids.some(id => typeof id !== "string" || !id)) throw new Error("회수할 과제를 다시 확인해 주세요.");
-  const { data, error } = await client.from("teacher_shared_files").delete().in("id", ids).eq("teacher_id", teacherId).select("id");
+  if (!teacherId || !Array.isArray(ids) || !ids.length || ids.length > MAX_ASSIGNMENT_RECIPIENTS || new Set(ids).size !== ids.length || ids.some(id => typeof id !== "string" || !id)) throw new Error("회수할 과제를 다시 확인해 주세요.");
+  const { error } = await client.from("teacher_shared_files").delete().in("id", ids).eq("teacher_id", teacherId).select("id");
   if (error) throw error;
-  return (data || []).length;
+  const remaining = await client.from("teacher_shared_files").select("id").in("id",ids).eq("teacher_id",teacherId);
+  if (remaining.error) throw new Error("회수 결과를 확인하지 못했습니다. 다시 시도해도 과제가 중복 삭제되지는 않습니다.");
+  if (remaining.data?.length) throw new Error("과제를 회수할 권한을 확인하지 못했습니다. 관리자에게 교사 과제 삭제 SQL 적용을 확인해 주세요.");
+  return ids.length;
+}
+
+export async function fetchRecipientProfiles(emails,client=supabase) {
+  const {data,error}=await client.from("profiles").select("id,name,email,directory_grade,directory_class,directory_number").eq("role","student").in("email",[...new Set(emails)].slice(0,MAX_ASSIGNMENT_RECIPIENTS));
+  if(error) throw error;
+  return data || [];
 }

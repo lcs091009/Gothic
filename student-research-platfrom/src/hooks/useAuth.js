@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase, isSupabaseConfigured, supabaseConfigError, getFriendlySupabaseError } from "../lib/supabaseClient";
-import { googleLoginOptions, googleLoginError, googleCallbackError } from "../lib/googleLogin";
+import { googleLoginError, googleCallbackError } from "../lib/googleLogin";
 import { cacheLoginDriveToken } from "../lib/loginDriveToken";
+import { cleanAuthCallbackUrl,createSessionReadGuard,beginGoogleLogin } from "../lib/authNavigation";
 
 export function useAuth(setMessage) {
   const [session, setSession] = useState(null);
@@ -10,30 +11,41 @@ export function useAuth(setMessage) {
   const signingIn = useRef(false);
   useEffect(() => {
     const callbackError = googleCallbackError(window.location);
-    if (callbackError) setMessage(callbackError);
+    const cleanCallback=()=>window.history.replaceState(window.history.state,"",cleanAuthCallbackUrl(window.location.href));
+    if (callbackError) {setMessage(callbackError);cleanCallback();}
     if (!isSupabaseConfigured()) { setIsLoading(false); return; }
     let active = true;
-    let authEventReceived = false;
+    const guard=createSessionReadGuard();
+    const applySession=nextSession=>{
+      void Promise.resolve().then(()=>cacheLoginDriveToken(nextSession, import.meta.env.VITE_GOOGLE_CLIENT_ID)).catch(() => {});
+      setSession(nextSession);setIsLoading(false);
+      if(nextSession) {setMessage("");cleanCallback();}
+    };
     // Do not await Supabase operations inside its synchronous auth callback.
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      authEventReceived = true;
+      guard.invalidate();
       if (active) {
-        void cacheLoginDriveToken(nextSession, import.meta.env.VITE_GOOGLE_CLIENT_ID).catch(() => {});
-        setSession(nextSession); setIsLoading(false);
+        applySession(nextSession);
       }
     });
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (!active || authEventReceived) return;
+    const syncSession=(block=false)=>{
+      const isCurrent=guard.begin();
+      if(block) setIsLoading(true);
+      return supabase.auth.getSession().then(({ data, error }) => {
+      if (!active || !isCurrent()) return;
       if (error) setMessage(getFriendlySupabaseError(error));
-      else {
-        void cacheLoginDriveToken(data.session, import.meta.env.VITE_GOOGLE_CLIENT_ID).catch(() => {});
-        setSession(data.session);
-      }
+      else applySession(data.session);
       setIsLoading(false);
     }).catch((error) => {
-      if (active) { setMessage(getFriendlySupabaseError(error)); setIsLoading(false); }
+      if (active && isCurrent()) { setMessage(getFriendlySupabaseError(error)); setIsLoading(false); }
     });
-    return () => { active = false; data.subscription.unsubscribe(); };
+    };
+    const restorePage=event=>{if(event?.persisted){signingIn.current=false;setIsSigningIn(false);}void syncSession(Boolean(event?.persisted));};
+    const foreground=()=>{if(document.visibilityState==="visible") restorePage();};
+    void syncSession(true);
+    window.addEventListener("pageshow",restorePage);
+    document.addEventListener("visibilitychange",foreground);
+    return () => { active = false;guard.invalidate();window.removeEventListener("pageshow",restorePage);document.removeEventListener("visibilitychange",foreground);data.subscription.unsubscribe(); };
   }, [setMessage]);
 
   async function signInWithGoogle() {
@@ -42,8 +54,9 @@ export function useAuth(setMessage) {
     if (!supabase) { setMessage(supabaseConfigError); return; }
     signingIn.current = true; setIsSigningIn(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth(googleLoginOptions(window.location.origin));
-      if (error) throw error;
+      // A restored login page may still have another account's cached session.
+      // Clear only this browser session before starting a fresh account choice.
+      await beginGoogleLogin(supabase,window.location.origin,url=>window.location.replace(url),()=>setSession(null));
     } catch (error) { setMessage(googleLoginError(error)); }
     finally { signingIn.current = false; setIsSigningIn(false); }
   }

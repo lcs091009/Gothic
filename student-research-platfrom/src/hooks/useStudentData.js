@@ -48,6 +48,7 @@ export function useStudentData(session, setMessage) {
     } catch (error) { if (userRef.current === id) setMessage(getFriendlySupabaseError(error)); }
     finally { if (userRef.current === id) setIsLoadingTeacherSharedFiles(false); }
   }
-  return { profile, records, teacherSharedFiles, academicProfile, setAcademicProfile,
+  const ownProfile=profile?.id===session?.user?.id;
+  return { profile:ownProfile ? profile:null, records:ownProfile ? records:[], teacherSharedFiles:ownProfile ? teacherSharedFiles:[], academicProfile:ownProfile ? academicProfile:null, setAcademicProfile,
     isAcademicProfileLoading, isLoadingTeacherSharedFiles, loadResearchRecords, loadTeacherSharedFiles };
 }
