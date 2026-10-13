@@ -15,7 +15,6 @@ export default function AssignmentComposer({ session, isSubmitting, onBusyChange
   const [category, setCategory] = useState(restored.current.category);
   const [message, setMessage] = useState("");
   const [sharingError, setSharingError] = useState(false);
-  const fileInput = useRef(null);
   const drive = useGoogleDrive({ setMessage, userId: session?.user?.id, multiple: true, initialAttachments: restored.current.attachments });
   const [shareProgress, setShareProgress] = useState("");
   const fileBusy = drive.isUploadingFile || drive.isGoogleAuthLoading || drive.isPickerLoading;
@@ -87,9 +86,8 @@ export default function AssignmentComposer({ session, isSubmitting, onBusyChange
         <textarea id="assignment-description" value={description} onChange={event => setDescription(event.target.value)} required maxLength={4000} rows={4} placeholder="무엇을 하고, 어떤 결과물을 제출할지 적어 주세요." />
         <p className="field-optional">Google Docs·Sheets도 학생의 보기 권한이 필요합니다. Drive에서 선택한 파일은 전달할 때 자동으로 권한을 부여하며, 실패하면 Drive의 공유 설정과 학교 공유 제한을 확인해 주세요.</p>
         <div className={`assignment-attachment ${drive.isUploadDragging ? "is-dragging" : ""}`} onDragOver={event => { event.preventDefault(); if (!isSubmitting && !fileBusy) drive.handleUploadDragOver(event); }} onDragLeave={drive.handleUploadDragLeave} onDrop={event => { event.preventDefault(); if (!isSubmitting && !fileBusy) drive.handleUploadDrop(event); }}>
-          <input ref={fileInput} type="file" multiple hidden aria-label="컴퓨터에서 첨부파일 선택" onChange={event => { const file = Array.from(event.target.files || []); event.target.value = ""; if (file.length) drive.uploadLocalFile(file); }} />
           <div className="attachment-actions">
-            <button type="button" disabled={fileBusy} onClick={() => fileInput.current?.click()}>컴퓨터 파일 첨부 <span aria-hidden="true">↑</span></button>
+            <button type="button" disabled={fileBusy} onClick={() => drive.openGooglePicker({ uploadFirst: true })}>컴퓨터 파일 첨부 <span aria-hidden="true">↑</span></button>
             <button type="button" disabled={fileBusy} onClick={drive.openGooglePicker}>Google Drive</button>
           </div>
           <p>{fileBusy ? drive.fileProgress || "Google 파일 연결 중…" : "여러 파일을 끌어 놓을 수 있습니다. 파일당 500MB · 최대 20개."}</p>
