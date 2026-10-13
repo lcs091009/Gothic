@@ -1,3 +1,4 @@
+import AssignmentRecallDialog from "./AssignmentRecallDialog";
 import AttachmentLinks from "./AttachmentLinks";
 import StudentDirectory from "./StudentDirectory";
 import AssignmentComposer from "./AssignmentComposer";
@@ -42,6 +43,10 @@ function TeacherPage({ session }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const [recallingId, setRecallingId] = useState(null);
+  const [recallGroup,setRecallGroup]=useState(null);
+  const [recallError,setRecallError]=useState("");
+  const recallLock=useRef(false);
+  const loadVersion=useRef(0);
 
   const loadSharedFiles = useCallback(async (reportOverride) => {
     const reportMessage = typeof reportOverride === "function" ? reportOverride : messageRef.current;
@@ -54,6 +59,7 @@ function TeacherPage({ session }) {
       return;
     }
 
+    const version=++loadVersion.current;
     setIsLoadingFiles(true);
 
     try {
@@ -70,11 +76,11 @@ function TeacherPage({ session }) {
         return;
       }
 
-      setSharedFiles(data || []);
+      if(version===loadVersion.current) setSharedFiles(data || []);
     } catch (error) {
       reportMessage(getFriendlySupabaseError(error));
     } finally {
-      setIsLoadingFiles(false);
+      if(version===loadVersion.current) setIsLoadingFiles(false);
     }
   }, [session]);
 
@@ -84,27 +90,20 @@ function TeacherPage({ session }) {
     }
   }, [session?.user?.id, loadSharedFiles]);
 
-  async function handleRecall(group) {
-    const ids = group.recipients.map(recipient => recipient.id).filter(Boolean);
-    const confirmed = window.confirm(
-      `‘${group.file_name}’ 과제를 학생 ${ids.length}명에게서 회수할까요?
-학생 화면에서 사라지며 되돌릴 수 없습니다.
-이미 공유한 Google Drive 파일의 보기 권한은 자동으로 해제되지 않습니다.`
-    );
-    if (!confirmed) return;
-    setRecallingId(group.id);
-    setMessage("");
+  async function handleRecall(ids) {
+    if(recallLock.current || !ids.length) return;
+    recallLock.current=true;setRecallingId(recallGroup.id);setRecallError("");
+    const report=setMessage;
     try {
-      const removed = await recallAssignmentRows(ids, session?.user?.id);
-      setMessage(removed === ids.length
-        ? `${removed}명에게서 과제를 회수했습니다.`
-        : `${removed}/${ids.length}명에게서 회수했습니다. 나머지는 이미 삭제됐거나 권한이 없습니다.`);
-      await loadSharedFiles();
-    } catch (error) {
-      setMessage(getFriendlySupabaseError(error));
-    } finally {
-      setRecallingId(null);
-    }
+      const removed=await recallAssignmentRows(ids,session.user.id);
+      // Invalidate old reads so they cannot restore recalled rows.
+      ++loadVersion.current;
+      const deleted=new Set(ids);
+      setSharedFiles(previous=>previous.filter(file=>!deleted.has(file.id)));
+      setRecallGroup(null);
+      report(`${removed}명에게서 회수했습니다. 받는 학생이 모두 회수된 과제는 전달 내역에서도 삭제됩니다.`);
+    }catch(error){setRecallError(getFriendlySupabaseError(error));}
+    finally{recallLock.current=false;setRecallingId(null);}
   }
 
   async function handleAssignmentSent(count) {
@@ -204,7 +203,7 @@ function TeacherPage({ session }) {
                   className="student-back"
                   style={styles.recallButton}
                   disabled={recallingId !== null || isLoadingFiles}
-                  onClick={() => handleRecall(file)}
+                  onClick={() => {setRecallError("");setRecallGroup(file);}}
                 >
                   {recallingId === file.id ? "회수 중…" : "과제 회수"}
                 </button>
@@ -215,6 +214,7 @@ function TeacherPage({ session }) {
       </section>}
       </div>
       {message && <p style={styles.message} role="status">{message}</p>}
+      {recallGroup && <AssignmentRecallDialog key={recallGroup.id} group={recallGroup} busy={recallingId !== null} error={recallError} onClose={()=>setRecallGroup(null)} onRecall={handleRecall} />}
     </section>
   );
 }

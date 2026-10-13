@@ -48,6 +48,7 @@ function App() {
   useEffect(() => {
     if (profile?.role === "student") sectionTitleRef.current?.focus();
   }, [currentPage, profile?.role]);
+  useEffect(()=>{setCurrentPage("home");},[session?.user?.id]);
 
 
   async function signOut() {
@@ -333,7 +334,7 @@ async function handleDeleteResearchRecord(recordId) {
         )}
 
         {profile?.role === "teacher" && (
-          <TeacherPage session={session} />
+          <TeacherPage key={session.user.id} session={session} />
         )}
 
         {(message || authMessage) && <p style={styles.message}>{message || authMessage}</p>}
