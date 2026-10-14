@@ -1,3 +1,4 @@
+import PickerAccountBar from "./PickerAccountBar";
 import { readAssignmentDraft, writeAssignmentDraft, clearAssignmentDraft, assignmentDeliveryKey } from "../lib/assignmentDraft";
 import { useEffect, useRef, useState } from "react";
 import { useGoogleDrive } from "../hooks/useGoogleDrive";
@@ -66,6 +67,7 @@ export default function AssignmentComposer({ session, isSubmitting, onBusyChange
     } finally { busy.current = false; onBusyChange(false); setShareProgress(""); }
   }
   return <form className="assignment-composer" onSubmit={submit}>
+    <PickerAccountBar open={drive.isPickerOpen} email={drive.driveAccountEmail} onSwitch={drive.switchPickerAccount} onClose={drive.closeGooglePicker} />
     <p className="assignment-draft-status" role="status" style={{color: saved === false ? "#a35454" : "#7b847d", fontSize: "12px", margin: 0}}>
       {saved === false ? "임시 저장을 사용할 수 없습니다. 현재 화면에서 작성을 마쳐 주세요." : "이 기기에 자동 저장 · 같은 계정으로 30일 동안 이어서 작성할 수 있습니다."}
     </p>

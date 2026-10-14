@@ -24,10 +24,11 @@ test("attachment account survives merge and draft restore; account changes stop 
 });
 test("refresh hints the previous account while explicit reconnect allows choosing another", async () => {
   for (const selectAccount of [false,true]) {
-    let config;
+    let config,request;
     const promise=requestDriveAccessToken({clientId:"client",loginHint:"a@example.com",selectAccount,
-      oauth2:{initTokenClient(value){config=value;return {requestAccessToken(){value.callback({access_token:"test-token"});}};}}});
+      oauth2:{initTokenClient(value){config=value;return {requestAccessToken(options){request=options;value.callback({access_token:"test-token"});}};}}});
     await promise;
     assert.equal(config.login_hint,selectAccount ? undefined : "a@example.com");
+    assert.equal(request.prompt,selectAccount ? "select_account":"");
   }
 });

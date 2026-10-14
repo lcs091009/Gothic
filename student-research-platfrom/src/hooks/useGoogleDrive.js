@@ -15,6 +15,14 @@ export function useGoogleDrive({ setMessage, userId, multiple = false, initialAt
   const [driveFileName, setDriveFileName] = useState(attachments[0]?.name || "");
   const [driveFileUrl, setDriveFileUrl] = useState(attachments[0]?.url || "");
   const [isPickerLoading, setIsPickerLoading] = useState(false);
+  const [isPickerOpen,setIsPickerOpen]=useState(false);
+  const [driveAccountEmail,setDriveAccountEmail]=useState("");
+  const pickerRef=useRef(null),pickerVersion=useRef(0),lastPickerOptions=useRef({});
+  const closeGooglePicker=useCallback(()=>{
+    ++pickerVersion.current;
+    pickerRef.current?.setVisible(false);pickerRef.current=null;
+    setIsPickerOpen(false);setIsPickerLoading(false);
+  },[]);
   const [isGoogleAuthLoading, setIsGoogleAuthLoading] = useState(false);
   const [isUploadDragging, setIsUploadDragging] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
@@ -31,6 +39,7 @@ export function useGoogleDrive({ setMessage, userId, multiple = false, initialAt
   const driveAccount = useRef(null);
   const identityToken = useRef("");
   const clearDriveSession = useCallback(({ keepAttachments = false } = {}) => {
+    closeGooglePicker();setDriveAccountEmail("");
     fileOperation.current?.abort();
     sharedRecipients.current.clear();
     googleAccessTokenRef.current = "";
@@ -45,14 +54,14 @@ export function useGoogleDrive({ setMessage, userId, multiple = false, initialAt
       attachmentsRef.current = []; setAttachments([]);
       setDriveFileId(""); setDriveFileName(""); setDriveFileUrl("");
     }
-  }, []);
+  }, [closeGooglePicker]);
   useEffect(() => {
     mounted.current = true;
     if (import.meta.env.VITE_GOOGLE_CLIENT_ID) loadScript("https://accounts.google.com/gsi/client").catch(() => {});
     if (userId && window.sessionStorage.getItem("googleDriveUserId") && (window.sessionStorage.getItem("googleDriveUserId") !== userId || window.sessionStorage.getItem("googleDriveClientId") !== import.meta.env.VITE_GOOGLE_CLIENT_ID)) clearDriveSession({ keepAttachments: attachmentOwner.current === userId });
     attachmentOwner.current = userId;
-    return () => { mounted.current = false; fileOperation.current?.abort(); googleAccessTokenRef.current = ""; googleAuthRequestRef.current?.abort(); };
-  }, [userId, clearDriveSession]);
+    return () => { mounted.current = false;closeGooglePicker();fileOperation.current?.abort(); googleAccessTokenRef.current = ""; googleAuthRequestRef.current?.abort(); };
+  }, [userId, clearDriveSession,closeGooglePicker]);
 
 function loadScript(src) {
   if ((src.includes("apis.google.com") && window.gapi) || (src.includes("accounts.google.com") && window.google?.accounts?.oauth2)) return Promise.resolve();
@@ -122,6 +131,7 @@ async function getGoogleAccessToken({ forceConsent = false, selectAccount = fals
       if (!mounted.current || userId !== currentUserRef.current) throw new Error("계정이 변경되었습니다.");
       identityToken.current = googleAccessTokenRef.current;
     }
+    setDriveAccountEmail(driveAccount.current?.email || "");
     return googleAccessTokenRef.current;
   }
 
@@ -151,6 +161,7 @@ async function getGoogleAccessToken({ forceConsent = false, selectAccount = fals
     const account = await getDriveAccount(accessToken, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]) });
     if (!mounted.current || owner !== currentUserRef.current) throw new Error("계정이 변경되었습니다. 다시 선택해 주세요.");
     driveAccount.current = account; identityToken.current = accessToken;
+    setDriveAccountEmail(account.email);
     const expiresAt = Date.now() + Number(tokenResponse.expires_in || 3600) * 1000;
     googleAccessTokenRef.current = accessToken;
     googleTokenExpiresAtRef.current = expiresAt;
@@ -175,7 +186,10 @@ function removeAttachment(id) {
   attachmentsRef.current = next; setAttachments(next);
   const first = next[0]; setDriveFileId(first?.id || ""); setDriveFileName(first?.name || ""); setDriveFileUrl(first?.url || "");
 }
-async function openGooglePicker({ uploadFirst = false } = {}) {
+async function openGooglePicker({ uploadFirst = false, selectAccount = false } = {}) {
+  closeGooglePicker();
+  const version=pickerVersion.current;
+  lastPickerOptions.current={uploadFirst};
   const googleApiKey = import.meta.env.VITE_GOOGLE_API_KEY;
   const googleAppId = import.meta.env.VITE_GOOGLE_APP_ID;
   const configError = getGooglePickerConfigError({ googleApiKey, googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID, googleAppId });
@@ -190,9 +204,10 @@ async function openGooglePicker({ uploadFirst = false } = {}) {
   setIsPickerLoading(false);
 
   try {
-    const accessToken = await getGoogleAccessToken();
+    const accessToken = await getGoogleAccessToken({selectAccount});
     const pickerAccount = driveAccount.current;
     await loadGooglePickerLibraries();
+    if(!mounted.current || version!==pickerVersion.current || userId!==currentUserRef.current) return;
 
     setIsGoogleAuthLoading(false);
     setIsPickerLoading(true);
@@ -210,7 +225,7 @@ async function openGooglePicker({ uploadFirst = false } = {}) {
       .addView(uploadFirst ? uploadView : docsView)
       .addView(uploadFirst ? docsView : uploadView)
       .setCallback(async (data) => {
-        if (!mounted.current || userId !== currentUserRef.current) return;
+        if (!mounted.current || userId !== currentUserRef.current || version!==pickerVersion.current) return;
         if (data.action === window.google.picker.Action.PICKED) {
           try {
             const files = (data.docs || []).map(file => ({ id: file.id, name: file.name || file.title, url: file.url, accountId: pickerAccount.id }));
@@ -218,10 +233,10 @@ async function openGooglePicker({ uploadFirst = false } = {}) {
             setMessage("선택한 파일의 접근 권한을 확인하고 있습니다…");
             const controller = new AbortController(); fileOperation.current = controller;
             await validatePickedFiles(files, accessToken, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]) });
-            if (!mounted.current || userId !== currentUserRef.current) return;
+            if (!mounted.current || userId !== currentUserRef.current || version!==pickerVersion.current) return;
             appendFiles(files);
             setMessage(`${attachmentsRef.current.length}개 파일을 첨부했습니다.`);
-          } catch (error) { if (mounted.current && userId === currentUserRef.current) setMessage(error.name === "AbortError" ? "파일 접근 확인을 완료하지 못했습니다. 다시 선택해 주세요." : error.message); }
+          } catch (error) { if (mounted.current && userId === currentUserRef.current && version===pickerVersion.current) setMessage(error.name === "AbortError" ? "파일 접근 확인을 완료하지 못했습니다. 다시 선택해 주세요." : error.message); }
 
         }
 
@@ -229,6 +244,8 @@ async function openGooglePicker({ uploadFirst = false } = {}) {
           data.action === window.google.picker.Action.PICKED ||
           data.action === window.google.picker.Action.CANCEL
         ) {
+          if(version!==pickerVersion.current) return;
+          closeGooglePicker();
           setIsGoogleAuthLoading(false);
           setIsPickerLoading(false);
 
@@ -243,6 +260,8 @@ async function openGooglePicker({ uploadFirst = false } = {}) {
       ;
     if (multiple) builder.enableFeature(window.google.picker.Feature.MULTISELECT_ENABLED);
     const picker = builder.build();
+    pickerRef.current=picker;
+    setIsPickerOpen(true);
     picker.setVisible(true);
 
     window.requestAnimationFrame(() => {
@@ -253,6 +272,7 @@ async function openGooglePicker({ uploadFirst = false } = {}) {
     });
 
   } catch (error) {
+    if(!mounted.current || version!==pickerVersion.current) return;
     setMessage(error.message || "Google Picker를 여는 중 오류가 발생했습니다.");
     setIsGoogleAuthLoading(false);
     setIsPickerLoading(false);
@@ -334,6 +354,10 @@ async function reconnectGoogleDrive() {
   finally { setIsGoogleAuthLoading(false); }
 }
 
+function switchPickerAccount() {
+  return openGooglePicker({...lastPickerOptions.current,selectAccount:true});
+}
+
 function handleUploadDragOver(event) {
   event.preventDefault();
   setIsUploadDragging(true);
@@ -364,5 +388,5 @@ function handleUploadDrop(event) {
 }
 
 
-  return { driveFileId, driveFileName, driveFileUrl, isPickerLoading, isGoogleAuthLoading, isUploadDragging, isUploadingFile, setDriveFileId, setDriveFileName, setDriveFileUrl, openGooglePicker, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, clearDriveSession, uploadLocalFile: uploadDroppedFileToGoogleDrive, shareSelectedFile, attachments, removeAttachment, reconnectGoogleDrive, fileProgress, cancelUpload: () => fileOperation.current?.abort() };
+  return { driveFileId, driveFileName, driveFileUrl, isPickerLoading, isPickerOpen,driveAccountEmail,switchPickerAccount,closeGooglePicker,isGoogleAuthLoading, isUploadDragging, isUploadingFile, setDriveFileId, setDriveFileName, setDriveFileUrl, openGooglePicker, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, clearDriveSession, uploadLocalFile: uploadDroppedFileToGoogleDrive, shareSelectedFile, attachments, removeAttachment, reconnectGoogleDrive, fileProgress, cancelUpload: () => fileOperation.current?.abort() };
 }
