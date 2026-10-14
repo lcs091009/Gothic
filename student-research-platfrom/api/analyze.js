@@ -3,10 +3,12 @@ import { createClient } from "@supabase/supabase-js";
 import { buildAnalysisContext, RECORD_SCAN_LIMIT, SYSTEM_PROMPT } from "../server/analysisContext.js";
 import { MAX_ANALYSIS_FILES, MAX_ANALYSIS_MATERIALS, selectTeacherMaterials } from "../src/lib/analysisMaterials.js";
 import { EXPLORATION_MARKER, CHOICE_FORMAT, validExplorationPath, explorationPrompt, parseExploration, readableReferences } from "../server/exploration.js";
+import {ANALYSIS_TIMEOUT_MS,withinAnalysisDeadline} from "../server/analysisDeadline.js";
 
 export const MAX_BODY_BYTES = 16_384;
 export const AI_MODEL = "nvidia/nemotron-3-super-120b-a12b";
 export const AI_FALLBACK_MODEL = "nvidia/nemotron-3-nano-30b-a3b";
+export const AI_OUTPUT_TOKENS=6400;
 
 export function providerFailure(status) {
   if (status === 401 || status === 403) return {
@@ -40,7 +42,7 @@ export function providerFailure(status) {
 }
 
 export function createAnalyzeHandler({ env = process.env, fetchImpl = fetch, clientFactory = createClient,
-  logger = console } = {}) {
+  logger = console, timeoutMs=ANALYSIS_TIMEOUT_MS } = {}) {
 return async function handler(request, response) {
   response.setHeader("Cache-Control", "no-store");
   if (request.method !== "POST") {
@@ -62,19 +64,22 @@ return async function handler(request, response) {
   }
 
   let timeoutId;
+  const controller=new AbortController();
+  const run=operation=>withinAnalysisDeadline(operation,controller.signal);
   try {
+    timeoutId=setTimeout(()=>controller.abort(),timeoutMs);
     const token = match[1];
     const client = clientFactory(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
+      global: { headers: { Authorization: `Bearer ${token}` },fetch:(url,options={})=>fetch(url,{...options,signal:options.signal ? AbortSignal.any([options.signal,controller.signal]):controller.signal}) },
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     });
-    const { data: authData, error: authError } = await client.auth.getUser(token);
+    const { data: authData, error: authError } = await run(()=>client.auth.getUser(token));
     const user = authData?.user;
     if (authError || !user?.id || !user.email || !user.email_confirmed_at) {
       return response.status(401).json({ error: "로그인이 만료되었거나 이메일 확인이 필요합니다. 다시 로그인해 주세요." });
     }
-    const { data: profile, error: profileError } = await client.from("profiles")
-      .select("role").eq("id", user.id).maybeSingle();
+    const { data: profile, error: profileError } = await run(()=>client.from("profiles")
+      .select("role").eq("id", user.id).maybeSingle());
     if (profileError) return response.status(503).json({ error: "사용자 권한을 확인할 수 없습니다." });
     if (profile?.role !== "student") return response.status(403).json({ error: "승인된 학생 계정만 분석할 수 있습니다." });
 
@@ -112,11 +117,11 @@ return async function handler(request, response) {
     if (materialIds?.length) teacherQuery = teacherQuery.in("id",materialIds);
     if (selectedRecordIds !== undefined) recordQuery = recordQuery.in("id", selectedRecordIds);
     // Resolve selection IDs using the authenticated owner and RLS; never accept browser record contents.
-    const [academicResult, recordResult, teacherResult] = await Promise.all([
+    const [academicResult, recordResult, teacherResult] = await run(()=>Promise.all([
       client.from("student_academic_profiles").select("*").eq("user_id", user.id).maybeSingle(),
       recordQuery.order("created_at", { ascending: false }).limit(RECORD_SCAN_LIMIT),
       materialIds?.length === 0 ? Promise.resolve({data:[],error:null}) : teacherQuery.order("created_at", { ascending: false }).limit(8),
-    ]);
+    ]));
     if (academicResult.error || recordResult.error || teacherResult.error) {
       return response.status(503).json({ error: "저장된 활동 자료를 불러오지 못했습니다." });
     }
@@ -136,7 +141,7 @@ return async function handler(request, response) {
       return response.status(400).json({ error: "선택한 활동을 확인할 수 없습니다. 기록을 새로 불러온 뒤 다시 선택해 주세요." });
     }
     if (!records.length) return response.status(400).json({ error: "분석할 활동 기록을 먼저 등록해 주세요." });
-    const { data: quota, error: quotaError } = await client.rpc("consume_ai_analysis_quota");
+    const { data: quota, error: quotaError } = await run(()=>client.rpc("consume_ai_analysis_quota"));
     // Fail closed if the distributed quota function is missing or unavailable.
     if (quotaError || !quota || typeof quota.allowed !== "boolean") {
       return response.status(503).json({ error: "요청 제한 설정을 확인할 수 없습니다. 관리자에게 문의해 주세요." });
@@ -151,13 +156,10 @@ return async function handler(request, response) {
     );
     scope.teacherAttachments = teacherSharedFiles.reduce((sum,material)=>sum+(material.attachments?.length || (material.file_id ? 1 : 0)),0);
 
-    const controller = new AbortController();
-    timeoutId = setTimeout(() => controller.abort(), 45000);
-
     let nvidiaResponse, nvidiaRawText, usedModel;
     for (const model of [AI_MODEL, AI_FALLBACK_MODEL]) {
       usedModel = model;
-      nvidiaResponse = await fetchImpl(
+      nvidiaResponse = await run(()=>fetchImpl(
         "https://integrate.api.nvidia.com/v1/chat/completions",
         {
           method: "POST",
@@ -174,15 +176,15 @@ return async function handler(request, response) {
               { role: "user", content: userPrompt + (explorationPath !== undefined ? `\n학생이 선택한 질문 경로(수행 결과가 아님): ${JSON.stringify(explorationPath)}` : "") },
             ],
             temperature: 0.6,
-            max_tokens: 4200,
+            max_tokens: explorationPath !== undefined ? 4200 : AI_OUTPUT_TOKENS,
             stream: false,
             ...(model === AI_MODEL
               ? { reasoning_effort: "none" }
               : { chat_template_kwargs: { enable_thinking: false } }),
           }),
         }
-      );
-      nvidiaRawText = await nvidiaResponse.text();
+      ));
+      nvidiaRawText = await run(()=>nvidiaResponse.text());
       // A retired model cannot generate an answer: try the bounded alternative
       // only for 410, sharing the original deadline and student quota charge.
       if (nvidiaResponse.status !== 410 || model === AI_FALLBACK_MODEL) break;
@@ -190,7 +192,6 @@ return async function handler(request, response) {
         code: "AI_PROVIDER_MODEL_RETIRED", providerStatus: 410, model,
       });
     }
-    clearTimeout(timeoutId);
 
     // Only log our fixed error code and HTTP status: never response bodies,
     // keys, tokens, student records, or untrusted provider error messages.
@@ -239,7 +240,7 @@ return async function handler(request, response) {
     if (error.name === "AbortError") {
       return response.status(504).json({
         error:
-          "NVIDIA AI 응답 시간이 너무 오래 걸립니다. 잠시 후 다시 시도하거나 입력 내용을 조금 줄여 주세요.",
+          "2분 이내에 AI 분석을 완료하지 못했습니다. 선택한 기록은 유지됩니다. 잠시 후 다시 시도해 주세요.",
       });
     }
 

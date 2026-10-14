@@ -15,6 +15,7 @@ export default function ExplorationPage({seed,records,files,extraContext,onBack}
     const controller=new AbortController();pending.current=controller;
     if(append) setSteps(previous=>[...previous,{path,result:null}]);
     setLoading(true);setError("");setQuestion("");
+    const timeout=setTimeout(()=>{if(pending.current===controller){controller.abort();pending.current=null;setLoading(false);setError("2분 이내에 심화 질문을 받지 못했습니다. 선택 경로는 유지됩니다. 다시 시도해 주세요.");}},120_000);
     try {
       const {data,error:authError}=await supabase.auth.getSession();
       if(controller.signal.aborted) return;
@@ -26,7 +27,7 @@ export default function ExplorationPage({seed,records,files,extraContext,onBack}
       if(!response.ok || !dataResult.exploration) throw new Error(dataResult.error || "심화 질문을 받지 못했습니다. 다시 시도해 주세요.");
       setSteps(previous=>previous.map((item,index)=>index===previous.length-1 ? {...item,result:dataResult.exploration,warning:dataResult.warning}:item));
     } catch(e) {if(!controller.signal.aborted) setError(e.name==="SyntaxError" ? "분석 서비스에 연결하지 못했습니다. 다시 시도해 주세요.":e.message);}
-    finally {if(pending.current===controller) {pending.current=null;setLoading(false);}}
+    finally {clearTimeout(timeout);if(pending.current===controller) {pending.current=null;setLoading(false);}}
   }
   function back() {
     pending.current?.abort();pending.current=null;setLoading(false);setError("");setQuestion("");
