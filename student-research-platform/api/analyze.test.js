@@ -339,3 +339,22 @@ test("invalid subjects are rejected before quota or provider calls",async()=>{
   }
   const f=fixture();assert.equal((await f.call({body:{explorationSubject:"화학"}})).code,400);assert.equal(f.quotaCalls,0);
 });
+
+test("recoverable exploration replies use one provider call and keep the explanation",async()=>{
+  for(const reply of [
+    `설명입니다.\n\`\`\`json\n${JSON.stringify({...explorationReply,intro:"설명".repeat(700)})}\n\`\`\``,
+    JSON.stringify({intro:"활동의 온도 선택과 구조의 연결 [R1]",choices:[{question:"내 온도 선택의 의미는?",connection:"온도 기록과 연결"}]}),
+    JSON.stringify({intro:"활동과 개념의 연결 [R1]",choices:[]})]) {
+    const f=fixture({raw:JSON.stringify({choices:[{message:{content:reply},finish_reason:"stop"}]})});
+    const result=await f.call({body:{explorationPath:[],explorationSubject:"생명과학"}});
+    assert.equal(result.code,200);assert.ok(result.body.exploration.intro);assert.equal(f.providerCalls.length,1);assert.equal(f.quotaCalls,1);
+    if(!result.body.exploration.choices.length) assert.match(result.body.warning,/직접 입력/);
+  }
+});
+test("truncated malformed exploration returns a distinct error without logging private contents",async()=>{
+  const content='{"intro":"PRIVATE-STUDENT-TEXT","choices":[';
+  const f=fixture({raw:JSON.stringify({choices:[{message:{content},finish_reason:"length"}]})});
+  const result=await f.call({body:{explorationPath:[]}});
+  assert.equal(result.code,502);assert.equal(result.body.code,"AI_EXPLORATION_FORMAT");assert.match(result.body.error,/잘렸습니다/);
+  assert.doesNotMatch(JSON.stringify(f.logs),/PRIVATE-STUDENT-TEXT/);assert.equal(f.providerCalls.length,1);
+});
