@@ -121,7 +121,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
   const selectedChoices = academicProfile?.selected_choices || {};
 
   if (workspace) return <AnalysisWorkspace analysis={analysis} loading={isAnalyzing} message={message} scope={scope} warning={warning}
-    exploration={exploration} extraContext={resultInputs?.extraContext || ""}
+    academicProfile={academicProfile} exploration={exploration} extraContext={resultInputs?.extraContext || ""}
     records={resultInputs?.records || []} files={resultInputs?.files || []}
     onBack={()=>{requestRef.current?.abort(); requestRef.current=null; setIsAnalyzing(false); setWorkspace(false); setMessage("");}}
     onRetry={handleAnalyze} />;

@@ -3,7 +3,7 @@ import { analysisSections } from "../lib/analysisSections";
 import "./AnalysisWorkspace.css";
 import ExplorationPage from "./ExplorationPage";
 
-export default function AnalysisWorkspace({analysis,loading,message,scope,warning,records,files,onBack,onRetry,exploration,extraContext}) {
+export default function AnalysisWorkspace({analysis,loading,message,scope,warning,records,files,onBack,onRetry,exploration,extraContext,academicProfile}) {
   const [active,setActive]=useState(0);
   const [exploring,setExploring]=useState(false);
   const heading=useRef(null);
@@ -13,14 +13,14 @@ export default function AnalysisWorkspace({analysis,loading,message,scope,warnin
   const sections=analysisSections(analysis);
   const subjects=new Map();
   for(const record of records) { const name=record.subject || "과목 미입력";subjects.set(name,(subjects.get(name)||0)+1); }
-  if(exploring) return <ExplorationPage seed={exploration} records={records} files={files} extraContext={extraContext} onBack={()=>setExploring(false)} />;
+  if(exploring) return <ExplorationPage academicProfile={academicProfile} seed={exploration} records={records} files={files} extraContext={extraContext} onBack={()=>setExploring(false)} />;
   return <section className="analysis-workspace">
     <aside className="analysis-workspace-nav">
       <button type="button" onClick={onBack}>← 자료 선택</button>
       <p className="student-eyebrow">나의 탐구 연결</p><h2 ref={heading} tabIndex={-1}>분석 작업실</h2>
       <nav aria-label="분석 항목">{sections.map((section,index)=><button key={section.number} type="button" disabled={loading || !analysis}
         aria-pressed={active===index} onClick={()=>setActive(index)}><span>{String(section.number).padStart(2,"0")}</span>{section.title}</button>)}</nav>
-      <button className="exploration-entry" type="button" disabled={loading || !analysis} onClick={()=>setExploring(true)}>탐구 주제 고르기 →</button>
+      <button className="exploration-entry" type="button" disabled={loading || !analysis} onClick={()=>setExploring(true)}>과목별 심화탐구 →</button>
       <p className="workspace-caption">선택한 기록 {records.length}개<br />선생님 첨부 {files.length}개</p>
     </aside>
     <div className="analysis-workspace-main">
