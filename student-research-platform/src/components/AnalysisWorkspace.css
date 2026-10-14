@@ -69,3 +69,15 @@
 .exploration-workspace h3 { overflow-wrap:anywhere; }
 .exploration-workspace aside ol { padding-left:20px; font-size:13px; line-height:1.8; overflow-wrap:anywhere; }
 .exploration-workspace aside summary { cursor:pointer; }
+
+.exploration-subject-picker { margin:0 0 24px; padding:18px; border:1px solid #dfe7df; border-radius:20px; background:#f5f8f3; }
+.exploration-subject-picker summary { cursor:pointer; line-height:1.8; }
+.exploration-subject-picker summary strong { margin-left:10px; color:#355c50; }
+.exploration-subject-picker summary small { color:#718375; }
+.exploration-subject-options { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+.exploration-subject-options button[aria-pressed=true] { color:white; background:#52735e; border-color:#52735e; }
+.exploration-subject-custom { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:16px; }
+.exploration-subject-custom label { font-size:13px; }
+.exploration-subject-custom input { flex:1; min-width:120px; padding:11px 14px; border:1px solid #d8e3d8; border-radius:14px; font:inherit; color:#293e31; background:white; }
+.exploration-subject-custom input:focus-visible { outline:3px solid #648675; outline-offset:3px; }
+.exploration-subject-picker .workspace-caption { margin:12px 0 0; }

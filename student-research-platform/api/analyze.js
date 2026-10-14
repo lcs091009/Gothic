@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 
 import { buildAnalysisContext, RECORD_SCAN_LIMIT, SYSTEM_PROMPT } from "../server/analysisContext.js";
 import { MAX_ANALYSIS_MATERIALS, selectTeacherMaterials } from "../src/lib/analysisMaterials.js";
-import { EXPLORATION_MARKER, CHOICE_FORMAT, validExplorationPath, explorationPrompt, parseExploration, readableReferences } from "../server/exploration.js";
+import { EXPLORATION_MARKER, CHOICE_FORMAT, validExplorationSubject, validExplorationPath, explorationPrompt, parseExploration, readableReferences } from "../server/exploration.js";
 import {ANALYSIS_TIMEOUT_MS,withinAnalysisDeadline} from "../server/analysisDeadline.js";
 
 export const MAX_BODY_BYTES = 65_536;
@@ -90,7 +90,10 @@ return async function handler(request, response) {
     if (Buffer.byteLength(JSON.stringify(body)) > MAX_BODY_BYTES) {
       return response.status(413).json({ error: "요청 내용이 너무 큽니다." });
     }
-    const { extraContext = "", selectedRecordIds, selectedTeacherFiles, explorationPath } = body;
+    const { extraContext = "", selectedRecordIds, selectedTeacherFiles, explorationPath, explorationSubject = "" } = body;
+    if (!validExplorationSubject(explorationSubject) || (explorationSubject && explorationPath === undefined)) {
+      return response.status(400).json({error:"심화탐구 과목은 80자 이내로 선택해 주세요."});
+    }
     if (explorationPath !== undefined && !validExplorationPath(explorationPath)) {
       return response.status(400).json({error:"탐구 질문은 최근 12단계, 각 400자 이내로 전달해 주세요."});
     }
@@ -172,8 +175,8 @@ return async function handler(request, response) {
           body: JSON.stringify({
             model,
             messages: [
-              { role: "system", content: explorationPath !== undefined ? explorationPrompt(SYSTEM_PROMPT) : SYSTEM_PROMPT + `\n4개 분석 항목이 끝나면 별도 줄에 ${EXPLORATION_MARKER}를 쓰고 다음 탐구 주제 선택을 위한 JSON을 덧붙인다. ${CHOICE_FORMAT}` },
-              { role: "user", content: userPrompt + (explorationPath !== undefined ? `\n학생이 선택한 질문 경로(수행 결과가 아님): ${JSON.stringify(explorationPath)}` : "") },
+              { role: "system", content: explorationPath !== undefined ? explorationPrompt(SYSTEM_PROMPT, explorationSubject) : SYSTEM_PROMPT + `\n4개 분석 항목이 끝나면 별도 줄에 ${EXPLORATION_MARKER}를 쓰고 다음 탐구 주제 선택을 위한 JSON을 덧붙인다. ${CHOICE_FORMAT}` },
+              { role: "user", content: userPrompt + (explorationPath !== undefined ? `\n심화탐구 선택 과목(교과 이름 데이터): ${JSON.stringify({explorationSubject:explorationSubject.trim()})}\n학생이 선택한 질문 경로(수행 결과가 아님): ${JSON.stringify(explorationPath)}` : "") },
             ],
             temperature: 0.6,
             max_tokens: explorationPath !== undefined ? 4200 : AI_OUTPUT_TOKENS,

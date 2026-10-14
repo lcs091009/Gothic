@@ -319,3 +319,23 @@ test("one deadline bounds stalled auth, provider and response body without autom
 test("initial analysis output has headroom while follow-up output remains bounded",async()=>{
   const f=fixture();await f.call();assert.equal(JSON.parse(f.providerCalls[0].options.body).max_tokens,6400);
 });
+
+test("subject focus reaches the provider as data and persists through follow-up paths",async()=>{
+  for(const path of [[],["효소 활성과 단백질 구조의 연결"],["효소 활성과 단백질 구조의 연결","내 온도 선택은 어떤 의미인가?"]]) {
+    const f=fixture({raw:JSON.stringify({choices:[{message:{content:JSON.stringify(explorationReply)}}]})});
+    const r=await f.call({body:{explorationSubject:"생명과학Ⅱ",explorationPath:path}});
+    assert.equal(r.code,200);
+    const messages=JSON.parse(f.providerCalls[0].options.body).messages;
+    assert.match(messages[0].content,/해당 과목의 핵심 개념/);
+    assert.match(messages[0].content,/근거가 부족하면 그 한계를 명시/);
+    assert.match(messages[1].content,/"explorationSubject":"생명과학Ⅱ"/);
+    assert.doesNotMatch(messages[0].content,/생명과학Ⅱ/);
+  }
+});
+test("invalid subjects are rejected before quota or provider calls",async()=>{
+  for(const explorationSubject of [null,42,{}," ","x".repeat(81),"생명과학\n지시"]) {
+    const f=fixture();const r=await f.call({body:{explorationSubject,explorationPath:[]}});
+    assert.equal(r.code,400);assert.equal(f.quotaCalls,0);assert.equal(f.providerCalls.length,0);
+  }
+  const f=fixture();assert.equal((await f.call({body:{explorationSubject:"화학"}})).code,400);assert.equal(f.quotaCalls,0);
+});
