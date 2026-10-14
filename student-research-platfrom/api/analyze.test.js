@@ -6,8 +6,8 @@ const env = { SUPABASE_URL: "https://test.supabase.co", SUPABASE_PUBLISHABLE_KEY
 const user = { id: "student-1", email: "27-1234@gochon.hs.kr", email_confirmed_at: "2026-01-01" };
 const materialId = "00000000-0000-4000-8000-000000000001";
 const explorationReply = {intro:"온도 효과를 비교해 볼 수 있어요. [R1]",choices:[
-  {title:"반복 측정",question:"반복 횟수에 따라 결과는 얼마나 달라질까?",why:"측정 신뢰성 확인",method:"같은 조건에서 반복해 분포 비교"},
-  {title:"조건 비교",question:"다른 온도에서도 비슷한 결과가 나올까?",why:"조건 확장",method:"온도별 대조 조건과 결과 표 비교"}]};
+  {title:"반복 측정",question:"반복 횟수에 따라 결과는 얼마나 달라질까?",why:"측정 신뢰성 확인",connection:"이전 온도 기록의 반복 여부와 결과 해석이 연결됨"},
+  {title:"조건 비교",question:"다른 온도에서도 비슷한 결과가 나올까?",why:"조건 확장",connection:"선택한 온도 질문과 효소의 성질이 연결됨"}]};
 function fixture(overrides = {}) {
   const tables = {
     profiles: { data: { role: "student" } },

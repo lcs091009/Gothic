@@ -55,6 +55,7 @@
 @media(prefers-reduced-motion:reduce) { .analysis-workspace button { transition:none; transform:none!important; }.analysis-skeleton { animation:none; } }
 
 .exploration-choices { display:grid; gap:14px; }
+.exploration-loading{background:#f5f8f3}.exploration-loading-heading{display:flex;gap:12px;align-items:center;color:#355c50}.exploration-loading p{color:#718375;font-size:13px}.exploration-loading-footer{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-top:24px;font-size:12px;color:#718375}
 .analysis-workspace .exploration-entry { width:100%; margin-top:16px; background:#edf4ec; font-weight:600; }
 .exploration-choices > button { display:grid; gap:12px; padding:22px; text-align:left; border-radius:20px; }
 .exploration-choices strong { font-size:20px; color:#293e31; }
