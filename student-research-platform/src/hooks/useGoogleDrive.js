@@ -1,4 +1,5 @@
-import { uploadDriveFile, shareDriveFileWithTokenRefresh, mergeDriveAttachments, validatePickedFiles, MAX_DRIVE_ATTACHMENTS } from "../lib/googleDriveFiles";
+import {assertAttachmentCapacity} from "../lib/attachmentCapacity";
+import { uploadDriveFile, shareDriveFileWithTokenRefresh, mergeDriveAttachments, validatePickedFiles } from "../lib/googleDriveFiles";
 const scriptRequests = new Map();
 import { requestDriveAccessToken } from "../lib/googleDriveAuth";
 import { getGooglePickerConfigError } from "../lib/googlePickerConfig";
@@ -232,7 +233,7 @@ async function openGooglePicker({ uploadFirst = false, selectAccount = false } =
             mergeDriveAttachments(multiple ? attachmentsRef.current : [], files);
             setMessage("선택한 파일의 접근 권한을 확인하고 있습니다…");
             const controller = new AbortController(); fileOperation.current = controller;
-            await validatePickedFiles(files, accessToken, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]) });
+            await validatePickedFiles(files, accessToken, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(120_000)]) });
             if (!mounted.current || userId !== currentUserRef.current || version!==pickerVersion.current) return;
             appendFiles(files);
             setMessage(`${attachmentsRef.current.length}개 파일을 첨부했습니다.`);
@@ -290,7 +291,7 @@ async function uploadDroppedFileToGoogleDrive(input) {
   const files = Array.isArray(input) ? input : [input];
   const selected = multiple ? files.filter(Boolean) : files.filter(Boolean).slice(0, 1);
   if (!selected.length || uploadLock.current) return;
-  if (multiple && attachmentsRef.current.length + selected.length > MAX_DRIVE_ATTACHMENTS) { setMessage(`파일은 최대 ${MAX_DRIVE_ATTACHMENTS}개까지 첨부할 수 있습니다.`); return; }
+  try {assertAttachmentCapacity([...(multiple ? attachmentsRef.current:[]),...selected]);}catch(error){setMessage(error.message);return;}
   uploadLock.current = true;
   setMessage(""); setIsUploadingFile(true);
   const owner = userId;
@@ -299,6 +300,11 @@ async function uploadDroppedFileToGoogleDrive(input) {
     const accessToken = await getGoogleAccessToken();
     const uploadAccount = driveAccount.current;
     if (!mounted.current || owner !== currentUserRef.current) throw new Error("계정이 변경되었습니다.");
+    if(multiple && attachmentsRef.current.length) {
+      assertDriveAccount(uploadAccount,attachmentsRef.current);
+      await validatePickedFiles(attachmentsRef.current,accessToken,{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(120_000)])});
+      assertAttachmentCapacity([...attachmentsRef.current,...selected]);
+    }
     for (const [index, file] of selected.entries()) {
       setFileProgress(`${index + 1}/${selected.length} · ${file.name}`);
       const result = await uploadDriveFile(file, accessToken, { signal: controller.signal,
@@ -322,6 +328,8 @@ async function shareSelectedFile(emails, onProgress) {
 
   const timeout = setTimeout(() => controller.abort(), 600_000);
   try {
+    await validatePickedFiles(files,token,{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(120_000)])});
+    assertAttachmentCapacity(files);
     for (const [index, file] of files.entries()) {
       if (!sharedRecipients.current.has(file.id)) sharedRecipients.current.set(file.id, new Set());
       const options = { signal: controller.signal, completed: sharedRecipients.current.get(file.id),

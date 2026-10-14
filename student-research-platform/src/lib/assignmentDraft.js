@@ -10,7 +10,7 @@ export function cleanAssignmentDraft(value) {
     id: text(s.id, 100), email: text(s.email, 254), name: text(s.name, 100), student_number: text(s.student_number, 20),
     directory_grade: Number.isInteger(s.directory_grade) ? s.directory_grade : null, directory_class: Number.isInteger(s.directory_class) ? s.directory_class : null, directory_number: Number.isInteger(s.directory_number) ? s.directory_number : null,
   })) : [];
-  const attachments = Array.isArray(source.attachments) ? source.attachments.slice(0, 20).filter(f => f && /^[\w-]+$/.test(f.id || "") && /^https:\/\//.test(f.url || "")).map(f => ({id:text(f.id, 200),name:text(f.name,255),url:text(f.url,2048), ...(typeof f.accountId === "string" ? {accountId:text(f.accountId,200)} : {})})) : [];
+  const attachments = Array.isArray(source.attachments) ? source.attachments.filter(f => f && /^[\w-]+$/.test(f.id || "") && /^https:\/\//.test(f.url || "")).map(f => ({... (Number.isSafeInteger(f.size) ? {size:f.size}:{}),id:text(f.id, 200),name:text(f.name,255),url:text(f.url,2048), ...(typeof f.accountId === "string" ? {accountId:text(f.accountId,200)} : {})})) : [];
   const delivery = source.delivery && typeof source.delivery.key === "string" && Array.isArray(source.delivery.ids)
     ? { key: text(source.delivery.key, 160000), ids: source.delivery.ids.slice(0,100).map(id => text(id,100)) } : null;
   return { students, attachments, title: text(source.title,160), description:text(source.description,4000),

@@ -42,6 +42,6 @@ test("simulation: picked file 404 fails before attachment success or permission 
 test("simulation: 20-file access checks run with at most four concurrent reads", async () => {
   let running=0,peak=0,calls=0;
   const files=Array.from({length:20},(_,i)=>({id:`file-${i}`}));
-  await validatePickedFiles(files,"token",{fetchImpl:async()=>{running++;peak=Math.max(peak,running);calls++;await Promise.resolve();running--;return {ok:true};}});
+  await validatePickedFiles(files,"token",{fetchImpl:async()=>{running++;peak=Math.max(peak,running);calls++;await Promise.resolve();running--;return {ok:true,json:async()=>({size:"1024"})};}});
   assert.equal(calls,20);assert.equal(peak,4);
 });

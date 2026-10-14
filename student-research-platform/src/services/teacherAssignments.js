@@ -1,3 +1,4 @@
+import {assertAttachmentCapacity} from "../lib/attachmentCapacity.js";
 import { supabase } from "../lib/supabaseClient.js";
 
 export const MAX_ASSIGNMENT_RECIPIENTS = 100;
@@ -13,13 +14,14 @@ export function buildAssignmentRows({ teacher, students, title, description, cat
   }
   const date = dueDate ? new Date(`${dueDate}T00:00:00Z`) : null;
   if (dueDate && (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== dueDate)) throw new Error("제출 기한을 확인해 주세요.");
-  if (!Array.isArray(attachments) || attachments.length > 20) throw new Error("파일은 최대 20개까지 첨부할 수 있습니다.");
+  if (!Array.isArray(attachments)) throw new Error("첨부파일 정보를 확인해 주세요.");
+  assertAttachmentCapacity(attachments);
   const attachmentIds = new Set();
   const savedAttachments = attachments.map(file => {
     let url; try { url = new URL(file.url); } catch { throw new Error("첨부파일 주소를 확인해 주세요."); }
     if (!/^[\w-]+$/.test(file.id || "") || attachmentIds.has(file.id) || !["http:", "https:"].includes(url.protocol) || url.username || url.password) throw new Error("첨부파일 정보를 확인해 주세요.");
     attachmentIds.add(file.id);
-    return { id: file.id, name: String(file.name || "파일").slice(0, 255), url: url.href };
+    return { ...(Number.isSafeInteger(file.size) ? {size:file.size}:{}),id: file.id, name: String(file.name || "파일").slice(0, 255), url: url.href };
   });
   const emails = new Set();
   return students.map(student => {
