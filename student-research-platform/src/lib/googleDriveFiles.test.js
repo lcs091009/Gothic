@@ -54,11 +54,13 @@ test("interrupted uploads query received bytes and continue without restarting t
  }});
  assert.equal(calls,4);assert.equal(resumed.body.size,6);assert.equal(resumed.headers["Content-Range"],"bytes 4-9/10");
 });
-test("multiple attachments deduplicate files, support append and enforce a 20-file cap",()=>{
+test("multiple attachments deduplicate files, support append and support more than twenty files within the total capacity",()=>{
  const first={id:"file1",name:"one",url:"https://drive.google.com/file/d/file1/view"};
  assert.equal(mergeDriveAttachments([first],[first,{id:"file2",name:"two"}]).length,2);
  assert.equal(mergeDriveAttachments([],[{id:"file3"}])[0].url,"https://drive.google.com/file/d/file3/view");
- assert.throws(()=>mergeDriveAttachments([],Array.from({length:21},(_,i)=>({id:`file${i}`}))),/20/);
+ assert.equal(mergeDriveAttachments([],Array.from({length:40},(_,i)=>({id:`file${i}`,size:1024}))).length,40);
+ assert.equal(mergeDriveAttachments([],[{id:"single",size:500*1024*1024}]).length,1);
+ assert.throws(()=>mergeDriveAttachments([],[{id:"first",size:300*1024*1024},{id:"second",size:201*1024*1024}]),/총용량/);
 });
 test("an interrupted first chunk with no received bytes retries within the same session",async()=>{
  const file=Object.assign(new Blob(["1234"]),{name:"file.txt"});let calls=0;

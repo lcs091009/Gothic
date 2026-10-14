@@ -56,6 +56,8 @@ export default function AssignmentComposer({ session, isSubmitting, onBusyChange
         setSaved(writeAssignmentDraft(userId, snapshot.current));
       }
       if (drive.driveFileId) await drive.shareSelectedFile(students.map(student => student.email), (done, total) => setShareProgress(`파일 공유 ${done}/${total}`));
+      let rowIndex=0;
+      pending.current.rows=buildAssignmentRows(draft,()=>delivery.current.ids[rowIndex++]);
       await deliverAssignmentRows(pending.current.rows);
       pending.current = null;
       delivered.current = true;
@@ -103,7 +105,7 @@ export default function AssignmentComposer({ session, isSubmitting, onBusyChange
             <button type="button" disabled={fileBusy} onClick={() => drive.openGooglePicker({ uploadFirst: true })}>컴퓨터 파일 첨부 <span aria-hidden="true">↑</span></button>
             <button type="button" disabled={fileBusy} onClick={drive.openGooglePicker}>Google Drive</button>
           </div>
-          <p>{fileBusy ? drive.fileProgress || "Google 파일 연결 중…" : "여러 파일을 끌어 놓을 수 있습니다. 파일당 500MB · 최대 20개."}</p>
+          <p>{fileBusy ? drive.fileProgress || "Google 파일 연결 중…" : "여러 파일을 끌어 놓을 수 있습니다. 첨부 총용량 500MB · 파일 개수 제한 없음. Google 문서는 크기가 없으면 합산하지 않습니다."}</p>
           {drive.isUploadingFile && <button type="button" onClick={drive.cancelUpload}>업로드 중단</button>}
           {drive.attachments.map(file => <div key={file.id} className="attachment-selected"><span>{file.name}</span><button type="button" disabled={fileBusy} onClick={() => drive.removeAttachment(file.id)} aria-label={`${file.name} 첨부 해제`}>×</button></div>)}
         </div>

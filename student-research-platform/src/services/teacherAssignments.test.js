@@ -60,10 +60,10 @@ test("history groups one batch while keeping distinct deliveries with the same t
 });
 
 test("all validated attachments are stored per recipient, with legacy first-link compatibility",()=>{
- const attachments=Array.from({length:20},(_,i)=>({id:`file${i}`,name:`자료${i}.pdf`,url:`https://drive.google.com/file/d/file${i}/view`}));
+ const attachments=Array.from({length:40},(_,i)=>({id:`file${i}`,name:`자료${i}.pdf`,url:`https://drive.google.com/file/d/file${i}/view`}));
  const rows=buildAssignmentRows({...draft,attachments,fileUrl:attachments[0].url,fileId:attachments[0].id},()=>crypto.randomUUID());
- assert.equal(rows[0].attachments.length,20);assert.deepEqual(rows[0].attachments,rows[1].attachments);assert.equal(rows[0].file_id,"file0");
- for(const files of [[...attachments,{id:"extra",url:"https://example.test"}],[{id:"bad",url:"javascript:alert(1)"}],[attachments[0],attachments[0]]])assert.throws(()=>buildAssignmentRows({...draft,attachments:files}));
+ assert.equal(rows[0].attachments.length,40);assert.deepEqual(rows[0].attachments,rows[1].attachments);assert.equal(rows[0].file_id,"file0");
+ for(const files of [[{id:"huge",url:"https://example.test",size:501*1024*1024}],[{id:"bad",url:"javascript:alert(1)"}],[attachments[0],attachments[0]]])assert.throws(()=>buildAssignmentRows({...draft,attachments:files}));
 });
 
 test("history keeps each recipient row id so one delivery can be recalled",()=>{

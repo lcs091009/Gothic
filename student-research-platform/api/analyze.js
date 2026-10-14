@@ -1,11 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { buildAnalysisContext, RECORD_SCAN_LIMIT, SYSTEM_PROMPT } from "../server/analysisContext.js";
-import { MAX_ANALYSIS_FILES, MAX_ANALYSIS_MATERIALS, selectTeacherMaterials } from "../src/lib/analysisMaterials.js";
+import { MAX_ANALYSIS_MATERIALS, selectTeacherMaterials } from "../src/lib/analysisMaterials.js";
 import { EXPLORATION_MARKER, CHOICE_FORMAT, validExplorationPath, explorationPrompt, parseExploration, readableReferences } from "../server/exploration.js";
 import {ANALYSIS_TIMEOUT_MS,withinAnalysisDeadline} from "../server/analysisDeadline.js";
 
-export const MAX_BODY_BYTES = 16_384;
+export const MAX_BODY_BYTES = 65_536;
 export const AI_MODEL = "nvidia/nemotron-3-super-120b-a12b";
 export const AI_FALLBACK_MODEL = "nvidia/nemotron-3-nano-30b-a3b";
 export const AI_OUTPUT_TOKENS=6400;
@@ -95,11 +95,11 @@ return async function handler(request, response) {
       return response.status(400).json({error:"탐구 질문은 최근 12단계, 각 400자 이내로 전달해 주세요."});
     }
     const uuid = id => typeof id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-    if (selectedTeacherFiles !== undefined && (!Array.isArray(selectedTeacherFiles) || selectedTeacherFiles.length > MAX_ANALYSIS_FILES ||
+    if (selectedTeacherFiles !== undefined && (!Array.isArray(selectedTeacherFiles) ||
         selectedTeacherFiles.some(item=>!item || !uuid(item.materialId) || typeof item.attachmentId !== "string" || !/^[\w-]{1,200}$/.test(item.attachmentId)) ||
         new Set(selectedTeacherFiles.map(item=>`${item.materialId}:${item.attachmentId}`)).size !== selectedTeacherFiles.length ||
         new Set(selectedTeacherFiles.map(item=>item.materialId)).size > MAX_ANALYSIS_MATERIALS)) {
-      return response.status(400).json({error:"선생님 자료는 최대 8개 과제에서 첨부 20개까지 선택할 수 있습니다."});
+      return response.status(400).json({error:"선생님 자료는 최대 8개 과제의 첨부파일을 선택할 수 있습니다."});
     }
     if (typeof extraContext !== "string" || extraContext.length > 1200) {
       return response.status(400).json({ error: "보충 입력은 1,200자 이내로 작성해 주세요." });

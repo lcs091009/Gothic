@@ -1,14 +1,14 @@
-export const MAX_DRIVE_ATTACHMENTS = 20;
+import {assertAttachmentCapacity} from "./attachmentCapacity.js";
 export const DRIVE_CHUNK_BYTES = 8 * 1024 * 1024;
 export const MAX_DRIVE_UPLOAD_BYTES = 500 * 1024 * 1024;
 const endpoint = "https://www.googleapis.com";
 // Check newly picked files with the exact Picker token before displaying them
 // as ready. At most four read requests run together, with no permission writes.
 export async function validatePickedFiles(files, token, { fetchImpl = fetch, signal } = {}) {
-  if (!files.length || files.length > MAX_DRIVE_ATTACHMENTS || files.some(file => !/^[\w-]+$/.test(file.id || ""))) throw new Error("선택한 파일을 다시 확인해 주세요.");
+  if (!files.length || files.some(file => !/^[\w-]+$/.test(file.id || ""))) throw new Error("선택한 파일을 다시 확인해 주세요.");
   for (let offset = 0; offset < files.length; offset += 4) {
     await Promise.all(files.slice(offset, offset + 4).map(async file => {
-      const response = await fetchImpl(`${endpoint}/drive/v3/files/${encodeURIComponent(file.id)}?supportsAllDrives=true&fields=id`, {
+      const response = await fetchImpl(`${endpoint}/drive/v3/files/${encodeURIComponent(file.id)}?supportsAllDrives=true&fields=id,size,mimeType`, {
         signal, headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) {
@@ -16,6 +16,10 @@ export async function validatePickedFiles(files, token, { fetchImpl = fetch, sig
         if (response.status === 404) error.message = `${file.name || "첨부파일"}: Google 선택창에서 선택했지만 앱의 파일 접근 권한을 확인하지 못했습니다. Picker 프로젝트 번호와 OAuth 클라이언트가 같은 Google Cloud 프로젝트인지 확인해야 합니다. 파일 삭제나 학교 공유 차단으로 단정할 수 없습니다. [Google 404 · notFound · 파일 선택 확인]`;
         error.stage = "pickerAccess"; throw error;
       }
+      const metadata=await response.json();
+      const size=metadata.size===undefined && String(metadata.mimeType || "").startsWith("application/vnd.google-apps.") ? 0:Number(metadata.size);
+      if(!Number.isSafeInteger(size)||size<0) throw new Error(`${file.name || "파일"}: 용량을 확인하지 못했습니다. 다시 선택해 주세요.`);
+      file.size=size;
     }));
   }
 }
@@ -54,7 +58,7 @@ export async function uploadDriveFile(file, token, { fetchImpl = fetch, signal, 
     offset = next; onProgress(offset, file.size);
   }
   if (!/^[\w-]+$/.test(result?.id || "")) throw new Error("업로드한 파일을 확인하지 못했습니다.");
-  return { id: result.id, name: result.name || file.name, url: result.webViewLink || `https://drive.google.com/file/d/${result.id}/view` };
+  return { size:file.size,id: result.id, name: result.name || file.name, url: result.webViewLink || `https://drive.google.com/file/d/${result.id}/view` };
 }
 const knownSharingReasons = new Set(["authError", "invalidSharingRequest", "domainPolicy", "insufficientFilePermissions", "insufficientPermissions", "sharingRateLimitExceeded", "rateLimitExceeded", "userRateLimitExceeded", "notFound"]);
 export async function driveSharingError(response, context = "") {
@@ -133,9 +137,9 @@ export function mergeDriveAttachments(existing, incoming) {
   const files = new Map(existing.map(file => [file.id, file]));
   for (const file of incoming) {
     if (!/^[\w-]+$/.test(file.id || "")) continue;
-    files.set(file.id, { id: file.id, name: file.name || "파일", url: file.url || `https://drive.google.com/file/d/${file.id}/view`, ...(typeof file.accountId === "string" && file.accountId.length <= 200 ? { accountId: file.accountId } : {}) });
+    files.set(file.id, { ...(files.get(file.id) || {}),...(Number.isSafeInteger(file.size) ? {size:file.size}:{}),id: file.id, name: file.name || "파일", url: file.url || `https://drive.google.com/file/d/${file.id}/view`, ...(typeof file.accountId === "string" && file.accountId.length <= 200 ? { accountId: file.accountId } : {}) });
   }
-  if (files.size > MAX_DRIVE_ATTACHMENTS) throw new Error(`파일은 최대 ${MAX_DRIVE_ATTACHMENTS}개까지 첨부할 수 있습니다.`);
+  assertAttachmentCapacity([...files.values()]);
   return [...files.values()];
 }
 

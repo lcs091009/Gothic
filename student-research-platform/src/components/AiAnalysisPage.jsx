@@ -33,8 +33,8 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
     const next = new Set(selectedFiles.map(item=>item.key));
     if (next.has(file.key)) next.delete(file.key);
     else {
-      if (next.size >= 20 || new Set([...selectedFiles.map(item=>item.materialId),file.materialId]).size > 8) {
-        setMessage("선생님 자료는 최대 8개 과제에서 첨부 20개까지 선택할 수 있습니다."); return;
+      if (new Set([...selectedFiles.map(item=>item.materialId),file.materialId]).size > 8) {
+        setMessage("선생님 자료는 최대 8개 과제의 첨부파일을 선택할 수 있습니다."); return;
       }
       next.add(file.key);
     }
@@ -166,7 +166,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
       <details className="quiet-details" style={styles.subjectBox}>
         <summary>선생님 첨부파일 선택 <span className="field-optional">· {selectedFiles.length}개 선택</span></summary>
         <p style={styles.text}>파일명과 선생님 안내를 분석에 반영합니다. 파일 본문은 읽지 않으며, 필요한 내용은 아래 보충 입력에 적어 주세요.</p>
-        <div className="analysis-material-actions"><span>{selectedFiles.length}개 선택 / 최대 20개</span>
+        <div className="analysis-material-actions"><span>{selectedFiles.length}개 선택</span>
           <button type="button" disabled={isAnalyzing || !selectedFiles.length} onClick={()=>setTeacherSelection(new Set())}>선택 해제</button></div>
         {!options.length && <p style={styles.text}>아직 전달받은 선생님 자료가 없습니다.</p>}
         <div className="analysis-material-list">{options.map(file=><div className={`analysis-material ${teacherSelection.has(file.key) ? "is-selected" : ""}`} key={file.key}>
