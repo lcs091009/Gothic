@@ -1,7 +1,7 @@
 import AttachmentLinks from "../components/AttachmentLinks";
 import styles from "../styles/studentStyles";
 
-export default function StudentPage({ section = "register", onNavigate, grade, setGrade, semester, setSemester, subject, setSubject, title, setTitle, content, setContent, handleSubmitResearchRecord, isUploadDragging, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, openGooglePicker, isPickerLoading, isUploadingFile, isGoogleAuthLoading, driveFileName, driveFileUrl, onClearSelectedFile, isSubmitting, records, handleDeleteResearchRecord, deletingRecordId, loadTeacherSharedFiles, session, isLoadingTeacherSharedFiles, teacherSharedFiles }) {
+export default function StudentPage({ section = "register", onNavigate, grade, setGrade, semester, setSemester, subject, setSubject, title, setTitle, content, setContent, handleSubmitResearchRecord, isUploadDragging, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, openGooglePicker, switchPickerAccount,driveAccountEmail,isPickerLoading, isUploadingFile, isGoogleAuthLoading, driveFileName, driveFileUrl, onClearSelectedFile, isSubmitting, records, handleDeleteResearchRecord, deletingRecordId, loadTeacherSharedFiles, session, isLoadingTeacherSharedFiles, teacherSharedFiles }) {
   return (
           <>
             {section === "register" && <section className="inner-page" style={styles.box}>
@@ -127,6 +127,9 @@ export default function StudentPage({ section = "register", onNavigate, grade, s
                       "파일 선택"
                     )}
                   </button>
+
+                  <button type="button" className="animated-button" onClick={switchPickerAccount} disabled={isUploadingFile || isGoogleAuthLoading || isPickerLoading}>Google 계정 변경</button>
+                  {driveAccountEmail && <p style={styles.noticeText}>파일 계정: {driveAccountEmail}</p>}
 
                   {driveFileName && (
                     <div style={styles.selectedFileBox}>

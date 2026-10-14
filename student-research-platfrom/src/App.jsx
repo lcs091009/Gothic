@@ -1,3 +1,4 @@
+import PickerAccountBar from "./components/PickerAccountBar";
 import { useAuth } from "./hooks/useAuth";
 import { useScopedMessage } from "./hooks/useScopedMessage";
 import { useStudentData } from "./hooks/useStudentData";
@@ -43,7 +44,7 @@ function App() {
   const { profile, records, teacherSharedFiles, academicProfile, setAcademicProfile,
     isAcademicProfileLoading, isLoadingTeacherSharedFiles, loadResearchRecords, loadTeacherSharedFiles
   } = useStudentData(session, setMessage);
-  const { driveFileId, driveFileName, driveFileUrl, isPickerLoading, isGoogleAuthLoading, isUploadDragging, isUploadingFile, setDriveFileId, setDriveFileName, setDriveFileUrl, openGooglePicker, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, clearDriveSession } = useGoogleDrive({ setMessage, userId: session?.user?.id });
+  const { isPickerOpen,driveAccountEmail,switchPickerAccount,closeGooglePicker,driveFileId, driveFileName, driveFileUrl, isPickerLoading, isGoogleAuthLoading, isUploadDragging, isUploadingFile, setDriveFileId, setDriveFileName, setDriveFileUrl, openGooglePicker, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, clearDriveSession } = useGoogleDrive({ setMessage, userId: session?.user?.id });
 
   useEffect(() => {
     if (profile?.role === "student") sectionTitleRef.current?.focus();
@@ -176,6 +177,7 @@ async function handleDeleteResearchRecord(recordId) {
 
   return (
     <main ref={pageRef} className={`dashboard-page neutral-dashboard ${profile?.role === "student" ? "student-dashboard" : profile?.role === "teacher" ? "teacher-dashboard" : ""}`} style={styles.page}>
+      <PickerAccountBar open={isPickerOpen} email={driveAccountEmail} onSwitch={switchPickerAccount} onClose={closeGooglePicker} />
       <section className="dashboard-card" style={styles.card}>
         {["student", "teacher"].includes(profile?.role) ? (
           <header className="student-header">
@@ -291,6 +293,8 @@ async function handleDeleteResearchRecord(recordId) {
             handleUploadDragLeave={handleUploadDragLeave}
             handleUploadDrop={handleUploadDrop}
             openGooglePicker={openGooglePicker}
+            switchPickerAccount={switchPickerAccount}
+            driveAccountEmail={driveAccountEmail}
             isPickerLoading={isPickerLoading}
             isUploadingFile={isUploadingFile}
             isGoogleAuthLoading={isGoogleAuthLoading}
