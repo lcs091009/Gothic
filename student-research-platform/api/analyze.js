@@ -228,7 +228,12 @@ return async function handler(request, response) {
     });
     const parts = text.split(EXPLORATION_MARKER);
     const exploration = parseExploration(explorationPath !== undefined ? text : parts[1] || "");
-    if (explorationPath !== undefined && !exploration) return response.status(502).json({error:"심화 질문의 형식을 확인하지 못했습니다. 이전 선택은 유지되며 다시 시도할 수 있습니다."});
+    if (explorationPath !== undefined && !exploration) {
+      logger.warn("AI exploration format rejected", {code:"AI_EXPLORATION_FORMAT",truncated:choice.finish_reason === "length"});
+      return response.status(502).json({code:"AI_EXPLORATION_FORMAT",error:choice.finish_reason === "length"
+        ? "AI 설명이 완성되기 전에 응답이 잘렸습니다. 선택 경로는 유지됩니다. 다시 시도해 주세요."
+        : "AI가 읽을 수 있는 설명 형식으로 답하지 못했습니다. 선택 경로는 유지됩니다. 다시 시도해 주세요."});
+    }
     const readable = value=>readableReferences(value,records,teacherSharedFiles);
     return response.status(200).json({
       analysis: explorationPath !== undefined ? "" : readable(parts[0].trim()),
@@ -236,8 +241,8 @@ return async function handler(request, response) {
       scope,
       providerModel: usedModel,
       fallbackUsed: usedModel === AI_FALLBACK_MODEL,
-      warning: choice.finish_reason === "length"
-        ? "응답 길이 제한으로 분석 일부가 생략되었을 수 있습니다." : null,
+      warning: [choice.finish_reason === "length" ? "응답 길이 제한으로 분석 일부가 생략되었을 수 있습니다." : "",
+        exploration && !exploration.choices.length ? "설명은 받았지만 이어갈 질문이 반환되지 않았습니다. 아래에서 궁금한 점을 직접 입력할 수 있어요." : ""].filter(Boolean).join(" ") || null,
     });
   } catch (error) {
     if (error.name === "AbortError") {
