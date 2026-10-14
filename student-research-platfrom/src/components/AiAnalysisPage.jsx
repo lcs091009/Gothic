@@ -63,6 +63,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
     setAnalysis(""); setExploration(null); setScope(null); setWarning(""); setWorkspace(true);
     setResultInputs({records:records.filter(record=>selectedIds.has(record.id)),files:selectedFiles,extraContext});
     const controller = new AbortController(); requestRef.current = controller;
+    const timeout=setTimeout(()=>{if(requestRef.current===controller){controller.abort();requestRef.current=null;setIsAnalyzing(false);setMessage("2분 이내에 분석을 완료하지 못했습니다. 선택한 기록은 유지됩니다. 다시 시도해 주세요.");}},120_000);
 
     try {
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -112,6 +113,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
     } catch (error) {
       if (error.name !== "AbortError") setMessage(error.message || "AI 분석 요청에 실패했습니다.");
     } finally {
+      clearTimeout(timeout);
       if (requestRef.current === controller) { requestRef.current = null; setIsAnalyzing(false); }
     }
   }
@@ -179,7 +181,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
         <h3 style={styles.infoTitle}>분석 방식</h3>
         <p style={styles.text}>
           직접 선택한 기록 최대 48개의 개요와, 학기·과목을 고려해 고른 최대
-          12개의 본문을 참고합니다. 긴 본문은 앞부분과 끝부분을 발췌하며,
+          20개의 본문을 참고합니다. 긴 본문은 앞부분과 끝부분을 발췌하며,
           첨부파일은 파일명과 설명만 참고합니다. 보충 입력도 함께 분석합니다.
         </p>
       </div>

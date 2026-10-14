@@ -19,7 +19,7 @@ function fixture(overrides = {}) {
   const queries = [], providerCalls = [], logs = [];
   let authCalls = 0, quotaCalls = 0;
   const client = {
-    auth: { async getUser(token) { authCalls++; assert.equal(token, "valid-token"); return overrides.auth || { data: { user } }; } },
+    auth: { async getUser(token) { authCalls++; if(overrides.hangAuth) return new Promise(()=>{}); assert.equal(token, "valid-token"); return overrides.auth || { data: { user } }; } },
     from(table) {
       const query = { table, filters: [] }; queries.push(query);
       const chain = { select() { return chain; }, eq(...args) { query.filters.push(args); return chain; },
@@ -32,13 +32,14 @@ function fixture(overrides = {}) {
     async rpc(name) { quotaCalls++; assert.equal(name, "consume_ai_analysis_quota"); return overrides.quota || { data: { allowed: true } }; },
   };
   const handler = createAnalyzeHandler({ env: overrides.env || env, clientFactory: () => client,
-    logger: { warn: (...args) => logs.push(args) },
+    logger: { warn: (...args) => logs.push(args) },timeoutMs:overrides.timeoutMs,
     fetchImpl: async (url, options) => {
       providerCalls.push({ url, options });
+      if(overrides.hangProvider) return new Promise(()=>{});
       if (overrides.fetchError) throw overrides.fetchError;
       const reply = overrides.providerResponses?.[providerCalls.length - 1] || overrides;
       return { ok: reply.ok ?? true, status: reply.status || 200,
-        text: async () => reply.raw ?? JSON.stringify({ choices: [{ message: { content: "분석 완료" } }] }) };
+        text: async () => overrides.hangBody ? new Promise(()=>{}) : reply.raw ?? JSON.stringify({ choices: [{ message: { content: "분석 완료" } }] }) };
     } });
   async function call(request = {}) {
     const response = { headers: {}, setHeader(k, v) { this.headers[k] = v; },
@@ -304,4 +305,17 @@ test("initial analysis separates topic cards and replaces readable evidence with
   const f=fixture({raw:JSON.stringify({choices:[{message:{content:"1. 핵심 흐름\n온도 비교 [R1]\n<<<EXPLORATION>>>\n"+JSON.stringify(explorationReply)}}]})});
   const r=await f.call();assert.equal(r.code,200);assert.match(r.body.analysis,/효소 실험/);assert.doesNotMatch(r.body.analysis,/EXPLORATION|choices|R1/);assert.equal(r.body.exploration.choices.length,2);
   const malformed=fixture();assert.equal((await malformed.call({body:{explorationPath:[]}})).code,502);
+});
+
+test("one deadline bounds stalled auth, provider and response body without automatic retries",async()=>{
+  for(const stage of ["hangAuth","hangProvider","hangBody"]) {
+    const f=fixture({[stage]:true,timeoutMs:20});
+    const started=Date.now();const r=await f.call();
+    assert.equal(r.code,504);assert.match(r.body.error,/2분/);assert.ok(Date.now()-started<1000);
+    assert.equal(f.providerCalls.length,stage==="hangAuth" ? 0:1);
+    assert.equal(f.quotaCalls,stage==="hangAuth" ? 0:1);
+  }
+});
+test("initial analysis output has headroom while follow-up output remains bounded",async()=>{
+  const f=fixture();await f.call();assert.equal(JSON.parse(f.providerCalls[0].options.body).max_tokens,6400);
 });

@@ -1,5 +1,5 @@
 export const RECORD_SCAN_LIMIT = 48;
-export const DETAIL_LIMIT = 12;
+export const DETAIL_LIMIT = 20;
 const clip = (value, limit = 160) => String(value ?? "").slice(0, limit);
 
 // Keep both the initial question and the conclusion of longer activity notes.
