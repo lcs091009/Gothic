@@ -58,7 +58,7 @@ export function useGoogleDrive({ setMessage, userId, multiple = false, initialAt
   }, [closeGooglePicker]);
   useEffect(() => {
     mounted.current = true;
-    if (userId && import.meta.env.VITE_GOOGLE_CLIENT_ID) loadScript("https://accounts.google.com/gsi/client").catch(() => {});
+    if (import.meta.env.VITE_GOOGLE_CLIENT_ID) loadScript("https://accounts.google.com/gsi/client").catch(() => {});
     if (userId && window.sessionStorage.getItem("googleDriveUserId") && (window.sessionStorage.getItem("googleDriveUserId") !== userId || window.sessionStorage.getItem("googleDriveClientId") !== import.meta.env.VITE_GOOGLE_CLIENT_ID)) clearDriveSession({ keepAttachments: attachmentOwner.current === userId });
     attachmentOwner.current = userId;
     return () => { mounted.current = false;closeGooglePicker();fileOperation.current?.abort(); googleAccessTokenRef.current = ""; googleAuthRequestRef.current?.abort(); };

@@ -21,6 +21,7 @@
 .analysis-section-title h3 { font-size:21px; margin:0; }
 .analysis-section p { font-size:15px; line-height:1.95; white-space:pre-wrap; overflow-wrap:anywhere; color:#425447; margin:0 0 17px; }
 .analysis-section-switch { display:flex; align-items:center; justify-content:space-between; gap:12px; border-top:1px solid #edf0ec; padding-top:18px; margin-top:24px; font-size:12px; }
+.workspace-caption { font-size:12px; color:#7a877c; line-height:1.8; margin-top:24px; }
 .analysis-evidence { margin-top:24px; border-top:1px solid #e1e8df; padding:18px 0; }
 .analysis-evidence summary { cursor:pointer; color:#526f5d; font-size:14px; }
 .analysis-subject-chart { display:grid; gap:12px; margin:24px 0; }
@@ -69,6 +70,17 @@
 .exploration-workspace aside ol { padding-left:20px; font-size:13px; line-height:1.8; overflow-wrap:anywhere; }
 .exploration-workspace aside summary { cursor:pointer; }
 
+.exploration-subject-picker { margin:0 0 24px; padding:18px; border:1px solid #dfe7df; border-radius:20px; background:#f5f8f3; }
+.exploration-subject-picker summary { cursor:pointer; line-height:1.8; }
+.exploration-subject-picker summary strong { margin-left:10px; color:#355c50; }
+.exploration-subject-picker summary small { color:#718375; }
+.exploration-subject-options { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+.exploration-subject-options button[aria-pressed=true] { color:white; background:#52735e; border-color:#52735e; }
+.exploration-subject-custom { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:16px; }
+.exploration-subject-custom label { font-size:13px; }
+.exploration-subject-custom input { flex:1; min-width:120px; padding:11px 14px; border:1px solid #d8e3d8; border-radius:14px; font:inherit; color:#293e31; background:white; }
+.exploration-subject-custom input:focus-visible { outline:3px solid #648675; outline-offset:3px; }
+.exploration-subject-picker .workspace-caption { margin:12px 0 0; }
 
 .subject-focus { padding:18px 0; margin-bottom:20px; border-bottom:1px solid #dfe7df; }
 .subject-focus-mode { display:flex; gap:8px; flex-wrap:wrap; }
@@ -87,3 +99,5 @@
 .analysis-file-failures { border:1px solid #e1d3cc; }
 .analysis-file-failures button { border:1px solid #d8e3d8; border-radius:12px; padding:11px 14px; background:white; color:#466650; font:inherit; cursor:pointer; }
 @media(prefers-reduced-motion:reduce) { .subject-focus-mode button { transition:none; transform:none!important; } }
+
+.retained-view[hidden],.analysis-workspace[hidden],.ai-analysis-panel[hidden] { display:none!important; }
