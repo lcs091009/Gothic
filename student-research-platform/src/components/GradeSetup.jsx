@@ -288,11 +288,6 @@ const styles = {
     padding: "14px 0",
     backgroundColor: "transparent",
   },
-  title: {
-    marginTop: 0,
-    fontSize: "24px",
-    color: "#0f172a",
-  },
   text: {
     color: "#475569",
     lineHeight: 1.7,
@@ -328,11 +323,6 @@ const styles = {
     borderBottom: "1px solid #e3e5e8",
     padding: "14px 0",
     backgroundColor: "transparent",
-  },
-  infoTitle: {
-    marginTop: 0,
-    marginBottom: "8px",
-    color: "#303841",
   },
   choiceList: {
     marginTop: "20px",

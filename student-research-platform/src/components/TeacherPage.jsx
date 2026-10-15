@@ -29,6 +29,7 @@ function getMatchLabel(matchStatus) {
 }
 
 function TeacherPage({ session }) {
+  const teacherId=session?.user?.id;
   const [currentSection, setCurrentSection] = useState("menu");
   const headingRef = useRef(null);
   useEffect(() => { headingRef.current?.focus(); }, [currentSection]);
@@ -54,7 +55,7 @@ function TeacherPage({ session }) {
       return;
     }
 
-    if (!session?.user) {
+    if (!teacherId) {
       return;
     }
 
@@ -62,7 +63,7 @@ function TeacherPage({ session }) {
     setIsLoadingFiles(true);
 
     try {
-      const data=await withRetry(()=>fetchTeacherAssignments(session.user.id));
+      const data=await withRetry(()=>fetchTeacherAssignments(teacherId));
 
       if(version===loadVersion.current) setSharedFiles(data || []);
     } catch (error) {
@@ -70,13 +71,13 @@ function TeacherPage({ session }) {
     } finally {
       if(version===loadVersion.current) setIsLoadingFiles(false);
     }
-  }, [session]);
+  }, [teacherId]);
 
   useEffect(() => {
-    if (session?.user?.id) {
+    if (teacherId) {
       loadSharedFiles();
     }
-  }, [session?.user?.id, loadSharedFiles]);
+  }, [teacherId, loadSharedFiles]);
 
   async function handleRecall(ids) {
     if(recallLock.current || !ids.length) return;
@@ -216,35 +217,6 @@ const styles = {
     backgroundColor: "rgba(255, 255, 255, 0.72)",
     boxShadow: "none",
   },
-  titleRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "16px",
-    alignItems: "flex-start",
-    flexWrap: "wrap",
-  },
-  kicker: {
-    margin: "0 0 6px",
-    color: "#648675",
-    fontSize: "13px",
-    fontWeight: 650,
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
-  },
-  title: {
-    marginTop: 0,
-    marginBottom: 0,
-    fontSize: "24px",
-    color: "#355c50",
-    fontWeight: 650,
-  },
-  subTitle: {
-    marginTop: 0,
-    marginBottom: 0,
-    color: "#355c50",
-    fontSize: "20px",
-    fontWeight: 650,
-  },
   text: {
     margin: "8px 0 0",
     color: "#59616b",
@@ -257,125 +229,6 @@ const styles = {
     fontSize: "13px",
     lineHeight: 1.6,
     fontWeight: 400,
-  },
-  warningText: {
-    margin: "10px 0 0",
-    color: "#59616b",
-    lineHeight: 1.7,
-    fontWeight: 600,
-  },
-  noticeBox: {
-    marginTop: "14px",
-    border: "none",
-    borderBottom: "1px solid #e3e5e8",
-    padding: "14px 0",
-    backgroundColor: "transparent",
-  },
-  noticeTitle: {
-    marginTop: 0,
-    marginBottom: "8px",
-    color: "#454d57",
-  },
-  form: {
-    marginTop: "22px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-  },
-  row: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "16px",
-  },
-  label: {
-    display: "block",
-    marginBottom: "8px",
-    fontWeight: 600,
-    color: "#1e293b",
-  },
-  input: {
-    width: "100%",
-    boxSizing: "border-box",
-    border: "1px solid #cbd5e1",
-    borderRadius: "12px",
-    padding: "12px",
-    fontSize: "15px",
-    backgroundColor: "white",
-    transition: "0.18s ease",
-  },
-  textarea: {
-    width: "100%",
-    boxSizing: "border-box",
-    border: "1px solid #cbd5e1",
-    borderRadius: "12px",
-    padding: "12px",
-    fontSize: "15px",
-    lineHeight: 1.6,
-    resize: "vertical",
-    backgroundColor: "white",
-    transition: "0.18s ease",
-  },
-  matchBox: {
-    border: "1px solid #d8e3d8",
-    borderRadius: "16px",
-    padding: "16px",
-    backgroundColor: "white",
-    transition: "0.22s ease",
-  },
-  matchBoxOk: {
-    borderColor: "#c8ced5",
-    backgroundColor: "#f2f4f6",
-  },
-  matchBoxReview: {
-    borderColor: "#d3d8de",
-    backgroundColor: "#f3f6f1",
-  },
-  matchHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "12px",
-    flexWrap: "wrap",
-  },
-  matchTitle: {
-    marginTop: 0,
-    marginBottom: 0,
-    color: "#355c50",
-  },
-  statusPill: {
-    borderRadius: "999px",
-    padding: "6px 10px",
-    fontSize: "12px",
-    fontWeight: 650,
-  },
-  statusPillOk: {
-    backgroundColor: "#e1ebdf",
-    color: "#454d57",
-  },
-  statusPillReview: {
-    backgroundColor: "#f0f1f3",
-    color: "#59616b",
-  },
-  button: {
-    border: "none",
-    borderRadius: "14px",
-    padding: "16px 20px",
-    backgroundColor: "#355c50",
-    color: "white",
-    fontWeight: 650,
-    fontSize: "15px",
-    boxShadow: "none",
-  },
-  refreshButton: {
-    border: "1px solid #dde1e6",
-    borderRadius: "999px",
-    padding: "11px 14px",
-    backgroundColor: "rgba(255, 255, 255, 0.86)",
-    color: "#355c50",
-    fontWeight: 650,
-    cursor: "pointer",
-    fontSize: "13px",
-    boxShadow: "none",
   },
   message: {
     marginTop: "4px",
@@ -458,13 +311,6 @@ const styles = {
     lineHeight: 1.7,
     fontWeight: 400,
     whiteSpace: "pre-wrap",
-  },
-  link: {
-    display: "inline-block",
-    marginTop: "10px",
-    color: "#355c50",
-    fontWeight: 650,
-    textDecoration: "none",
   },
   recallButton: {
     marginTop: "10px",

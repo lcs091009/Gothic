@@ -1,4 +1,5 @@
 import RetainedView from "./components/RetainedView";
+import PageErrorBoundary from "./components/PageErrorBoundary";
 import PickerAccountBar from "./components/PickerAccountBar";
 import { useAuth } from "./hooks/useAuth";
 import { useScopedMessage } from "./hooks/useScopedMessage";
@@ -15,15 +16,15 @@ import styles from "./styles/appStyles";
 import "./styles/neutralTheme.css";
 import "./styles/innerPages.css";
 import GradeSetup from "./components/GradeSetup";
-import TeacherPage from "./components/TeacherPage";
-import AiAnalysisPage from "./components/AiAnalysisPage";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
   getFriendlySupabaseError,
   isSupabaseConfigured,
   supabaseConfigError,
 } from "./lib/supabaseClient";
 
+const TeacherPage=lazy(()=>import("./components/TeacherPage"));
+const AiAnalysisPage=lazy(()=>import("./components/AiAnalysisPage"));
 
 function App() {
 
@@ -34,7 +35,6 @@ function App() {
   const [deletingRecordId, setDeletingRecordId] = useState(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const pageRef = useRef(null);
   const [currentPage, setCurrentPage] = useState("home");
   const [isLogoutHovered, setIsLogoutHovered] = useState(false);
   const sectionTitleRef = useRef(null);
@@ -177,7 +177,7 @@ async function handleDeleteResearchRecord(recordId) {
   if (!session) return <HomePage signInWithGoogle={signInWithGoogle} isSigningIn={isSigningIn} message={authMessage} />;
 
   return (
-    <main ref={pageRef} className={`dashboard-page neutral-dashboard ${profile?.role === "student" ? "student-dashboard" : profile?.role === "teacher" ? "teacher-dashboard" : ""}`} style={styles.page}>
+    <main className={`dashboard-page neutral-dashboard ${profile?.role === "student" ? "student-dashboard" : profile?.role === "teacher" ? "teacher-dashboard" : ""}`} style={styles.page}>
       <PickerAccountBar open={isPickerOpen} email={driveAccountEmail} onSwitch={switchPickerAccount} onClose={closeGooglePicker} />
       <section className="dashboard-card" style={styles.card}>
         {["student", "teacher"].includes(profile?.role) ? (
@@ -267,14 +267,14 @@ async function handleDeleteResearchRecord(recordId) {
             <button type="button" className="student-back" onClick={() => setCurrentPage("academic")}>학년 / 선택과목 설정</button>
           </section>
         ) : (
-          <AiAnalysisPage
+          <PageErrorBoundary><Suspense fallback={<p role="status">분석 화면을 불러오는 중입니다.</p>}><AiAnalysisPage
             key={session.user.id}
             active={currentPage === "ai"}
             userId={session.user.id}
             academicProfile={academicProfile}
             records={records}
             teacherSharedFiles={teacherSharedFiles}
-          />
+          /></Suspense></PageErrorBoundary>
         )}</RetainedView>}
         {profile?.role === "student" &&
           ["register", "records", "materials"].includes(currentPage) && (
@@ -342,7 +342,7 @@ async function handleDeleteResearchRecord(recordId) {
         )}
 
         {profile?.role === "teacher" && (
-          <TeacherPage key={session.user.id} session={session} />
+          <PageErrorBoundary key={session.user.id}><Suspense fallback={<p role="status">교사 화면을 불러오는 중입니다.</p>}><TeacherPage session={session} /></Suspense></PageErrorBoundary>
         )}
 
         {(message || authMessage) && <p style={styles.message}>{message || authMessage}</p>}
