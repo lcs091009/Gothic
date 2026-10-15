@@ -341,18 +341,6 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
   );
 }
 
-// Render provider text safely as text nodes; keep unexpected/legacy lines intact.
-export function AnalysisText({ text }) {
-  return <div style={styles.resultText}>
-    {text.split(/\r?\n/).filter(line => line.trim()).map((line, index) => {
-      const heading = line.trim().replace(/^#{1,3}\s+/, "").replace(/^\*\*(.+)\*\*$/, "$1");
-      return /^[1-4]\. (핵심 흐름|교과 연결|다음 탐구|기록 보완과 바로 할 일)$/.test(heading)
-        ? <h4 key={index} style={styles.analysisHeading}>{heading}</h4>
-        : <p key={index} style={styles.analysisLine}>{line}</p>;
-    })}
-  </div>;
-}
-
 const styles = {
   page: {
     marginTop: "28px",
@@ -467,29 +455,7 @@ const styles = {
     color: "white",
     fontWeight: 800,
   },
-  resultBox: {
-    marginTop: "22px",
-    border: "1px solid #cbd5e1",
-    borderRadius: "16px",
-    padding: "20px",
-    backgroundColor: "white",
-  },
-  resultTitle: {
-    marginTop: 0,
-    color: "#0f172a",
-  },
-  analysisHeading: { margin: "22px 0 10px", color: "#355c50", fontSize: "16px", fontWeight: 650 },
-  analysisLine: { margin: "6px 0", whiteSpace: "pre-wrap", overflowWrap: "anywhere" },
-  resultText: {
-    whiteSpace: "pre-wrap",
-    wordBreak: "keep-all",
-    overflowWrap: "break-word",
-    fontFamily:
-      "Pretendard, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-    color: "#0f172a",
-    lineHeight: 1.8,
-    fontSize: "15px",
-  },
+
 };
 
 export default AiAnalysisPage;

@@ -11,7 +11,7 @@ export async function pdfDocumentText(document,{signal,onProgress=()=>{}}={}) {
         const text=data.items.map(item=>typeof item.str==="string" ? item.str+(item.hasEOL ? "\n":" ") : "").join("").trim();
         if(!text) unreadPages++;
         characters+=text.length;
-        if(kept<TEXT_LIMIT) {const part=text.slice(0,TEXT_LIMIT-kept);pieces.push(`[${page}쪽]\n${part}`);kept+=part.length;}
+        if(text && kept<TEXT_LIMIT) {const part=text.slice(0,TEXT_LIMIT-kept);pieces.push(`[${page}쪽]\n${part}`);kept+=part.length;}
         onProgress(`${page}/${document.numPages}쪽 읽는 중`);
       } finally {current.cleanup();}
     }
@@ -49,10 +49,22 @@ async function readOffice(buffer) {
     const xml=new TextDecoder().decode(files[name]);
     if(!name.startsWith("xl/worksheets/")) return xmlText(xml);
     const document=new DOMParser().parseFromString(xml,"application/xml");
-    return [...document.getElementsByTagName("row")].map(row=>[...row.getElementsByTagName("c")].map(cell=>{
-      const value=cell.getElementsByTagName("v")[0]?.textContent || "";
-      return cell.getAttribute("t")==="s" ? strings[Number(value)] || "" : cell.getAttribute("t")==="inlineStr" ? [...cell.getElementsByTagName("t")].map(part=>part.textContent).join("") : value;
-    }).join("\t")).join("\n");
+    return [...document.getElementsByTagName("row")].map(row=>{
+      const values=[];let column=0;
+      for(const cell of row.getElementsByTagName("c")) {
+        const address=cell.getAttribute("r");
+        if(address) {
+          const letters=/^([A-Z]{1,3})[1-9]\d*$/.exec(address)?.[1];
+          if(!letters) throw new Error("시트의 셀 주소를 읽지 못했습니다.");
+          column=0;for(const letter of letters) column=column*26+letter.charCodeAt(0)-64;
+          column--;
+        }
+        if(column>=16384) throw new Error("시트의 열 범위를 확인해 주세요.");
+        const value=cell.getElementsByTagName("v")[0]?.textContent || "";
+        values[column++]=cell.getAttribute("t")==="s" ? strings[Number(value)] || "" : cell.getAttribute("t")==="inlineStr" ? [...cell.getElementsByTagName("t")].map(part=>part.textContent).join("") : value;
+      }
+      return values.join("\t");
+    }).join("\n");
   }).join("\n\n");
   return text;
 }
@@ -85,8 +97,8 @@ export async function readAnalysisDocument(file,token,{signal,onProgress=()=>{},
   else if(/\.(docx|pptx|xlsx)$/i.test(name)) office=true;
   else if(!mime.startsWith("text/") && !/\.(txt|csv|md|json)$/i.test(name)) throw new Error("본문 읽기는 PDF·Google 문서/시트/슬라이드·DOCX·PPTX·XLSX·텍스트를 지원합니다. 이 파일은 PDF나 텍스트로 내보내 주세요.");
   onProgress("본문 다운로드 중");const response=await fetchImpl(url,{headers,signal});const buffer=await download(response,signal);check(signal);
-  const text=(office ? await readOffice(buffer) : new TextDecoder().decode(buffer)).trim();check(signal);
-  if(!text) throw new Error("읽을 수 있는 텍스트가 없습니다. 이미지 자료는 텍스트를 인식한 PDF로 첨부해 주세요.");
+  const text=office ? await readOffice(buffer) : new TextDecoder().decode(buffer).trim();check(signal);
+  if(!text.trim()) throw new Error("읽을 수 있는 텍스트가 없습니다. 이미지 자료는 텍스트를 인식한 PDF로 첨부해 주세요.");
   return {text:text.slice(0,TEXT_LIMIT),characters:text.length,pages:0,unreadPages:0,partial:text.length>TEXT_LIMIT};
 }
 export async function readAnalysisDocuments(files,token,{signal,onProgress=()=>{},read=readAnalysisDocument}={}) {

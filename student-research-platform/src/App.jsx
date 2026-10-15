@@ -3,6 +3,7 @@ import PickerAccountBar from "./components/PickerAccountBar";
 import { useAuth } from "./hooks/useAuth";
 import { useScopedMessage } from "./hooks/useScopedMessage";
 import { useStudentData } from "./hooks/useStudentData";
+import { useResearchDraft } from "./hooks/useResearchDraft";
 import { saveResearchRecord, deleteResearchRecord } from "./services/dataService";
 import { useGoogleDrive } from "./hooks/useGoogleDrive";
 import HomePage from "./pages/HomePage";
@@ -26,21 +27,18 @@ import {
 
 function App() {
 
-  const [grade, setGrade] = useState("1학년");
-  const [semester, setSemester] = useState("1학기");
-  const [subject, setSubject] = useState("");
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
+  const { session, isLoading, isSigningIn, signInWithGoogle, signOut: authSignOut } = useAuth(setAuthMessage);
+  const draft=useResearchDraft(session?.user?.id);
+  const {grade,setGrade,semester,setSemester,subject,setSubject,title,setTitle,content,setContent}=draft;
   const [deletingRecordId, setDeletingRecordId] = useState(null);
 
-  const [authMessage, setAuthMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const pageRef = useRef(null);
   const [currentPage, setCurrentPage] = useState("home");
   const [isLogoutHovered, setIsLogoutHovered] = useState(false);
   const sectionTitleRef = useRef(null);
 
-  const { session, isLoading, isSigningIn, signInWithGoogle, signOut: authSignOut } = useAuth(setAuthMessage);
   const { message, setMessage } = useScopedMessage(`${session?.user?.id || "guest"}:${currentPage}`);
   const { profile, records, teacherSharedFiles, academicProfile, setAcademicProfile,
     isAcademicProfileLoading, isLoadingTeacherSharedFiles, loadResearchRecords, loadTeacherSharedFiles
@@ -50,7 +48,7 @@ function App() {
   useEffect(() => {
     if (profile?.role === "student") sectionTitleRef.current?.focus();
   }, [currentPage, profile?.role]);
-  useEffect(()=>{setCurrentPage("home");},[session?.user?.id]);
+  useEffect(()=>{setCurrentPage("home");setIsSubmitting(false);setDeletingRecordId(null);},[session?.user?.id]);
 
 
   async function signOut() {
@@ -95,6 +93,7 @@ function App() {
           drive_file_url: driveFileUrl || null,
         });
 
+      if(!draft.isCurrent()) return;
       setMessage("활동 기록이 저장되었습니다.");
       setSubject("");
       setTitle("");
@@ -105,9 +104,9 @@ function App() {
 
       await loadResearchRecords(session.user.id);
     } catch (error) {
-      setMessage(getFriendlySupabaseError(error));
+      if(draft.isCurrent()) setMessage(getFriendlySupabaseError(error));
     } finally {
-      setIsSubmitting(false);
+      if(draft.isCurrent()) setIsSubmitting(false);
     }
   }
 async function handleDeleteResearchRecord(recordId) {
@@ -136,12 +135,13 @@ async function handleDeleteResearchRecord(recordId) {
   try {
     await deleteResearchRecord(recordId, session.user.id);
 
+    if(!draft.isCurrent()) return;
     setMessage("활동 기록이 삭제되었습니다.");
     await loadResearchRecords(session.user.id);
   } catch (error) {
-    setMessage(getFriendlySupabaseError(error));
+    if(draft.isCurrent()) setMessage(getFriendlySupabaseError(error));
   } finally {
-    setDeletingRecordId(null);
+    if(draft.isCurrent()) setDeletingRecordId(null);
   }
 }
 

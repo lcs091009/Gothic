@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { PGlite } from "@electric-sql/pglite";
-import { buildAssignmentRows, deliverAssignmentRows, groupAssignmentDeliveries, recallAssignmentRows } from "./teacherAssignments.js";
+import { buildAssignmentRows, deliverAssignmentRows, fetchTeacherAssignments, groupAssignmentDeliveries, recallAssignmentRows } from "./teacherAssignments.js";
 const draft = { teacher: { id: "teacher", email: "teacher@example.test" },
   students: [{ id: "student1", email: "27-10101@example.test", student_number: "10101" }, { id: "student2", email: "27-10102@example.test", student_number: "10102" }],
   title: " 실험 결과 비교 ", description: " 본인의 결과와 오차 원인을 정리해 주세요. " };
@@ -69,6 +69,31 @@ test("all validated attachments are stored per recipient, with legacy first-link
 test("history keeps each recipient row id so one delivery can be recalled",()=>{
  let id=0;const rows=buildAssignmentRows(draft,()=>`row-${++id}`).map(row=>({...row,created_at:"2026-10-12T01:00:00Z"}));
  assert.deepEqual(groupAssignmentDeliveries(rows)[0].recipients.map(r=>r.id),["row-1","row-2"]);
+});
+test("teacher history loads beyond 1000 rows without splitting recipient groups or skipping after concurrent deletion",async()=>{
+  const stamp="2026-10-12T01:00:00Z";
+  const rows=Array.from({length:1100},(_,i)=>({id:String(1100-i).padStart(4,"0"),teacher_id:"teacher",student_email:`s${i}@school.test`,file_name:`과제${Math.floor(i/100)}`,created_at:stamp}));
+  const calls=[];
+  const client={from(table){assert.equal(table,"teacher_shared_files");let cursor,limit;const q={
+    select(value){assert.equal(value,"*");return q;},eq(column,value){assert.deepEqual([column,value],["teacher_id","teacher"]);return q;},
+    order(column,options){assert.ok(["created_at","id"].includes(column));assert.equal(options.ascending,false);return q;},
+    limit(value){limit=value;assert.equal(value,500);return q;},or(value){cursor=value;return q;},
+    then(resolve,reject){
+      if(calls.length===1) rows.shift();
+      const lastId=cursor?.match(/id\.lt\.([^)]+)\)$/)?.[1];
+      if(cursor) assert.equal(cursor,`created_at.lt.${stamp},and(created_at.eq.${stamp},id.lt.${lastId})`);
+      const data=rows.filter(row=>!lastId || row.id<lastId).slice(0,limit);calls.push(cursor);
+      return Promise.resolve({data,error:null}).then(resolve,reject);
+    }
+  };return q;}};
+  const files=await fetchTeacherAssignments("teacher",client);
+  assert.equal(files.length,1100);assert.equal(new Set(files.map(row=>row.id)).size,1100);assert.equal(calls.length,3);
+  const groups=groupAssignmentDeliveries(files);assert.equal(groups.length,11);assert.ok(groups.every(group=>group.recipients.length===100));
+  let deleted=[];
+  const recallClient={from(){const q={delete(){return q;},in(column,ids){deleted=ids;return q;},eq(){return q;},select(){return q;},then(resolve){return Promise.resolve({data:[],error:null}).then(resolve);}};return q;}};
+  assert.equal(await recallAssignmentRows(groups.at(-1).recipients.map(r=>r.id),"teacher",recallClient),100);assert.equal(deleted.length,100);
+  const failing={from(){const q={select(){return q;},eq(){return q;},order(){return q;},limit(){return q;},then(resolve){return Promise.resolve({error:new Error("read failed")}).then(resolve);}};return q;}};
+  await assert.rejects(fetchTeacherAssignments("teacher",failing),/read failed/);
 });
 test("recall verifies all requested rows are absent, including already-removed recipients",async()=>{
  const calls=[];
