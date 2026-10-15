@@ -23,6 +23,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: https://example.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: test-public-key
+      - run: node student-research-platform/scripts/check-production-startup.js
       - name: Reject tracked environment secrets
         run: |
           python - <<'PY'
