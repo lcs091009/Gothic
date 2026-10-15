@@ -358,12 +358,6 @@ const styles = {
     fontWeight: 700,
     cursor: "pointer",
   },
-  title: {
-    marginTop: "20px",
-    marginBottom: "10px",
-    fontSize: "26px",
-    color: "#0f172a",
-  },
   text: {
     color: "#475569",
     lineHeight: 1.7,
