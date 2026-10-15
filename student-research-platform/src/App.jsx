@@ -1,3 +1,4 @@
+import RetainedView from "./components/RetainedView";
 import PickerAccountBar from "./components/PickerAccountBar";
 import { useAuth } from "./hooks/useAuth";
 import { useScopedMessage } from "./hooks/useScopedMessage";
@@ -225,7 +226,7 @@ async function handleDeleteResearchRecord(recordId) {
           </div>
         </div>}
 
-        {profile?.role === "student" && <div key={currentPage} className="student-view">
+        {profile?.role === "student" && <div key={session.user.id} className="student-view">
         {profile?.role === "student" && currentPage === "home" && (
           <StudentHome headingRef={sectionTitleRef} name={profile.name} academicProfile={academicProfile}
             isAcademicProfileLoading={isAcademicProfileLoading} recordsCount={records.length}
@@ -258,7 +259,7 @@ async function handleDeleteResearchRecord(recordId) {
             />
           )}
 
-        {profile?.role === "student" && currentPage === "ai" && (isAcademicProfileLoading ? (
+        {profile?.role === "student" && <RetainedView key={session.user.id} active={currentPage === "ai"}>{isAcademicProfileLoading ? (
           <p style={styles.text} role="status">선택과목 정보를 불러오는 중입니다.</p>
         ) : !academicProfile ? (
           <section style={styles.box}>
@@ -267,11 +268,14 @@ async function handleDeleteResearchRecord(recordId) {
           </section>
         ) : (
           <AiAnalysisPage
+            key={session.user.id}
+            active={currentPage === "ai"}
+            userId={session.user.id}
             academicProfile={academicProfile}
             records={records}
             teacherSharedFiles={teacherSharedFiles}
           />
-        ))}
+        )}</RetainedView>}
         {profile?.role === "student" &&
           ["register", "records", "materials"].includes(currentPage) && (
           <StudentPage

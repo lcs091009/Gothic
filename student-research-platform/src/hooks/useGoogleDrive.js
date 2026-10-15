@@ -7,7 +7,7 @@ import { getDriveAccount, assertDriveAccount } from "../lib/googleDriveAccount";
 import { pendingLoginDriveToken } from "../lib/loginDriveToken";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export function useGoogleDrive({ setMessage, userId, multiple = false, initialAttachments = [] }) {
+export function useGoogleDrive({ setMessage, userId, multiple = false, initialAttachments = [], accessOnly = false }) {
   const [attachments, setAttachments] = useState(() => mergeDriveAttachments([], initialAttachments));
   const attachmentsRef = useRef(attachments);
   const attachmentOwner = useRef(userId);
@@ -223,20 +223,19 @@ async function openGooglePicker({ uploadFirst = false, selectAccount = false } =
       .setOAuthToken(accessToken)
       .setDeveloperKey(googleApiKey)
       .setAppId(googleAppId)
-      .addView(uploadFirst ? uploadView : docsView)
-      .addView(uploadFirst ? docsView : uploadView)
+      .addView(accessOnly ? docsView : uploadFirst ? uploadView : docsView)
       .setCallback(async (data) => {
         if (!mounted.current || userId !== currentUserRef.current || version!==pickerVersion.current) return;
         if (data.action === window.google.picker.Action.PICKED) {
           try {
             const files = (data.docs || []).map(file => ({ id: file.id, name: file.name || file.title, url: file.url, accountId: pickerAccount.id }));
-            mergeDriveAttachments(multiple ? attachmentsRef.current : [], files);
+            if(!accessOnly) mergeDriveAttachments(multiple ? attachmentsRef.current : [], files);
             setMessage("선택한 파일의 접근 권한을 확인하고 있습니다…");
             const controller = new AbortController(); fileOperation.current = controller;
             await validatePickedFiles(files, accessToken, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(120_000)]) });
             if (!mounted.current || userId !== currentUserRef.current || version!==pickerVersion.current) return;
-            appendFiles(files);
-            setMessage(`${attachmentsRef.current.length}개 파일을 첨부했습니다.`);
+            if(!accessOnly) appendFiles(files);
+            setMessage(accessOnly ? "파일 읽기 권한을 확인했습니다. 다시 분석해 주세요." : `${attachmentsRef.current.length}개 파일을 첨부했습니다.`);
           } catch (error) { if (mounted.current && userId === currentUserRef.current && version===pickerVersion.current) setMessage(error.name === "AbortError" ? "파일 접근 확인을 완료하지 못했습니다. 다시 선택해 주세요." : error.message); }
 
         }
@@ -259,6 +258,7 @@ async function openGooglePicker({ uploadFirst = false, selectAccount = false } =
         }
       })
       ;
+    if (!accessOnly) builder.addView(uploadFirst ? docsView : uploadView);
     if (multiple) builder.enableFeature(window.google.picker.Feature.MULTISELECT_ENABLED);
     const picker = builder.build();
     pickerRef.current=picker;
@@ -396,5 +396,5 @@ function handleUploadDrop(event) {
 }
 
 
-  return { driveFileId, driveFileName, driveFileUrl, isPickerLoading, isPickerOpen,driveAccountEmail,switchPickerAccount,closeGooglePicker,isGoogleAuthLoading, isUploadDragging, isUploadingFile, setDriveFileId, setDriveFileName, setDriveFileUrl, openGooglePicker, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, clearDriveSession, uploadLocalFile: uploadDroppedFileToGoogleDrive, shareSelectedFile, attachments, removeAttachment, reconnectGoogleDrive, fileProgress, cancelUpload: () => fileOperation.current?.abort() };
+  return { getGoogleAccessToken,driveFileId, driveFileName, driveFileUrl, isPickerLoading, isPickerOpen,driveAccountEmail,switchPickerAccount,closeGooglePicker,isGoogleAuthLoading, isUploadDragging, isUploadingFile, setDriveFileId, setDriveFileName, setDriveFileUrl, openGooglePicker, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, clearDriveSession, uploadLocalFile: uploadDroppedFileToGoogleDrive, shareSelectedFile, attachments, removeAttachment, reconnectGoogleDrive, fileProgress, cancelUpload: () => fileOperation.current?.abort() };
 }

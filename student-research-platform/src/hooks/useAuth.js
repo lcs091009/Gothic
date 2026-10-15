@@ -9,6 +9,7 @@ export function useAuth(setMessage) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const signingIn = useRef(false);
+  const appliedSession=useRef(null);
   useEffect(() => {
     const callbackError = googleCallbackError(window.location);
     const cleanCallback=()=>window.history.replaceState(window.history.state,"",cleanAuthCallbackUrl(window.location.href));
@@ -17,6 +18,7 @@ export function useAuth(setMessage) {
     let active = true;
     const guard=createSessionReadGuard();
     const applySession=nextSession=>{
+      appliedSession.current=nextSession;
       void Promise.resolve().then(()=>cacheLoginDriveToken(nextSession, import.meta.env.VITE_GOOGLE_CLIENT_ID)).catch(() => {});
       setSession(nextSession);setIsLoading(false);
       if(nextSession) {setMessage("");cleanCallback();}
@@ -30,7 +32,7 @@ export function useAuth(setMessage) {
     });
     const syncSession=(block=false)=>{
       const isCurrent=guard.begin();
-      if(block) setIsLoading(true);
+      if(block && !appliedSession.current) setIsLoading(true);
       return supabase.auth.getSession().then(({ data, error }) => {
       if (!active || !isCurrent()) return;
       if (error) setMessage(getFriendlySupabaseError(error));

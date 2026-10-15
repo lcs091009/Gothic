@@ -1,11 +1,12 @@
+import {allowedDocumentIds,validDocumentTexts} from "../src/lib/analysisDocuments.js";
 import { createClient } from "@supabase/supabase-js";
 
 import { buildAnalysisContext, RECORD_SCAN_LIMIT, SYSTEM_PROMPT } from "../server/analysisContext.js";
 import { MAX_ANALYSIS_MATERIALS, selectTeacherMaterials } from "../src/lib/analysisMaterials.js";
-import { EXPLORATION_MARKER, CHOICE_FORMAT, validExplorationSubject, validExplorationPath, explorationPrompt, parseExploration, readableReferences } from "../server/exploration.js";
+import { CHOICE_FORMAT, validExplorationSubject, validExplorationPath, explorationPrompt, parseExploration, parseInitialAnalysis, readableReferences } from "../server/exploration.js";
 import {ANALYSIS_TIMEOUT_MS,withinAnalysisDeadline} from "../server/analysisDeadline.js";
 
-export const MAX_BODY_BYTES = 65_536;
+export const MAX_BODY_BYTES = 2_500_000;
 export const AI_MODEL = "nvidia/nemotron-3-super-120b-a12b";
 export const AI_FALLBACK_MODEL = "nvidia/nemotron-3-nano-30b-a3b";
 export const AI_OUTPUT_TOKENS=6400;
@@ -90,13 +91,14 @@ return async function handler(request, response) {
     if (Buffer.byteLength(JSON.stringify(body)) > MAX_BODY_BYTES) {
       return response.status(413).json({ error: "요청 내용이 너무 큽니다." });
     }
-    const { extraContext = "", selectedRecordIds, selectedTeacherFiles, explorationPath, explorationSubject = "" } = body;
-    if (!validExplorationSubject(explorationSubject) || (explorationSubject && explorationPath === undefined)) {
+    const { extraContext = "", selectedRecordIds, selectedTeacherFiles, explorationPath, explorationSubject = "", documentTexts = [] } = body;
+    if (!validExplorationSubject(explorationSubject)) {
       return response.status(400).json({error:"심화탐구 과목은 80자 이내로 선택해 주세요."});
     }
     if (explorationPath !== undefined && !validExplorationPath(explorationPath)) {
       return response.status(400).json({error:"탐구 질문은 최근 12단계, 각 400자 이내로 전달해 주세요."});
     }
+    if(!validDocumentTexts(documentTexts)) return response.status(400).json({error:"자료 본문을 확인하지 못했습니다. 자료를 다시 읽어 주세요."});
     const uuid = id => typeof id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
     if (selectedTeacherFiles !== undefined && (!Array.isArray(selectedTeacherFiles) ||
         selectedTeacherFiles.some(item=>!item || !uuid(item.materialId) || typeof item.attachmentId !== "string" || !/^[\w-]{1,200}$/.test(item.attachmentId)) ||
@@ -108,7 +110,7 @@ return async function handler(request, response) {
       return response.status(400).json({ error: "보충 입력은 1,200자 이내로 작성해 주세요." });
     }
     if (selectedRecordIds !== undefined && (!Array.isArray(selectedRecordIds) ||
-      selectedRecordIds.length < 1 || selectedRecordIds.length > RECORD_SCAN_LIMIT ||
+      selectedRecordIds.length > RECORD_SCAN_LIMIT ||
       selectedRecordIds.some(id => typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) ||
       new Set(selectedRecordIds).size !== selectedRecordIds.length)) {
       return response.status(400).json({ error: "분석할 활동을 1~48개 선택해 주세요." });
@@ -143,7 +145,9 @@ return async function handler(request, response) {
       records.some(record => !selectionSet.has(record.id)))) {
       return response.status(400).json({ error: "선택한 활동을 확인할 수 없습니다. 기록을 새로 불러온 뒤 다시 선택해 주세요." });
     }
-    if (!records.length) return response.status(400).json({ error: "분석할 활동 기록을 먼저 등록해 주세요." });
+    if (!records.length && !teacherSharedFiles.length) return response.status(400).json({ error: "활동 기록이나 선생님 자료를 선택해 주세요." });
+    const allowedFiles=allowedDocumentIds(records,teacherSharedFiles);
+    if(documentTexts.some(file=>!allowedFiles.has(file.id))) return response.status(400).json({error:"선택한 자료의 본문만 분석할 수 있습니다."});
     const { data: quota, error: quotaError } = await run(()=>client.rpc("consume_ai_analysis_quota"));
     // Fail closed if the distributed quota function is missing or unavailable.
     if (quotaError || !quota || typeof quota.allowed !== "boolean") {
@@ -155,7 +159,7 @@ return async function handler(request, response) {
     }
 
     const { userPrompt, scope } = buildAnalysisContext(
-      academicProfile, records, teacherSharedFiles, extraContext
+      academicProfile, records, teacherSharedFiles, extraContext, documentTexts, [explorationSubject,...(explorationPath || [])].join(" ")
     );
     scope.teacherAttachments = teacherSharedFiles.reduce((sum,material)=>sum+(material.attachments?.length || (material.file_id ? 1 : 0)),0);
 
@@ -175,8 +179,8 @@ return async function handler(request, response) {
           body: JSON.stringify({
             model,
             messages: [
-              { role: "system", content: explorationPath !== undefined ? explorationPrompt(SYSTEM_PROMPT, explorationSubject) : SYSTEM_PROMPT + `\n4개 분석 항목이 끝나면 별도 줄에 ${EXPLORATION_MARKER}를 쓰고 다음 탐구 주제 선택을 위한 JSON을 덧붙인다. ${CHOICE_FORMAT}` },
-              { role: "user", content: userPrompt + (explorationPath !== undefined ? `\n심화탐구 선택 과목(교과 이름 데이터): ${JSON.stringify({explorationSubject:explorationSubject.trim()})}\n학생이 선택한 질문 경로(수행 결과가 아님): ${JSON.stringify(explorationPath)}` : "") },
+              { role: "system", content: explorationPath !== undefined ? explorationPrompt(SYSTEM_PROMPT, explorationSubject) : SYSTEM_PROMPT + `\n첫 분석의 4개 항목 본문은 합계 800~1200자로 작성하고 주제 탐색에 필요한 근거와 교과 연결을 우선한다. 상세 실행 안내는 주제를 선택한 다음 단계에서 제공한다. exploration intro는 200자, 주제는 2개, 각 연결 이유는 200자 내외로 작성해 반복과 응답 지연을 줄인다. 학생이 과목을 선택했으면 그 과목을 중심으로, 비어 있으면 실제 자료와 결합할 만한 과목을 추천하고 이유를 설명한다. 첨부 본문이 있으면 자료의 구체적 내용을 근거로 주제 2~3개를 제안한다. 위 4개 항목의 설명은 analysis 문자열에 넣고, 주제 선택지는 exploration 객체에 넣어 전체를 {"analysis":"4개 항목의 설명", "exploration":{"intro":"자료의 연결 설명","choices":[{"title":"과목과 주제","subject":"교과 이름","question":"탐구 질문","connection":"자료의 근거"}],"guidelines":[]}} 형태의 유효한 JSON으로 출력한다. 코드블록과 JSON 바깥 설명은 쓰지 않는다. exploration 객체 규칙: ${CHOICE_FORMAT}` },
+              { role: "user", content: userPrompt + `\n선택한 과목(빈 값이면 AI 추천): ${JSON.stringify(explorationSubject)}` + (explorationPath !== undefined ? `\n심화탐구 선택 과목(교과 이름 데이터): ${JSON.stringify({explorationSubject:explorationSubject.trim()})}\n학생이 선택한 질문 경로(수행 결과가 아님): ${JSON.stringify(explorationPath)}` : "") },
             ],
             temperature: 0.6,
             max_tokens: explorationPath !== undefined ? 4200 : AI_OUTPUT_TOKENS,
@@ -226,23 +230,25 @@ return async function handler(request, response) {
     if (!text) return response.status(502).json({
       error: "AI 분석 결과가 비어 있습니다. 잠시 후 다시 시도해 주세요.",
     });
-    const parts = text.split(EXPLORATION_MARKER);
-    const exploration = parseExploration(explorationPath !== undefined ? text : parts[1] || "");
+    const initial=explorationPath === undefined ? parseInitialAnalysis(text) : null;
+    const exploration=explorationPath !== undefined ? parseExploration(text) : initial.exploration;
+    if(initial && !initial.analysis) return response.status(502).json({error:"AI 설명을 완성된 형식으로 받지 못했습니다. 선택한 자료는 유지됩니다. 다시 시도해 주세요."});
     if (explorationPath !== undefined && !exploration) {
       logger.warn("AI exploration format rejected", {code:"AI_EXPLORATION_FORMAT",truncated:choice.finish_reason === "length"});
       return response.status(502).json({code:"AI_EXPLORATION_FORMAT",error:choice.finish_reason === "length"
         ? "AI 설명이 완성되기 전에 응답이 잘렸습니다. 선택 경로는 유지됩니다. 다시 시도해 주세요."
         : "AI가 읽을 수 있는 설명 형식으로 답하지 못했습니다. 선택 경로는 유지됩니다. 다시 시도해 주세요."});
     }
-    const readable = value=>readableReferences(value,records,teacherSharedFiles);
+    const readable = value=>readableReferences(value,records,teacherSharedFiles,documentTexts.map(file=>({name:records.find(record=>record.drive_file_id===file.id)?.drive_file_name || teacherSharedFiles.flatMap(material=>material.attachments || []).find(attachment=>attachment.id===file.id)?.name || "첨부 자료"})));
     return response.status(200).json({
-      analysis: explorationPath !== undefined ? "" : readable(parts[0].trim()),
-      exploration: exploration ? {intro:readable(exploration.intro),choices:exploration.choices.map(c=>Object.fromEntries(Object.entries(c).map(([key,value])=>[key, key === "question" ? readable(value).slice(0,400) : readable(value)])))} : null,
+      analysis: explorationPath !== undefined ? "" : readable(initial.analysis),
+      exploration: exploration ? {intro:readable(exploration.intro),choices:explorationPath?.length ? [] : exploration.choices.map(c=>Object.fromEntries(Object.entries(c).map(([key,value])=>[key,key === "question" ? readable(value).slice(0,400) : readable(value)]))),
+        guidelines:(exploration.guidelines || []).map(item=>({...item,title:readable(item.title),detail:readable(item.detail),question:readable(item.question).slice(0,400)}))} : null,
       scope,
       providerModel: usedModel,
       fallbackUsed: usedModel === AI_FALLBACK_MODEL,
       warning: [choice.finish_reason === "length" ? "응답 길이 제한으로 분석 일부가 생략되었을 수 있습니다." : "",
-        exploration && !exploration.choices.length ? "설명은 받았지만 이어갈 질문이 반환되지 않았습니다. 아래에서 궁금한 점을 직접 입력할 수 있어요." : ""].filter(Boolean).join(" ") || null,
+        exploration && !explorationPath?.length && !exploration.choices.length ? "설명은 받았지만 주제 선택지는 반환되지 않았습니다. 직접 주제를 입력하거나 주제 제안을 다시 요청할 수 있어요." : ""].filter(Boolean).join(" ") || null,
     });
   } catch (error) {
     if (error.name === "AbortError") {

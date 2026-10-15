@@ -1,4 +1,4 @@
-import { supabase, withRetry } from "../lib/supabaseClient";
+import { supabase, withRetry } from "../lib/supabaseClient.js";
 
 async function read(query) {
   return withRetry(async () => {
