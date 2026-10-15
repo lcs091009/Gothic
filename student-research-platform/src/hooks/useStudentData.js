@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { ensureProfile, fetchAcademicProfile, fetchResearchRecords, fetchTeacherSharedFiles } from "../services/dataService";
-import { getFriendlySupabaseError } from "../lib/supabaseClient";
+import * as studentDataService from "../services/dataService.js";
+import { getFriendlySupabaseError } from "../lib/supabaseClient.js";
 
-export function useStudentData(session, setMessage) {
+export function useStudentData(session, setMessage, service = studentDataService) {
   const [profile, setProfile] = useState(null);
   const [records, setRecords] = useState([]);
   const [teacherSharedFiles, setTeacherSharedFiles] = useState([]);
@@ -14,7 +14,11 @@ export function useStudentData(session, setMessage) {
   messageRef.current = setMessage;
   userRef.current = session?.user?.id;
   const user = session?.user;
+  const userId=user?.id,userEmail=user?.email;
+  const latestUser=useRef(user);latestUser.current=user;
   useEffect(() => {
+    const user=latestUser.current;
+    const {ensureProfile,fetchAcademicProfile,fetchResearchRecords,fetchTeacherSharedFiles}=service;
     const reportMessage = messageRef.current;
     let active = true;
     setProfile(null); setRecords([]); setTeacherSharedFiles([]); setAcademicProfile(null);
@@ -33,17 +37,17 @@ export function useStudentData(session, setMessage) {
       finally { if (active) setIsAcademicProfileLoading(false); }
     })();
     return () => { active = false; };
-  }, [user]);
+  }, [userId,userEmail,service]);
 
   async function loadResearchRecords(userId) {
-    const data = await fetchResearchRecords(userId);
+    const data = await service.fetchResearchRecords(userId);
     if (userRef.current === userId) setRecords(data || []);
   }
   async function loadTeacherSharedFiles(email) {
     const id = userRef.current;
     setIsLoadingTeacherSharedFiles(true);
     try {
-      const data = await fetchTeacherSharedFiles(email);
+      const data = await service.fetchTeacherSharedFiles(email);
       if (userRef.current === id) setTeacherSharedFiles(data || []);
     } catch (error) { if (userRef.current === id) setMessage(getFriendlySupabaseError(error)); }
     finally { if (userRef.current === id) setIsLoadingTeacherSharedFiles(false); }

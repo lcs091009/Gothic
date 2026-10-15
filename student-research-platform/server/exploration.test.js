@@ -43,3 +43,16 @@ test("rejects incomplete JSON, missing explanations and hostile response sizes w
   for(const text of ['{"intro":"설명","choices":[', '{"intro":42,"choices":[]}', '{"intro":" ","choices":[]}',
     '({intro:"설명",choices:[]})',"x".repeat(100001),JSON.stringify({intro:["설명",{}],choices:[]})]) assert.equal(parseExploration(text),null);
 });
+
+test("repairs raw newlines/trailing commas without corrupting punctuation inside strings",()=>{
+  const reply='{"intro":"자료 설명\n둘째 줄, }", "choices":[{"question":"왜 연결될까?",},],"guidelines":[{"title":"준비","detail":"비교 기준을 선택해 보세요.","question":"내 기준은 무엇일까?",},],}';
+  const result=parseExploration(reply);assert.match(result.intro,/둘째 줄, }/);assert.equal(result.guidelines.length,1);assert.equal(result.choices.length,1);
+});
+test("plain explanation is usable without inventing topics or exposing broken JSON",()=>{
+  const text="선택한 효소 주제를 계속 살펴보려면 온도 조건을 어떻게 비교할지 먼저 판단해 볼 수 있어요. 자료에서 온도와 활성의 연결을 확인하고, 비교할 때 유지할 조건과 해석의 한계를 스스로 정해 보세요.";
+  const result=parseExploration(text);assert.equal(result.intro,text);assert.deepEqual(result.choices,[]);assert.equal(result.formatRecovered,true);
+  assert.equal(parseExploration('{"intro":"broken'),null);
+});
+test("document citations resolve to actual filenames",()=>{
+  assert.equal(readableReferences("자료 [D1]와 D99",[],[],[{name:"효소 자료.pdf"}]),"자료 「효소 자료.pdf」와 「근거 확인 필요」");
+});

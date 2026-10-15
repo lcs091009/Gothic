@@ -326,8 +326,8 @@ test("subject focus reaches the provider as data and persists through follow-up 
     const r=await f.call({body:{explorationSubject:"생명과학Ⅱ",explorationPath:path}});
     assert.equal(r.code,200);
     const messages=JSON.parse(f.providerCalls[0].options.body).messages;
-    assert.match(messages[0].content,/해당 과목의 핵심 개념/);
-    assert.match(messages[0].content,/근거가 부족하면 그 한계를 명시/);
+    assert.match(messages[0].content,/이 과목의 개념과 실제 자료/);
+    assert.match(messages[0].content,/원자료가 없거나 일부만 읽혔으면 한계를 먼저 밝힌다/);
     assert.match(messages[1].content,/"explorationSubject":"생명과학Ⅱ"/);
     assert.doesNotMatch(messages[0].content,/생명과학Ⅱ/);
   }
@@ -337,7 +337,7 @@ test("invalid subjects are rejected before quota or provider calls",async()=>{
     const f=fixture();const r=await f.call({body:{explorationSubject,explorationPath:[]}});
     assert.equal(r.code,400);assert.equal(f.quotaCalls,0);assert.equal(f.providerCalls.length,0);
   }
-  const f=fixture();assert.equal((await f.call({body:{explorationSubject:"화학"}})).code,400);assert.equal(f.quotaCalls,0);
+  const f=fixture();assert.equal((await f.call({body:{explorationSubject:"화학"}})).code,200);assert.equal(f.quotaCalls,1);
 });
 
 test("recoverable exploration replies use one provider call and keep the explanation",async()=>{
@@ -348,7 +348,7 @@ test("recoverable exploration replies use one provider call and keep the explana
     const f=fixture({raw:JSON.stringify({choices:[{message:{content:reply},finish_reason:"stop"}]})});
     const result=await f.call({body:{explorationPath:[],explorationSubject:"생명과학"}});
     assert.equal(result.code,200);assert.ok(result.body.exploration.intro);assert.equal(f.providerCalls.length,1);assert.equal(f.quotaCalls,1);
-    if(!result.body.exploration.choices.length) assert.match(result.body.warning,/직접 입력/);
+    if(!result.body.exploration.choices.length) assert.match(result.body.warning,/직접 주제를 입력/);
   }
 });
 test("truncated malformed exploration returns a distinct error without logging private contents",async()=>{
@@ -357,4 +357,34 @@ test("truncated malformed exploration returns a distinct error without logging p
   const result=await f.call({body:{explorationPath:[]}});
   assert.equal(result.code,502);assert.equal(result.body.code,"AI_EXPLORATION_FORMAT");assert.match(result.body.error,/잘렸습니다/);
   assert.doesNotMatch(JSON.stringify(f.logs),/PRIVATE-STUDENT-TEXT/);assert.equal(f.providerCalls.length,1);
+});
+
+const bodyText=(id,text)=>({id,text,characters:text.length,pages:2,unreadPages:0,partial:false});
+test("authorized attachment bodies reach initial and follow-up prompts, with file citations",async()=>{
+  const f=fixture({tables:{research_records:{data:[{id:selectedId,title:"내 활동",drive_file_id:"own-file",drive_file_name:"내 원본.pdf"}]},teacher_shared_files:{data:[{id:materialId,student_email:user.email,file_name:"선생님 과제",attachments:[{id:"teacher-file",name:"수업 자료.pdf"}]}]}},raw:JSON.stringify({choices:[{message:{content:JSON.stringify({intro:"두 자료의 효소 개념 [D1, D2]",choices:[],guidelines:[{title:"준비",detail:"온도 비교 기준을 선택해 보세요.",question:"내 기준은?"}]})}}]})});
+  const response=await f.call({body:{selectedRecordIds:[selectedId],selectedTeacherFiles:[{materialId,attachmentId:"teacher-file"}],documentTexts:[bodyText("own-file","내 문서의 촉매"),bodyText("teacher-file","선생님 문서의 활성화 에너지")],explorationPath:["효소의 온도 영향"],explorationSubject:"생명과학"}});
+  assert.equal(response.code,200);assert.equal(response.body.scope.documentsRead,2);assert.match(response.body.exploration.intro,/내 원본.pdf.*수업 자료.pdf/);
+  assert.equal(response.body.exploration.guidelines.length,1);assert.deepEqual(response.body.exploration.choices,[]);
+  const messages=JSON.parse(f.providerCalls[0].options.body).messages;assert.match(messages[1].content,/활성화 에너지/);assert.match(messages[1].content,/내 문서의 촉매/);
+});
+test("foreign/unselected attachment text is rejected before quota/provider calls",async()=>{
+  const f=fixture();const response=await f.call({body:{documentTexts:[bodyText("foreign","forged file body")]}});
+  assert.equal(response.code,400);assert.equal(f.quotaCalls,0);assert.equal(f.providerCalls.length,0);
+  const duplicate=fixture();assert.equal((await duplicate.call({body:{documentTexts:[bodyText("same","body"),bodyText("same","body")]}})).code,400);
+});
+test("teacher-only material analysis works without student activity records",async()=>{
+  const f=fixture({tables:{research_records:{data:[]},teacher_shared_files:{data:[{id:materialId,file_name:"교과 자료",attachments:[{id:"teacher-file",name:"선생님.pdf"}]}]}}});
+  const response=await f.call({body:{selectedRecordIds:[],selectedTeacherFiles:[{materialId,attachmentId:"teacher-file"}],documentTexts:[bodyText("teacher-file","관측값과 비교 기준")],explorationSubject:"물리학"}});
+  assert.equal(response.code,200);assert.equal(response.body.scope.scannedRecords,0);assert.equal(response.body.scope.documentsRead,1);
+});
+test("follow-up never exposes unrelated new topic choices returned by the model",async()=>{
+  const f=fixture({raw:JSON.stringify({choices:[{message:{content:JSON.stringify(explorationReply)}}]})});
+  const response=await f.call({body:{explorationPath:["효소 주제","진행 중 점검"]}});assert.equal(response.code,200);assert.deepEqual(response.body.exploration.choices,[]);
+  assert.match(JSON.parse(f.providerCalls[0].options.body).messages[0].content,/현재 필요한 2~4가지 안내/);
+});
+
+test("initial structured response renders analysis separately from recommendations",async()=>{
+  const payload={analysis:"1. 핵심 흐름\n자료의 온도 비교 [R1]",exploration:{intro:"생명과학과 연결",choices:[{title:"생명과학 · 효소",subject:"생명과학",question:"효소 활성은 어떻게 달라질까?",connection:"자료의 온도 기록"}]}};
+  const f=fixture({raw:JSON.stringify({choices:[{message:{content:JSON.stringify(payload)}}]})});
+  const response=await f.call();assert.equal(response.code,200);assert.match(response.body.analysis,/효소 실험/);assert.doesNotMatch(response.body.analysis,/"choices"|"analysis"/);assert.equal(response.body.exploration.choices[0].subject,"생명과학");
 });

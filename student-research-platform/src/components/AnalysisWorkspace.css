@@ -81,3 +81,23 @@
 .exploration-subject-custom input { flex:1; min-width:120px; padding:11px 14px; border:1px solid #d8e3d8; border-radius:14px; font:inherit; color:#293e31; background:white; }
 .exploration-subject-custom input:focus-visible { outline:3px solid #648675; outline-offset:3px; }
 .exploration-subject-picker .workspace-caption { margin:12px 0 0; }
+
+.subject-focus { padding:18px 0; margin-bottom:20px; border-bottom:1px solid #dfe7df; }
+.subject-focus-mode { display:flex; gap:8px; flex-wrap:wrap; }
+.subject-focus-mode button { border:1px solid #d8e3d8; border-radius:14px; padding:11px 14px; background:white; color:#466650; font:inherit; cursor:pointer; transition:transform 160ms,background 160ms; }
+.subject-focus-mode button[aria-pressed=true] { background:#52735e; color:white; border-color:#52735e; }
+.subject-focus-mode button:hover:not(:disabled) { transform:translateY(-2px); }
+.subject-focus-field { display:grid; grid-template-columns:auto minmax(0,1fr); gap:10px; align-items:center; margin-top:14px; max-width:500px; }
+.subject-focus-field select,.subject-focus-field input { min-width:0; width:100%; box-sizing:border-box; padding:12px; border:1px solid #d8e3d8; border-radius:12px; color:#293e31; background:white; font:inherit; }
+.subject-focus-field input { grid-column:2; }
+.subject-focus .workspace-caption { margin:10px 0 0; }
+.subject-focus button:focus-visible,.subject-focus select:focus-visible,.subject-focus input:focus-visible { outline:3px solid #648675; outline-offset:3px; }
+.exploration-guidelines { display:grid; gap:14px; margin-top:20px; }
+.exploration-guidelines h4 { margin-top:0; font-size:17px; }
+.exploration-stage-options { display:flex; flex-wrap:wrap; gap:8px; margin-top:22px; }
+.analysis-document-evidence,.analysis-file-failures { padding:16px; margin:16px 0; border-radius:14px; background:#f5f8f3; font-size:13px; line-height:1.8; overflow-wrap:anywhere; }
+.analysis-file-failures { border:1px solid #e1d3cc; }
+.analysis-file-failures button { border:1px solid #d8e3d8; border-radius:12px; padding:11px 14px; background:white; color:#466650; font:inherit; cursor:pointer; }
+@media(prefers-reduced-motion:reduce) { .subject-focus-mode button { transition:none; transform:none!important; } }
+
+.retained-view[hidden],.analysis-workspace[hidden],.ai-analysis-panel[hidden] { display:none!important; }
