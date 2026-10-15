@@ -26,10 +26,28 @@ test("DOCX/PPTX extract text while skipping image bytes",async()=>{
     const result=await readAnalysisDocument(file,"test-token",f);assert.match(result.text,/활성화 에너지 근거 비교/);
   }
 });
+test("spreadsheet cell addresses preserve missing columns, including AA and leading blanks",async()=>{
+  const xml='<worksheet><sheetData><row><c r="A1" t="inlineStr"><is><t>온도</t></is></c><c r="B1" t="inlineStr"><is><t>압력</t></is></c><c r="C1" t="inlineStr"><is><t>속도</t></is></c></row><row><c r="A2"><v>25</v></c><c r="C2"><v>99</v></c><c r="AA2"><v>7</v></c></row></sheetData></worksheet>';
+  const body=source=>zipSync({"xl/worksheets/sheet1.xml":strToU8(source)});
+  const result=await readAnalysisDocument(file,"test-token",reader("application/octet-stream",body(xml),"실험.xlsx"));
+  const [header,row]=result.text.split("\n").map(line=>line.split("\t"));
+  assert.deepEqual(header,["온도","압력","속도"]);assert.equal(row[0],"25");assert.equal(row[1],"");assert.equal(row[2],"99");assert.equal(row[26],"7");
+  const leading=await readAnalysisDocument(file,"test-token",reader("application/octet-stream",body('<worksheet><row><c r="C1"><v>99</v></c></row></worksheet>'),"실험.xlsx"));
+  assert.equal(leading.text,"\t\t99");
+  await assert.rejects(readAnalysisDocument(file,"test-token",reader("application/octet-stream",body(xml.replace("AA2","XFE2")),"실험.xlsx")),/열 범위/);
+});
 test("PDF reads every page, counts image-only pages and destroys resources",async()=>{
   let destroyed=false;const visited=[];
   const result=await pdfDocumentText({numPages:3,getPage:async number=>{visited.push(number);return {getTextContent:async()=>({items:number===2 ? []:[{str:`페이지 ${number}`,hasEOL:true}]}),cleanup(){}};},destroy:async()=>{destroyed=true;}});
   assert.deepEqual(visited,[1,2,3]);assert.equal(result.pages,3);assert.equal(result.unreadPages,1);assert.equal(result.partial,true);assert.ok(destroyed);assert.match(result.text,/페이지 3/);
+});
+test("image-only PDFs fail before analysis and always release their resources",async()=>{
+  let destroyed=false,cleaned=0;
+  const result=await readAnalysisDocuments([{id:"scan",name:"스캔.pdf"}],"test-token",{read:()=>pdfDocumentText({
+    numPages:2,getPage:async()=>({getTextContent:async()=>({items:[]}),cleanup(){cleaned++;}}),destroy:async()=>{destroyed=true;}
+  })});
+  assert.deepEqual(result.documents,[]);assert.equal(result.failures.length,1);assert.match(result.failures[0].message,/스캔 PDF/);
+  assert.equal(destroyed,true);assert.equal(cleaned,2);
 });
 test("permission/format failures are listed per file while valid bodies remain available",async()=>{
   const result=await readAnalysisDocuments([{id:"a",name:"내 자료"},{id:"b",name:"권한 제한"}],"test-token",{read:async file=>{

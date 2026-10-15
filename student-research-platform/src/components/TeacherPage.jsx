@@ -3,14 +3,13 @@ import AttachmentLinks from "./AttachmentLinks";
 import StudentDirectory from "./StudentDirectory";
 import AssignmentComposer from "./AssignmentComposer";
 import { useScopedMessage } from "../hooks/useScopedMessage";
-import { groupAssignmentDeliveries, recallAssignmentRows } from "../services/teacherAssignments";
+import { fetchTeacherAssignments, groupAssignmentDeliveries, recallAssignmentRows } from "../services/teacherAssignments";
 import "../pages/StudentHome.css";
 import "./TeacherPage.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getFriendlySupabaseError,
   isSupabaseConfigured,
-  supabase,
   supabaseConfigError,
   withRetry,
 } from "../lib/supabaseClient";
@@ -63,18 +62,7 @@ function TeacherPage({ session }) {
     setIsLoadingFiles(true);
 
     try {
-      const { data, error } = await withRetry(() =>
-        supabase
-          .from("teacher_shared_files")
-          .select("*")
-          .eq("teacher_id", session.user.id)
-          .order("created_at", { ascending: false })
-      );
-
-      if (error) {
-        reportMessage(getFriendlySupabaseError(error));
-        return;
-      }
+      const data=await withRetry(()=>fetchTeacherAssignments(session.user.id));
 
       if(version===loadVersion.current) setSharedFiles(data || []);
     } catch (error) {

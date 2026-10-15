@@ -41,6 +41,21 @@ export async function deliverAssignmentRows(rows, client = supabase) {
   if (error) throw error;
 }
 
+export async function fetchTeacherAssignments(teacherId,client=supabase) {
+  const files=[];let before;
+  while(true) {
+    let query=client.from("teacher_shared_files").select("*").eq("teacher_id",teacherId)
+      .order("created_at",{ascending:false}).order("id",{ascending:false}).limit(500);
+    // A cursor keeps simultaneous inserts/deletes from shifting later pages.
+    if(before) query=query.or(`created_at.lt.${before.created_at},and(created_at.eq.${before.created_at},id.lt.${before.id})`);
+    const {data,error}=await query;
+    if(error) throw error;
+    files.push(...data);
+    if(data.length<500) return files;
+    before=data.at(-1);
+  }
+}
+
 // A single bulk write has one created_at value; show it as one delivery in the
 // teacher's history while preserving separate recipient rows for student RLS.
 export function groupAssignmentDeliveries(files) {
