@@ -13,3 +13,18 @@ test("imported core courses keep first and second semester criteria separate and
   assert.ok(first.standards.length>0);assert.ok(first.standards.every(s=>s.code.startsWith("10공수1-")));
   for(const course of courses) for(const criterion of course.standards) {assert.match(criterion.code,/^1[02]/);assert.ok(criterion.objective.length>7);assert.ok(!Array.from(criterion.objective).some(char=>char.charCodeAt(0)<32));}
 });
+
+test("workbook unit references apply only to the matching course and revision; absent lesson goals remain absent",()=>{
+  const current=curriculumLearningContext({admissionYear:2025,selected:[]},[],"공통수학1");
+  assert.equal(current.textbookReferences.length,1);
+  const book=current.textbookReferences[0];
+  assert.equal(book.textbook,"비상 공통수학1(김원경)");
+  assert.equal(book.units.length,18);
+  assert.deepEqual(book.units[2],{large:"Ⅰ 다항식",middle:"2 나머지 정리와 인수분해",small:"02 인수분해",lessonObjective:null});
+  assert.ok(book.units.every(unit=>unit.lessonObjective===null));
+  assert.ok(book.units.every(unit=>Object.keys(unit).sort().join(",")==="large,lessonObjective,middle,small"));
+  assert.match(current.rule,/성취기준으로 대체하거나 추측하지 않는다/);
+  for(const [admissionYear,subject] of [[2024,"공통수학1"],[2025,"공통수학2"],[undefined,"공통수학1"],[2025,"생명과학"]]) {
+    assert.deepEqual(curriculumLearningContext({admissionYear,selected:[]},[],subject).textbookReferences,[]);
+  }
+});

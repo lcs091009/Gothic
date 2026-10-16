@@ -60,3 +60,14 @@ test("attachment excerpts disclose partial content and include passages matching
   const {userPrompt,scope}=buildAnalysisContext({selected_choices:{}},[{drive_file_id:"source",drive_file_name:"원문.pdf"}],[],"",[{id:"source",text:content,characters:content.length,partial:false,pages:50,unreadPages:2}],"생명과학 효소");
   const data=JSON.parse(userPrompt.slice(userPrompt.indexOf("{")));assert.equal(data.documents[0].fileName,"원문.pdf");assert.match(data.documents[0].text,/활성화 에너지/);assert.ok(data.documents[0].text.length<=12000);assert.equal(data.documents[0].partial,true);assert.equal(scope.documentsPartial,1);assert.equal(scope.documentEvidence[0].unreadPages,2);
 });
+
+test("topic and follow-up prompts receive workbook units without changing other screens' scope",()=>{
+  for(const focus of ["", "인수분해의 활용"]) {
+    const {userPrompt,scope}=buildAnalysisContext({current_grade:"2"},[],[],"",[],focus,"공통수학1");
+    const data=JSON.parse(userPrompt.slice(userPrompt.indexOf("{")));
+    assert.equal(data.academic.learning.textbookReferences[0].units.length,18);
+    assert.equal(data.academic.learning.textbookReferences[0].units[0].lessonObjective,null);
+    assert.equal(scope.textbookReferences,undefined);
+    assert.ok(scope.curriculumEvidence.every(course=>!course.textbookReferences));
+  }
+});
