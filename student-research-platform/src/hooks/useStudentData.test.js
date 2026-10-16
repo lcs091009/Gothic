@@ -19,3 +19,28 @@ test("same-user auth refresh preserves loaded data; actual account change clears
   await act(async()=>root.update(createElement(Harness,{session:null})));assert.equal(value.profile,null);assert.deepEqual(value.records,[]);
   await act(async()=>root.unmount());
 });
+
+test("failed teacher or academic fetch cannot discard successfully loaded records; errors survive until retry",async()=>{
+  let hook,root,fail=true;
+  const service={ensureProfile:async user=>({id:user.id,role:"student"}),fetchResearchRecords:async()=>[{id:"record"}],fetchTeacherSharedFiles:async()=>{if(fail) throw Error("materials unavailable");return [{id:"material"}];},fetchAcademicProfile:async()=>{if(fail) throw Error("academic unavailable");return {current_grade:"2"};}};
+  function Harness(){hook=useStudentData({user:{id:"one",email:"one@test"}},()=>{},service);return null;}
+  try {
+    await act(async()=>{root=create(createElement(Harness));});
+    assert.equal(hook.records.length,1);assert.ok(hook.dataErrors.materials);assert.ok(hook.dataErrors.academic);assert.equal(hook.isLoadingResearchRecords,false);
+    fail=false;await act(async()=>hook.reloadStudentData());
+    assert.equal(hook.records.length,1);assert.equal(hook.teacherSharedFiles.length,1);assert.equal(hook.dataErrors.materials,"");assert.equal(hook.academicProfile.current_grade,"2");
+  } finally {if(root) await act(async()=>root.unmount());}
+});
+
+test("record errors are explicit and retryable; a delayed initial read cannot overwrite a newer refresh",async()=>{
+  let hook,root,release,call=0;
+  const service={ensureProfile:async user=>({id:user.id,role:"student"}),fetchAcademicProfile:async()=>({}),fetchTeacherSharedFiles:async()=>[],fetchResearchRecords:async()=>{call++;if(call===1) throw Error("records unavailable");if(call===2) return new Promise(resolve=>{release=resolve;});return [{id:"new-record"}];}};
+  function Harness(){hook=useStudentData({user:{id:"one",email:"one@test"}},()=>{},service);return null;}
+  try {
+    await act(async()=>{root=create(createElement(Harness));});
+    assert.ok(hook.dataErrors.records);assert.equal(hook.isLoadingResearchRecords,false);
+    await act(async()=>hook.reloadStudentData());assert.equal(hook.isLoadingResearchRecords,true);
+    await act(async()=>hook.loadResearchRecords("one"));assert.equal(hook.records[0].id,"new-record");
+    await act(async()=>release([{id:"stale-record"}]));assert.equal(hook.records[0].id,"new-record");assert.equal(hook.dataErrors.records,"");
+  } finally {if(root) await act(async()=>root.unmount());}
+});
