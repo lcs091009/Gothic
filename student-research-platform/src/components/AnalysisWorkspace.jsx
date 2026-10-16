@@ -5,7 +5,7 @@ import { analysisSections } from "../lib/analysisSections";
 import "./AnalysisWorkspace.css";
 import ExplorationPage from "./ExplorationPage";
 
-export default function AnalysisWorkspace({analysis,loading,message,scope,warning,records,files,onBack,onRetry,exploration,extraContext,academicProfile,documentTexts=[],initialSubject="",fileProgress="",explorationState,onExplorationChange,readOnly=false,onResume}) {
+export default function AnalysisWorkspace({analysis,loading,message,scope,warning,records,files,onBack,onRetry,exploration,extraContext,academicProfile,documentTexts=[],initialSubject="",fileProgress="",explorationState,onExplorationChange,readOnly=false,onResume,noteId}) {
   const [active,setActive]=useState(0);
   const [exploring,setExploring]=useState(false);
   const heading=useRef(null);
@@ -15,7 +15,7 @@ export default function AnalysisWorkspace({analysis,loading,message,scope,warnin
   const sections=analysisSections(analysis);
   const subjects=new Map();
   for(const record of records) { const name=record.subject || "과목 미입력";subjects.set(name,(subjects.get(name)||0)+1); }
-  const explorationView=<ExplorationPage readOnly={readOnly} initialState={explorationState} onChange={onExplorationChange} documentTexts={documentTexts} initialSubject={initialSubject} academicProfile={academicProfile} seed={exploration} records={records} files={files} extraContext={extraContext} onBack={()=>setExploring(false)} />;
+  const explorationView=<ExplorationPage noteId={noteId} readOnly={readOnly} initialState={explorationState} onChange={onExplorationChange} documentTexts={documentTexts} initialSubject={initialSubject} academicProfile={academicProfile} seed={exploration} records={records} files={files} extraContext={extraContext} onBack={()=>setExploring(false)} />;
   return <section className="analysis-workspace">
     <aside className="analysis-workspace-nav">
       <button type="button" onClick={onBack}>← 자료 선택</button>
@@ -31,7 +31,7 @@ export default function AnalysisWorkspace({analysis,loading,message,scope,warnin
       <div className="analysis-flow" aria-label="분석에 사용한 자료의 연결">
         {[{label:"활동 기록",value:`${records.length}개`},{label:"관련 과목",value:`${subjects.size}개`},{label:"선생님 첨부",value:`${files.length}개`},{label:"다음 탐구",value:analysis ? "제안 확인" : "분석 중"}].map(item=><div key={item.label}><small>{item.label}</small><strong>{item.value}</strong></div>)}
       </div>
-      {loading && <ExplorationLoading title={fileProgress ? "첨부 자료의 본문을 읽고 있어요":"AI가 활동 분석과 탐구 주제를 작성하고 있어요"} description={fileProgress || "읽은 자료의 근거와 교과 개념을 연결합니다. 화면을 이동해도 요청은 유지됩니다."} onCancel={onBack} />}
+      {loading && <ExplorationLoading title={fileProgress ? "첨부 자료의 본문을 읽고 있어요":"AI가 활동 분석과 탐구 주제를 작성하고 있어요"} description={fileProgress || "읽은 자료의 근거와 교과 개념을 연결합니다. 서버에 접수된 분석은 화면을 닫아도 계속되고 노트에 저장돼요."} cancelLabel="자료 선택으로 돌아가기" onCancel={onBack} />}
       {message && <div className="analysis-workspace-error" role="alert"><p>{message}</p><button type="button" disabled={loading} onClick={onRetry}>다시 분석</button></div>}
       {warning && <p className="workspace-caption" role="status">{warning}</p>}
       {analysis && !loading && <article className="analysis-section" aria-live="polite"><div className="analysis-section-title"><span>{String(sections[active]?.number || 1).padStart(2,"0")}</span><h3>{sections[active]?.title}</h3></div>

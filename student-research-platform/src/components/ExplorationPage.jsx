@@ -1,3 +1,4 @@
+import {runAnalysisJob,getAnalysisAccessToken} from "../lib/analysisJobs.js";
 import {requestDocumentTexts} from "../lib/analysisDocumentExcerpt.js";
 import ExplorationEmphasis from "./ExplorationEmphasis.js";
 import SubjectConnection from "./SubjectConnection";
@@ -12,7 +13,7 @@ const stages=[
   {label:"결과 해석",question:"이 주제의 결과를 해석할 때 확인할 근거와 한계를 안내해 줘. 실제 결과는 아직 제시하지 않았으니 만들지 마."},
   {label:"탐구 정리",question:"같은 주제의 탐구를 정리할 때 남기면 좋은 근거와 성찰 질문을 안내해 줘. 내가 수행하지 않은 사실은 만들지 마."}
 ];
-export default function ExplorationPage({seed,records,files,extraContext,onBack,academicProfile,documentTexts=[],initialSubject="",initialState,onChange,readOnly=false}) {
+export default function ExplorationPage({seed,records,files,extraContext,onBack,academicProfile,documentTexts=[],initialSubject="",initialState,onChange,readOnly=false,noteId}) {
   const [subject,setSubject]=useState(initialState?.subject ?? initialSubject);
   const [steps,setSteps]=useState(initialState?.steps?.length ? initialState.steps:[{path:[],result:seed}]);
   const [loading,setLoading]=useState(false),[error,setError]=useState(""),[question,setQuestion]=useState("");
@@ -31,21 +32,20 @@ export default function ExplorationPage({seed,records,files,extraContext,onBack,
     const controller=new AbortController();pending.current=controller;
     if(append) {setExpanded([steps.length]);setSteps(previous=>[...previous,{path,result:null,connection}]);}
     setLoading(true);setError("");setQuestion("");
-    const timeout=setTimeout(()=>{if(pending.current===controller){controller.abort();pending.current=null;setLoading(false);setError("응답 시간이 길어졌습니다. 선택한 주제와 자료는 유지됩니다. 다시 시도해 주세요.");}},120_000);
     try {
       const {data,error:authError}=await supabase.auth.getSession();if(controller.signal.aborted) return;
       if(authError || !data.session?.access_token) throw new Error("다시 로그인한 뒤 탐구를 이어가 주세요.");
-      const response=await fetch("/api/analyze",{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json",Authorization:`Bearer ${data.session.access_token}`},
-        body:JSON.stringify({extraContext,documentTexts:requestDocumentTexts(documentTexts,[nextSubject,...explorationContextPath(path)].join(" ")),explorationSubject:nextSubject.trim(),selectedRecordIds:records.map(record=>record.id),selectedTeacherFiles:files.map(file=>({materialId:file.materialId,attachmentId:file.id})),explorationPath:explorationContextPath(path)})});
-      const result=await response.json();if(controller.signal.aborted) return;
-      if(!response.ok || !result.exploration) throw new Error(result.error || "탐구 안내를 받지 못했습니다. 선택한 주제는 유지됩니다.");
+      const result=await runAnalysisJob({extraContext,documentTexts:requestDocumentTexts(documentTexts,[nextSubject,...explorationContextPath(path)].join(" ")),explorationSubject:nextSubject.trim(),selectedRecordIds:records.map(record=>record.id),selectedTeacherFiles:files.map(file=>({materialId:file.materialId,attachmentId:file.id})),explorationPath:explorationContextPath(path),...(noteId ? {noteId}:{})},
+        {signal:controller.signal,getToken:()=>getAnalysisAccessToken(supabase.auth)});
+      if(controller.signal.aborted) return;
+      if(!result.exploration) throw new Error("탐구 안내를 받지 못했어요. 선택한 주제는 유지됩니다.");
       setSteps(previous=>previous.map((item,index)=>index===previous.length-1 ? {...item,result:result.exploration,warning:result.warning,timings:result.timings}:item));
     } catch(e) {if(!controller.signal.aborted) setError(e.name==="SyntaxError" ? "서비스 응답을 읽지 못했습니다. 선택한 주제는 유지됩니다. 다시 시도해 주세요.":e.message);}
-    finally {clearTimeout(timeout);if(pending.current===controller) {pending.current=null;setLoading(false);}}
+    finally {if(pending.current===controller) {pending.current=null;setLoading(false);}}
   }
   function cancel() {
     pending.current?.abort();pending.current=null;setLoading(false);
-    setError("요청을 멈췄어요. 선택과 이전 카드는 유지되며 다시 시도할 수 있어요.");
+    setError("화면 대기를 멈췄어요. 서버에 접수된 분석은 계속 진행되고 결과는 활동 분석 노트에 저장돼요.");
   }
   return <section className="exploration-workspace exploration-inline">
     <header className="exploration-inline-header"><div><p className="student-eyebrow">나의 탐구 가이드</p><h3>선택한 주제를 한 걸음씩</h3></div><button type="button" onClick={onBack}>카드 접기</button></header>

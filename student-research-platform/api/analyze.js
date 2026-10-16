@@ -43,7 +43,7 @@ export function providerFailure(status) {
 }
 
 export function createAnalyzeHandler({ env = process.env, fetchImpl = fetch, clientFactory = createClient,
-  logger = console, timeoutMs=ANALYSIS_TIMEOUT_MS } = {}) {
+  logger = console, onResult=null, timeoutMs=ANALYSIS_TIMEOUT_MS } = {}) {
 return async function handler(request, response) {
   const startedAt=Date.now();
   response.setHeader("Cache-Control", "no-store");
@@ -243,7 +243,7 @@ return async function handler(request, response) {
         : "AI가 읽을 수 있는 설명 형식으로 답하지 못했습니다. 선택 경로는 유지됩니다. 다시 시도해 주세요."});
     }
     const readable = value=>readableReferences(value,records,teacherSharedFiles,documentTexts.map(file=>({name:records.find(record=>record.drive_file_id===file.id)?.drive_file_name || teacherSharedFiles.flatMap(material=>material.attachments || []).find(attachment=>attachment.id===file.id)?.name || "첨부 자료"})));
-    return response.status(200).json({
+    const payload={
       analysis: explorationPath !== undefined ? "" : readable(initial.analysis),
       exploration: exploration ? {intro:readable(exploration.intro),choices:explorationPath?.length ? [] : exploration.choices.map(c=>choiceWithSources(c,records,teacherSharedFiles,readable)),
         guidelines:(exploration.guidelines || []).map(item=>({...item,title:readable(item.title),detail:readable(item.detail),question:readable(item.question).slice(0,400)}))} : null,
@@ -254,7 +254,9 @@ return async function handler(request, response) {
       warning: [initial?.formatRecovered || exploration?.formatRecovered ? "응답 형식이 일부 달라 확인된 설명만 표시했어요. 탐구 안내가 비어 있으면 같은 자료로 주제 추천을 다시 요청할 수 있어요.":"",
         choice.finish_reason === "length" ? "응답 길이 제한으로 분석 일부가 생략되었을 수 있습니다." : "",
         exploration && !explorationPath?.length && !exploration.choices.length ? "설명은 받았지만 주제 선택지는 반환되지 않았습니다. 직접 주제를 입력하거나 주제 제안을 다시 요청할 수 있어요." : ""].filter(Boolean).join(" ") || null,
-    });
+    };
+    if(onResult) await run(()=>onResult(payload,{user,records,teacherSharedFiles,extraContext,explorationSubject,explorationPath}));
+    return response.status(200).json(payload);
   } catch (error) {
     if (error.name === "AbortError") {
       return response.status(504).json({

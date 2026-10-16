@@ -90,7 +90,7 @@ async function loadGooglePickerLibraries() {
   });
 }
 
-async function getGoogleAccessToken({ forceConsent = false, selectAccount = false } = {}) {
+async function getGoogleAccessToken({ forceConsent = false, selectAccount = false, interactive = true } = {}) {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
   if (!googleClientId) {
@@ -136,6 +136,7 @@ async function getGoogleAccessToken({ forceConsent = false, selectAccount = fals
     return googleAccessTokenRef.current;
   }
 
+  if(!interactive) throw new Error("Google 자료 연결이 필요해요. ‘Google 자료 계정 연결’을 눌러 한 번 연결해 주세요. 분석 버튼에서는 로그인 창을 열지 않아요.");
   googleAuthRequestRef.current?.abort();
   if (!window.google?.accounts?.oauth2) {
     await loadScript("https://accounts.google.com/gsi/client");

@@ -32,7 +32,7 @@ function fixture(overrides = {}) {
     async rpc(name) { quotaCalls++; assert.equal(name, "consume_ai_analysis_quota"); return overrides.quota || { data: { allowed: true } }; },
   };
   const handler = createAnalyzeHandler({ env: overrides.env || env, clientFactory: () => client,
-    logger: { warn: (...args) => logs.push(args) },timeoutMs:overrides.timeoutMs,
+    logger: { warn: (...args) => logs.push(args) },onResult:overrides.onResult,timeoutMs:overrides.timeoutMs,
     fetchImpl: async (url, options) => {
       providerCalls.push({ url, options });
       if(overrides.hangProvider) return new Promise(()=>{});
@@ -406,4 +406,10 @@ test("reports stage durations without exposing student data or credentials",asyn
   const f=fixture();const response=await f.call();assert.equal(response.code,200);
   assert.deepEqual(Object.keys(response.body.timings).sort(),["preparationMs","providerMs","totalMs"]);
   for(const value of Object.values(response.body.timings)) assert.ok(Number.isFinite(value) && value>=0);
+});
+
+test("server persistence receives authenticated source context and finishes before success is returned",async()=>{
+  let saved=false;
+  const f=fixture({onResult:async(payload,context)=>{await Promise.resolve();assert.equal(context.user.id,user.id);assert.equal(context.records[0].title,"효소 실험");payload.noteId="persisted-note";saved=true;}});
+  const response=await f.call();assert.equal(response.code,200);assert.equal(saved,true);assert.equal(response.body.noteId,"persisted-note");
 });
