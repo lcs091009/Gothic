@@ -12,7 +12,10 @@ test("follow-up appends collapsible cards, preserves earlier answers and retries
     const {default:Page}=await server.ssrLoadModule("/src/components/ExplorationPage.jsx");
     const seed={intro:"자료 연결",choices:[{title:"효소 탐구",subject:"생명과학",question:"온도에 따른 효소 반응",sources:[]}],guidelines:[]};
     const requests=[];let fail=false,saved;
-    globalThis.fetch=async(url,options)=>{requests.push(JSON.parse(options.body));return {ok:!fail,json:async()=>fail ? {error:"일시 실패"}:{exploration:{intro:"첫 안내",choices:[],guidelines:[{title:"통제 변인",detail:"온도 외 조건을 일정하게",question:"반복 측정은 어떻게?"}]}}};};
+    globalThis.fetch=async(url,options)=>{
+      if(options.method==="POST") {requests.push(JSON.parse(options.body));return {ok:true,json:async()=>({jobId:"00000000-0000-4000-8000-000000000001"})};}
+      return {ok:true,json:async()=>fail ? {status:"failed",error:"일시 실패"}:{status:"completed",result:{exploration:{intro:"첫 안내",choices:[],guidelines:[{title:"통제 변인",detail:"온도 외 조건을 일정하게",question:"반복 측정은 어떻게?"}]}}}};
+    };
     await act(async()=>{root=create(createElement(Page,{seed,records:[],files:[],onBack:()=>{},onChange:value=>{saved=value;}}));});
     const content=node=>typeof node==="string" ? node:(node.children || []).map(content).join("");
     const button=text=>root.root.findAllByType("button").find(node=>content(node).includes(text));

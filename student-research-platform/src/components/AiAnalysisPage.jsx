@@ -1,3 +1,4 @@
+import {runAnalysisJob,getAnalysisAccessToken} from "../lib/analysisJobs.js";
 import AnalysisNotebook from "./AnalysisNotebook";
 import {useAnalysisNotes} from "../hooks/useAnalysisNotes";
 import {analysisNoteContent,noteTitle} from "../lib/analysisNotes.js";
@@ -99,7 +100,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
     const key=documents.map(file=>file.id).sort().join("|");
     // Start any needed Google authorization in the original button gesture.
     const canReuse=!forceRead && readyKey.current===key && readyDocuments && (allowUnread || (readyComplete.current && Date.now()-readyAt.current<600_000));
-    const tokenPromise=documents.length && !canReuse ? getDriveAccessToken?.() : null;
+    const tokenPromise=documents.length && !canReuse ? getDriveAccessToken?.({interactive:false}) : null;
     if(!canReuse) setFileFailures([]);
     setIsAnalyzing(true);setFileProgress("");
     setWorkspace(true);
@@ -131,41 +132,12 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
         return;
       }
       if (controller.signal.aborted) return;
-      const response = await fetch("/api/analyze", {
-        signal: controller.signal,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-        },
-        body: JSON.stringify({
-          extraContext,explorationSubject:subject,documentTexts:requestDocumentTexts(documentTexts,[subject,extraContext].join(" ")),
-          selectedRecordIds,
-          selectedTeacherFiles: selectedFiles.map(file=>({materialId:file.materialId,attachmentId:file.id})),
-        }),
-      });
-
-      const rawText = await response.text();
-      if (controller.signal.aborted) return;
-
-      let data = null;
-
-      try {
-        data = JSON.parse(rawText);
-      } catch {
-        setMessage(
-          "분석 서비스에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요."
-        );
-        return;
-      }
-
-      if (!response.ok) {
-        setMessage(data.error || "활동 흐름 분석 중 오류가 발생했습니다.");
-        return;
-      }
-
-      const inputs={records:selectedRecords,files:selectedFiles,extraContext,subject,documentTexts};
-      setRestoredNote(false);setCurrentNote({id:crypto.randomUUID(),title:noteTitle(inputs),content:analysisNoteContent({analysis:data.analysis || "",exploration:data.exploration,inputs,scope:data.scope,warning:data.warning})});
+      clearTimeout(timeout);
+      const data=await runAnalysisJob({extraContext,explorationSubject:subject,documentTexts:requestDocumentTexts(documentTexts,[subject,extraContext].join(" ")),selectedRecordIds,
+        selectedTeacherFiles:selectedFiles.map(file=>({materialId:file.materialId,attachmentId:file.id})),budgetMs:Math.max(1000,Math.min(110000,120000-(Date.now()-preparationStartedAt)))},
+        {signal:controller.signal,getToken:()=>getAnalysisAccessToken(supabase.auth)});
+      if(controller.signal.aborted) return;
+      setRestoredNote(false);setCurrentNote({id:data.noteId || crypto.randomUUID(),title:noteTitle(inputs),content:analysisNoteContent({analysis:data.analysis || "",exploration:data.exploration,inputs,scope:data.scope,warning:data.warning})});
       setResultInputs(inputs);
       setAnalysis(data.analysis || "분석 결과가 비어 있습니다.");
       setExploration(data.exploration || null);
@@ -181,16 +153,17 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
 
   const selectedChoices = academicProfile?.selected_choices || {};
 
-  const workspaceView=<AnalysisWorkspace readOnly={restoredNote} onResume={()=>{setSelection(new Set(currentNote.content.inputs.records.map(record=>record.id)));setTeacherSelection(new Set(currentNote.content.inputs.files.map(file=>file.key)));setSubject(currentNote.content.inputs.subject);setExtraContext(currentNote.content.inputs.extraContext);setWorkspace(false);setNotesView(false);setMessage("원본 자료를 확인하고 분석을 눌러 주세요. 새 결과는 별도 노트로 저장됩니다.");}} key={currentNote?.id || "pending"} explorationState={currentNote?.content.explorationState} onExplorationChange={changeExploration} analysis={analysis} loading={isAnalyzing} message={message} scope={scope} warning={warning}
+  const workspaceView=<AnalysisWorkspace noteId={currentNote?.id} readOnly={restoredNote} onResume={()=>{setSelection(new Set(currentNote.content.inputs.records.map(record=>record.id)));setTeacherSelection(new Set(currentNote.content.inputs.files.map(file=>file.key)));setSubject(currentNote.content.inputs.subject);setExtraContext(currentNote.content.inputs.extraContext);setWorkspace(false);setNotesView(false);setMessage("원본 자료를 확인하고 분석을 눌러 주세요. 새 결과는 별도 노트로 저장됩니다.");}} key={currentNote?.id || "pending"} explorationState={currentNote?.content.explorationState} onExplorationChange={changeExploration} analysis={analysis} loading={isAnalyzing} message={message} scope={scope} warning={warning}
     academicProfile={academicProfile} documentTexts={resultInputs?.documentTexts || []} initialSubject={resultInputs?.subject || ""} fileProgress={fileProgress} exploration={exploration} extraContext={resultInputs?.extraContext || ""}
     records={resultInputs?.records || []} files={resultInputs?.files || []}
-    onBack={()=>{requestRef.current?.abort(); requestRef.current=null; setIsAnalyzing(false); setWorkspace(false); setMessage("");}}
+    onBack={()=>{setWorkspace(false);setMessage("");}}
     onRetry={handleAnalyze} />;
 
   return (
     <>
     <div className="analysis-shell">
     <nav className="analysis-top-tabs" aria-label="활동 분석 메뉴"><button type="button" aria-pressed={!workspace && !notesView} onClick={()=>{setWorkspace(false);setNotesView(false);}}>자료 선택</button><button type="button" aria-pressed={notesView} onClick={()=>{setWorkspace(false);setNotesView(true);notebook.refresh();}}>활동 분석 노트 ({notebook.notes.length})</button></nav>
+    {isAnalyzing && !workspace && <button type="button" className="student-back" onClick={()=>{setNotesView(false);setWorkspace(true);}}>분석 진행 중 · 진행 화면 보기</button>}
     {(notebook.status || notebook.error) && <div className="analysis-note-status" role="status">{notebook.error || notebook.status}{notebook.error && currentNote && <button type="button" onClick={()=>notebook.save(currentNote)}>저장 다시 시도</button>}</div>}
     {notesView && <AnalysisNotebook notes={notebook.notes} onOpen={openNote} opening={openingNote} onRefresh={notebook.refresh} error={notebook.error || message} />}
     <RetainedView active={workspace}>{workspaceView}</RetainedView>

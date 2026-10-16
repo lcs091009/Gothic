@@ -1,6 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
-    "api/analyze.js": { "maxDuration": 120 }
+    "api/analyze.js": {
+      "maxDuration": 120
+    },
+    "api/analysis-jobs.js": {
+      "maxDuration": 130
+    }
   }
 }
