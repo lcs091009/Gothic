@@ -2,20 +2,31 @@ const endpoint="https://www.googleapis.com/drive/v3/files/";
 const TEXT_LIMIT=2_000_000;
 function check(signal) {signal?.throwIfAborted();}
 export async function pdfDocumentText(document,{signal,onProgress=()=>{}}={}) {
-  const pieces=[];let characters=0,kept=0,unreadPages=0;
+  const pieces=[];let characters=0,kept=0,unreadPages=0,completed=0;
+  const readPage=async page=>{
+    check(signal);const current=await document.getPage(page);
+    try {
+      const data=await current.getTextContent();check(signal);
+      const text=data.items.map(item=>typeof item.str==="string" ? item.str+(item.hasEOL ? "\n":" "):"").join("").trim();
+      completed++;onProgress(`${completed}/${document.numPages}쪽 읽는 중`);
+      return {page,text:text.slice(0,TEXT_LIMIT),characters:text.length};
+    } finally {current.cleanup();}
+  };
   try {
-    for(let page=1;page<=document.numPages;page++) {
-      check(signal);const current=await document.getPage(page);
-      try {
-        const data=await current.getTextContent();check(signal);
-        const text=data.items.map(item=>typeof item.str==="string" ? item.str+(item.hasEOL ? "\n":" ") : "").join("").trim();
-        if(!text) unreadPages++;
-        characters+=text.length;
-        if(text && kept<TEXT_LIMIT) {const part=text.slice(0,TEXT_LIMIT-kept);pieces.push(`[${page}쪽]\n${part}`);kept+=part.length;}
-        onProgress(`${page}/${document.numPages}쪽 읽는 중`);
-      } finally {current.cleanup();}
+    // Batches overlap up to three Drive range reads, cap retained text memory,
+    // and preserve source order even when pages finish out of order.
+    for(let start=1;start<=document.numPages;start+=3) {
+      check(signal);
+      const results=await Promise.allSettled(Array.from({length:Math.min(3,document.numPages-start+1)},(_,index)=>readPage(start+index)));
+      const failure=results.find(result=>result.status==="rejected");if(failure) throw failure.reason;
+      for(const {value} of results) {
+        if(!value.characters) unreadPages++;
+        characters+=value.characters;
+        const part=value.text.slice(0,Math.max(0,TEXT_LIMIT-kept));kept+=part.length;
+        if(part) pieces.push(`[${value.page}쪽]\n${part}`);
+      }
     }
-    const text=pieces.join("\n\n");
+    const text=pieces.filter(Boolean).join("\n\n");
     if(!text.trim()) throw new Error("텍스트가 없는 스캔 PDF입니다. 텍스트를 인식한 PDF나 문서로 다시 첨부해 주세요.");
     return {text,characters:Math.max(characters,text.length),pages:document.numPages,unreadPages,partial:characters>kept || unreadPages>0};
   } finally {await (document.loadingTask ? document.loadingTask.destroy() : document.destroy());}

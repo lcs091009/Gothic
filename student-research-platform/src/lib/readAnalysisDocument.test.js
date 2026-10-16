@@ -71,3 +71,21 @@ test("real PDF.js extracts source text from a valid PDF byte stream",async()=>{
   const result=await pdfDocumentText(await getDocument({data:new TextEncoder().encode(pdf),isEvalSupported:false}).promise);
   assert.equal(result.pages,1);assert.equal(result.partial,false);assert.match(result.text,/Original enzyme source/);
 });
+
+test("PDF page reads overlap in batches of three and preserve order despite out-of-order completion",async()=>{
+  let active=0,peak=0,cleaned=0,destroyed=0;const releases=new Map();
+  const task=pdfDocumentText({numPages:6,getPage:async number=>({
+    getTextContent:async()=>{active++;peak=Math.max(peak,active);await new Promise(resolve=>releases.set(number,resolve));active--;return {items:[{str:`본문${number}`}]};},cleanup(){cleaned++;}
+  }),destroy:async()=>{assert.equal(active,0);destroyed++;}});
+  for(const batch of [[1,2,3],[4,5,6]]) {
+    while(!batch.every(page=>releases.has(page))) await new Promise(resolve=>setImmediate(resolve));
+    for(const page of [...batch].reverse()) releases.get(page)();
+  }
+  const result=await task;assert.equal(peak,3);assert.equal(cleaned,6);assert.equal(destroyed,1);
+  assert.deepEqual([...result.text.matchAll(/본문(\d)/g)].map(match=>Number(match[1])),[1,2,3,4,5,6]);
+});
+test("PDF cancellation drains active pages before cleanup and never starts the next batch",async()=>{
+  const controller=new AbortController();let visited=0,destroyed=false;
+  await assert.rejects(pdfDocumentText({numPages:6,getPage:async()=>{visited++;return {getTextContent:async()=>{controller.abort();return {items:[{str:"본문"}]};},cleanup(){}};},destroy:async()=>{destroyed=true;}},{signal:controller.signal}),{name:"AbortError"});
+  assert.equal(visited,3);assert.equal(destroyed,true);
+});
