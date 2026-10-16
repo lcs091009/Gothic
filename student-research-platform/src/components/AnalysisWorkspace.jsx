@@ -43,6 +43,7 @@ export default function AnalysisWorkspace({analysis,loading,message,scope,warnin
         <ol className="analysis-record-timeline">{records.map(record=><li key={record.id}><small>{[record.grade,record.semester,record.subject].filter(Boolean).join(" · ")}</small><strong>{record.title || "제목 없음"}</strong><details><summary>기록 내용</summary><p>{record.content || "작성한 내용이 없습니다."}</p></details></li>)}</ol>
         {!!files.length && <div className="analysis-source-files"><h4>선택한 선생님 첨부</h4>{files.map(file=><p key={file.key}>{file.name} · {file.title}</p>)}<small>본문을 읽은 범위는 아래 자료 확인 내역에 표시합니다.</small></div>}
         {!!scope?.documentEvidence?.length && <div className="analysis-document-evidence"><h4>첨부 본문 확인 내역</h4>{scope.documentEvidence.map((file,index)=><p key={index}>{file.name} · {file.pages ? `${file.pages}쪽 텍스트 확인 · `:""}{file.partial ? "일부 발췌/읽지 못한 부분 있음":"추출한 텍스트 전체 반영"}{file.unreadPages>0 ? ` · 텍스트 없는 페이지 ${file.unreadPages}쪽`:""}</p>)}<small>이미지·그래프와 수식의 시각 정보는 텍스트로 추출된 부분만 참고합니다.</small></div>}
+        {scope?.timings && <p className="workspace-caption">처리 시간 · 자료 준비 {(scope.timings.documentReadMs/1000).toFixed(1)}초 · AI 응답 {(scope.timings.providerMs/1000).toFixed(1)}초</p>}
         {scope && <p className="workspace-caption">서버 분석 범위: 활동 개요 {scope.scannedRecords}개 · 본문 발췌 {scope.detailedRecords}개 · 선생님 자료 {scope.teacherMaterials}개</p>}
       </details>
       <RetainedView key={analysis} active={exploring}>{explorationView}</RetainedView>

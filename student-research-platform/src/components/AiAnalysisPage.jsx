@@ -1,3 +1,4 @@
+import {requestDocumentTexts} from "../lib/analysisDocumentExcerpt.js";
 import RetainedView from "./RetainedView";
 import {useGoogleDrive} from "../hooks/useGoogleDrive";
 import PickerAccountBar from "./PickerAccountBar";
@@ -81,8 +82,9 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
     setIsAnalyzing(true);setFileProgress("");
     setWorkspace(true);
 
+    const preparationStartedAt=Date.now();let phase="자료 준비";
     const controller = new AbortController(); requestRef.current = controller;
-    const timeout=setTimeout(()=>{if(requestRef.current===controller){controller.abort();requestRef.current=null;setIsAnalyzing(false);setMessage("2분 이내에 분석을 완료하지 못했습니다. 선택한 기록은 유지됩니다. 다시 시도해 주세요.");}},120_000);
+    const timeout=setTimeout(()=>{if(requestRef.current===controller){controller.abort();requestRef.current=null;setIsAnalyzing(false);setMessage(`${phase} 단계에서 2분을 넘겼습니다. 선택한 기록과 읽은 자료는 유지됩니다. 다시 시도해 주세요.`);}},120_000);
 
     try {
       let documentTexts=[];
@@ -98,6 +100,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
         }
       } else setFileFailures([]);
       if(controller.signal.aborted) return;
+      const documentReadMs=Date.now()-preparationStartedAt;phase="AI 응답";
       setFileProgress("");
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       if (controller.signal.aborted) return;
@@ -114,7 +117,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
           Authorization: `Bearer ${sessionData.session.access_token}`,
         },
         body: JSON.stringify({
-          extraContext,explorationSubject:subject,documentTexts,
+          extraContext,explorationSubject:subject,documentTexts:requestDocumentTexts(documentTexts,[subject,extraContext].join(" ")),
           selectedRecordIds,
           selectedTeacherFiles: selectedFiles.map(file=>({materialId:file.materialId,attachmentId:file.id})),
         }),
@@ -142,7 +145,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
       setResultInputs({records:selectedRecords,files:selectedFiles,extraContext,subject,documentTexts});
       setAnalysis(data.analysis || "분석 결과가 비어 있습니다.");
       setExploration(data.exploration || null);
-      setScope(data.scope || null);
+      setScope(data.scope ? {...data.scope,timings:{...data.timings,documentReadMs}}:null);
       setWarning(data.warning || "");
     } catch (error) {
       if (error.name !== "AbortError") setMessage(error.message || "AI 분석 요청에 실패했습니다.");

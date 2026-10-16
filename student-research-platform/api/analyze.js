@@ -45,6 +45,7 @@ export function providerFailure(status) {
 export function createAnalyzeHandler({ env = process.env, fetchImpl = fetch, clientFactory = createClient,
   logger = console, timeoutMs=ANALYSIS_TIMEOUT_MS } = {}) {
 return async function handler(request, response) {
+  const startedAt=Date.now();
   response.setHeader("Cache-Control", "no-store");
   if (request.method !== "POST") {
     response.setHeader("Allow", "POST");
@@ -163,6 +164,7 @@ return async function handler(request, response) {
     );
     scope.teacherAttachments = teacherSharedFiles.reduce((sum,material)=>sum+(material.attachments?.length || (material.file_id ? 1 : 0)),0);
 
+    const providerStartedAt=Date.now();
     let nvidiaResponse, nvidiaRawText, usedModel;
     for (const model of [AI_MODEL, AI_FALLBACK_MODEL]) {
       usedModel = model;
@@ -185,9 +187,10 @@ return async function handler(request, response) {
             temperature: 0.6,
             max_tokens: explorationPath !== undefined ? 4200 : AI_OUTPUT_TOKENS,
             stream: false,
+            chat_template_kwargs: { enable_thinking: false },
             ...(model === AI_MODEL
               ? { reasoning_effort: "none" }
-              : { chat_template_kwargs: { enable_thinking: false } }),
+              : {}),
           }),
         }
       ));
@@ -245,6 +248,7 @@ return async function handler(request, response) {
       exploration: exploration ? {intro:readable(exploration.intro),choices:explorationPath?.length ? [] : exploration.choices.map(c=>choiceWithSources(c,records,teacherSharedFiles,readable)),
         guidelines:(exploration.guidelines || []).map(item=>({...item,title:readable(item.title),detail:readable(item.detail),question:readable(item.question).slice(0,400)}))} : null,
       scope,
+      timings:{preparationMs:providerStartedAt-startedAt,providerMs:Date.now()-providerStartedAt,totalMs:Date.now()-startedAt},
       providerModel: usedModel,
       fallbackUsed: usedModel === AI_FALLBACK_MODEL,
       warning: [choice.finish_reason === "length" ? "응답 길이 제한으로 분석 일부가 생략되었을 수 있습니다." : "",

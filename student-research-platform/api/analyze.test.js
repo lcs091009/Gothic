@@ -180,6 +180,7 @@ test("uses Nemotron 3 Super with explicit non-streaming and reasoning disabled",
   assert.ok(payload.max_tokens <= 32768);
   assert.equal(payload.stream, false);
   assert.equal(payload.reasoning_effort, "none");
+  assert.deepEqual(payload.chat_template_kwargs,{enable_thinking:false});
   assert.deepEqual(payload.messages.map(m => m.role), ["system", "user"]);
   assert.doesNotMatch(payload.messages[0].content, /\/no_think/);
   assert.match(payload.messages[0].content, /근거 규칙/);
@@ -399,4 +400,10 @@ test("initial and follow-up requests both ask for natural polite guidance, with 
     assert.equal(response.body.exploration.choices[0].sourceRefs,undefined);
     assert.match(JSON.parse(f.providerCalls[0].options.body).messages[0].content,/자연스러운 해요체/);
   }
+});
+
+test("reports stage durations without exposing student data or credentials",async()=>{
+  const f=fixture();const response=await f.call();assert.equal(response.code,200);
+  assert.deepEqual(Object.keys(response.body.timings).sort(),["preparationMs","providerMs","totalMs"]);
+  for(const value of Object.values(response.body.timings)) assert.ok(Number.isFinite(value) && value>=0);
 });

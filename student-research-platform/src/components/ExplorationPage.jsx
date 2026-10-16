@@ -1,3 +1,4 @@
+import {requestDocumentTexts} from "../lib/analysisDocumentExcerpt.js";
 import ExplorationEmphasis from "./ExplorationEmphasis.js";
 import SubjectConnection from "./SubjectConnection";
 import SubjectFocus from "./SubjectFocus";
@@ -34,10 +35,10 @@ export default function ExplorationPage({seed,records,files,extraContext,onBack,
       const {data,error:authError}=await supabase.auth.getSession();if(controller.signal.aborted) return;
       if(authError || !data.session?.access_token) throw new Error("다시 로그인한 뒤 탐구를 이어가 주세요.");
       const response=await fetch("/api/analyze",{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json",Authorization:`Bearer ${data.session.access_token}`},
-        body:JSON.stringify({extraContext,documentTexts,explorationSubject:nextSubject.trim(),selectedRecordIds:records.map(record=>record.id),selectedTeacherFiles:files.map(file=>({materialId:file.materialId,attachmentId:file.id})),explorationPath:explorationContextPath(path)})});
+        body:JSON.stringify({extraContext,documentTexts:requestDocumentTexts(documentTexts,[nextSubject,...explorationContextPath(path)].join(" ")),explorationSubject:nextSubject.trim(),selectedRecordIds:records.map(record=>record.id),selectedTeacherFiles:files.map(file=>({materialId:file.materialId,attachmentId:file.id})),explorationPath:explorationContextPath(path)})});
       const result=await response.json();if(controller.signal.aborted) return;
       if(!response.ok || !result.exploration) throw new Error(result.error || "탐구 안내를 받지 못했습니다. 선택한 주제는 유지됩니다.");
-      setSteps(previous=>previous.map((item,index)=>index===previous.length-1 ? {...item,result:result.exploration,warning:result.warning}:item));
+      setSteps(previous=>previous.map((item,index)=>index===previous.length-1 ? {...item,result:result.exploration,warning:result.warning,timings:result.timings}:item));
     } catch(e) {if(!controller.signal.aborted) setError(e.name==="SyntaxError" ? "서비스 응답을 읽지 못했습니다. 선택한 주제는 유지됩니다. 다시 시도해 주세요.":e.message);}
     finally {clearTimeout(timeout);if(pending.current===controller) {pending.current=null;setLoading(false);}}
   }
@@ -72,6 +73,7 @@ export default function ExplorationPage({seed,records,files,extraContext,onBack,
       {latest && !loading && <form className="exploration-custom" onSubmit={e=>{e.preventDefault();if(question.trim()) generate([...step.path,question.trim()],true);}}>
         <label htmlFor="exploration-question">{chosen ? "내가 한 일이나 막힌 점을 알려 주세요":"원하는 주제를 직접 적어도 좋아요"}</label><textarea id="exploration-question" maxLength={400} rows={3} value={question} onChange={e=>setQuestion(e.target.value)} placeholder={chosen ? "예: 두 조건을 비교했는데 차이가 작았어요. 어떤 근거를 확인하면 좋을까요?":"예: 자료의 효소 내용을 생명과학과 연결해 탐구하고 싶어요."} /><button type="submit" disabled={!question.trim()}>이어서 안내받기 →</button>
       </form>}
+      {step.timings && <p className="workspace-caption">AI 응답 {(step.timings.providerMs/1000).toFixed(1)}초</p>}
       {step.warning && <p role="status" className="workspace-caption">{step.warning}</p>}
       <p className="workspace-caption">AI는 판단 기준과 선택 가능한 안내를 제공합니다. 탐구의 조건과 결정은 내가 정합니다. 첨부의 발췌 여부는 분석 결과의 자료 확인 내역에서 볼 수 있어요.</p>
         </div>
