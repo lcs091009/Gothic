@@ -101,3 +101,8 @@
 @media(prefers-reduced-motion:reduce) { .subject-focus-mode button { transition:none; transform:none!important; } }
 
 .retained-view[hidden],.analysis-workspace[hidden],.ai-analysis-panel[hidden] { display:none!important; }
+
+.exploration-subject-connection { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 8px; line-height:1.7; color:#647b69; font-size:12px; overflow-wrap:anywhere; }
+.exploration-subject-connection > span:last-child { color:#355c50; font-weight:650; }
+.exploration-workspace header > .exploration-subject-connection { margin:0 0 8px; }
+.exploration-subject-connection > span { font-size:inherit; }

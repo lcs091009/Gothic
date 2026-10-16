@@ -1,3 +1,4 @@
+import SubjectConnection from "./SubjectConnection";
 import SubjectFocus from "./SubjectFocus";
 import ExplorationLoading from "./ExplorationLoading";
 import {explorationContextPath} from "../lib/explorationPath";
@@ -21,10 +22,10 @@ export default function ExplorationPage({seed,records,files,extraContext,onBack,
     if(pending.current || value===subject) return;
     setSubject(value);setSteps([{path:[],result:value===initialSubject ? seed:null}]);setError("");setQuestion("");
   }
-  async function generate(path,append,nextSubject=subject) {
+  async function generate(path,append,nextSubject=subject,connection=step.connection) {
     if(pending.current) return;
     const controller=new AbortController();pending.current=controller;
-    if(append) setSteps(previous=>[...previous,{path,result:null}]);
+    if(append) setSteps(previous=>[...previous,{path,result:null,connection}]);
     setLoading(true);setError("");setQuestion("");
     const timeout=setTimeout(()=>{if(pending.current===controller){controller.abort();pending.current=null;setLoading(false);setError("응답 시간이 길어졌습니다. 선택한 주제와 자료는 유지됩니다. 다시 시도해 주세요.");}},120_000);
     try {
@@ -49,14 +50,14 @@ export default function ExplorationPage({seed,records,files,extraContext,onBack,
       <details><summary>진행 경로</summary><ol>{step.path.map((item,index)=><li key={index}>{item}</li>)}</ol></details>
       {chosen && <button type="button" disabled={loading} onClick={()=>{setSteps([{path:[],result:null}]);setError("");setQuestion("");}}>다른 주제 고르기</button>}
     </aside>
-    <div className="analysis-workspace-main"><header><p className="student-eyebrow">{chosen ? "내 선택으로 이어가는 탐구":"자료와 교과를 연결하기"}</p><h3 ref={heading} tabIndex={-1}>{step.path[0] || "어떤 주제를 탐구할까요?"}</h3></header>
+    <div className="analysis-workspace-main"><header>{chosen ? <SubjectConnection sources={step.connection?.sources || []} subject={step.connection?.subject || subject} />:<p className="student-eyebrow">자료와 교과를 연결하기</p>}<h3 ref={heading} tabIndex={-1}>{step.connection?.title || step.path[0] || "어떤 주제를 탐구할까요?"}</h3></header>
       {!chosen && <SubjectFocus value={subject} onChange={chooseSubject} profile={academicProfile} records={records} disabled={loading} />}
       {loading && <ExplorationLoading onCancel={back} />}
       {error && <div className="analysis-workspace-error" role="alert"><p>{error}</p><button type="button" onClick={()=>generate(step.path,false)}>다시 시도</button></div>}
       {!loading && step.result && <>
         <article className="analysis-section" aria-live="polite"><p>{step.result.intro}</p></article>
-        {!chosen && !!step.result.choices.length && <><h4>자료에서 이어지는 주제</h4><div className="exploration-choices">{step.result.choices.map(choice=><button type="button" key={choice.question} onClick={()=>{const next=choice.subject || subject;setSubject(next);generate([choice.question],true,next);}}>
-          {choice.subject && <small>{choice.subject}과 연결</small>}<strong>{choice.title}</strong><span className="exploration-question">{choice.question}</span>
+        {!chosen && !!step.result.choices.length && <><h4>자료에서 이어지는 주제</h4><div className="exploration-choices">{step.result.choices.map(choice=><button type="button" key={choice.question} onClick={()=>{const next=choice.subject || subject;setSubject(next);generate([choice.question],true,next,{sources:choice.sources || [],subject:next,title:choice.title});}}>
+          <SubjectConnection sources={choice.sources || []} subject={choice.subject || subject} /><strong>{choice.title}</strong><span className="exploration-question">{choice.question}</span>
           {(choice.connection || choice.why) && <span><b>자료와 연결되는 이유</b> · {choice.connection || choice.why}</span>}<em>이 주제로 탐구하기 →</em>
         </button>)}</div></>}
         {chosen && !!step.result.guidelines?.length && <div className="exploration-guidelines">{step.result.guidelines.map((item,index)=><article className="analysis-section" key={index}><h4>{item.title}</h4><p>{item.detail}</p>{item.question && <button type="button" onClick={()=>generate([...step.path,item.question],true)}>{item.question} →</button>}</article>)}</div>}

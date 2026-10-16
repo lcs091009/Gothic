@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 
 import { buildAnalysisContext, RECORD_SCAN_LIMIT, SYSTEM_PROMPT } from "../server/analysisContext.js";
 import { MAX_ANALYSIS_MATERIALS, selectTeacherMaterials } from "../src/lib/analysisMaterials.js";
-import { CHOICE_FORMAT, validExplorationSubject, validExplorationPath, explorationPrompt, parseExploration, parseInitialAnalysis, readableReferences } from "../server/exploration.js";
+import { EXPLORATION_VOICE,choiceWithSources,CHOICE_FORMAT, validExplorationSubject, validExplorationPath, explorationPrompt, parseExploration, parseInitialAnalysis, readableReferences } from "../server/exploration.js";
 import {ANALYSIS_TIMEOUT_MS,withinAnalysisDeadline} from "../server/analysisDeadline.js";
 
 export const MAX_BODY_BYTES = 2_500_000;
@@ -179,7 +179,7 @@ return async function handler(request, response) {
           body: JSON.stringify({
             model,
             messages: [
-              { role: "system", content: explorationPath !== undefined ? explorationPrompt(SYSTEM_PROMPT, explorationSubject) : SYSTEM_PROMPT + `\n첫 분석의 4개 항목 본문은 합계 800~1200자로 작성하고 주제 탐색에 필요한 근거와 교과 연결을 우선한다. 상세 실행 안내는 주제를 선택한 다음 단계에서 제공한다. exploration intro는 200자, 주제는 2개, 각 연결 이유는 200자 내외로 작성해 반복과 응답 지연을 줄인다. 학생이 과목을 선택했으면 그 과목을 중심으로, 비어 있으면 실제 자료와 결합할 만한 과목을 추천하고 이유를 설명한다. 첨부 본문이 있으면 자료의 구체적 내용을 근거로 주제 2~3개를 제안한다. 위 4개 항목의 설명은 analysis 문자열에 넣고, 주제 선택지는 exploration 객체에 넣어 전체를 {"analysis":"4개 항목의 설명", "exploration":{"intro":"자료의 연결 설명","choices":[{"title":"과목과 주제","subject":"교과 이름","question":"탐구 질문","connection":"자료의 근거"}],"guidelines":[]}} 형태의 유효한 JSON으로 출력한다. 코드블록과 JSON 바깥 설명은 쓰지 않는다. exploration 객체 규칙: ${CHOICE_FORMAT}` },
+              { role: "system", content: explorationPath !== undefined ? explorationPrompt(SYSTEM_PROMPT, explorationSubject) : SYSTEM_PROMPT + `\n${EXPLORATION_VOICE}\n첫 분석의 4개 항목 본문은 합계 800~1200자로 작성하고 주제 탐색에 필요한 근거와 교과 연결을 우선한다. 상세 실행 안내는 주제를 선택한 다음 단계에서 제공한다. exploration intro는 200자, 주제는 2개, 각 연결 이유는 200자 내외로 작성해 반복과 응답 지연을 줄인다. 학생이 과목을 선택했으면 그 과목을 중심으로, 비어 있으면 실제 자료와 결합할 만한 과목을 추천하고 이유를 설명한다. 첨부 본문이 있으면 자료의 구체적 내용을 근거로 주제 2~3개를 제안한다. 위 4개 항목의 설명은 analysis 문자열에 넣고, 주제 선택지는 exploration 객체에 넣어 전체를 {"analysis":"4개 항목의 설명", "exploration":{"intro":"자료의 연결 설명","choices":[{"title":"과목과 주제","subject":"교과 이름","question":"탐구 질문","connection":"자료의 근거"}],"guidelines":[]}} 형태의 유효한 JSON으로 출력한다. 코드블록과 JSON 바깥 설명은 쓰지 않는다. exploration 객체 규칙: ${CHOICE_FORMAT}` },
               { role: "user", content: userPrompt + `\n선택한 과목(빈 값이면 AI 추천): ${JSON.stringify(explorationSubject)}` + (explorationPath !== undefined ? `\n심화탐구 선택 과목(교과 이름 데이터): ${JSON.stringify({explorationSubject:explorationSubject.trim()})}\n학생이 선택한 질문 경로(수행 결과가 아님): ${JSON.stringify(explorationPath)}` : "") },
             ],
             temperature: 0.6,
@@ -242,7 +242,7 @@ return async function handler(request, response) {
     const readable = value=>readableReferences(value,records,teacherSharedFiles,documentTexts.map(file=>({name:records.find(record=>record.drive_file_id===file.id)?.drive_file_name || teacherSharedFiles.flatMap(material=>material.attachments || []).find(attachment=>attachment.id===file.id)?.name || "첨부 자료"})));
     return response.status(200).json({
       analysis: explorationPath !== undefined ? "" : readable(initial.analysis),
-      exploration: exploration ? {intro:readable(exploration.intro),choices:explorationPath?.length ? [] : exploration.choices.map(c=>Object.fromEntries(Object.entries(c).map(([key,value])=>[key,key === "question" ? readable(value).slice(0,400) : readable(value)]))),
+      exploration: exploration ? {intro:readable(exploration.intro),choices:explorationPath?.length ? [] : exploration.choices.map(c=>choiceWithSources(c,records,teacherSharedFiles,readable)),
         guidelines:(exploration.guidelines || []).map(item=>({...item,title:readable(item.title),detail:readable(item.detail),question:readable(item.question).slice(0,400)}))} : null,
       scope,
       providerModel: usedModel,

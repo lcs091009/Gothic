@@ -56,3 +56,13 @@ test("plain explanation is usable without inventing topics or exposing broken JS
 test("document citations resolve to actual filenames",()=>{
   assert.equal(readableReferences("자료 [D1]와 D99",[],[],[{name:"효소 자료.pdf"}]),"자료 「효소 자료.pdf」와 「근거 확인 필요」");
 });
+
+test("recommendation origins resolve from actual records/materials and ignore invented labels",async()=>{
+  const {choiceWithSources}=await import("./exploration.js");
+  const result=parseExploration(JSON.stringify({intro:"교과 연결",choices:[{title:"활성화 에너지",subject:"화학",question:"어떻게 연결될까요?",connection:"실제 자료 근거",sourceRefs:["R2","R2","T1"],sourceSubject:"가짜 과목"}]}));
+  const choice=choiceWithSources(result.choices[0],[{subject:"수학",title:"함수"},{subject:"생명과학",title:"효소 실험"}],[{file_name:"선생님 수업 자료"}]);
+  assert.deepEqual(choice.sources,[{subject:"생명과학",topic:"효소 실험"},{subject:"선생님 자료",topic:"선생님 수업 자료"}]);
+  assert.equal(choice.sourceRefs,undefined);assert.equal(choice.sourceSubject,undefined);
+  assert.deepEqual(choiceWithSources({title:"주제",sourceRefs:["R99"]},[{subject:"수학",title:"함수"}],[]).sources,[]);
+  assert.deepEqual(choiceWithSources({title:"주제"},[{subject:"수학",title:"함수"}],[]).sources,[{subject:"수학",topic:"함수"}]);
+});
