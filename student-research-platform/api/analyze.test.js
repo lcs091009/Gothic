@@ -352,11 +352,11 @@ test("recoverable exploration replies use one provider call and keep the explana
     if(!result.body.exploration.choices.length) assert.match(result.body.warning,/직접 주제를 입력/);
   }
 });
-test("truncated malformed exploration returns a distinct error without logging private contents",async()=>{
+test("truncated exploration keeps complete explanation and warns without another provider call",async()=>{
   const content='{"intro":"PRIVATE-STUDENT-TEXT","choices":[';
   const f=fixture({raw:JSON.stringify({choices:[{message:{content},finish_reason:"length"}]})});
   const result=await f.call({body:{explorationPath:[]}});
-  assert.equal(result.code,502);assert.equal(result.body.code,"AI_EXPLORATION_FORMAT");assert.match(result.body.error,/잘렸습니다/);
+  assert.equal(result.code,200);assert.equal(result.body.exploration.intro,"PRIVATE-STUDENT-TEXT");assert.match(result.body.warning,/생략/);
   assert.doesNotMatch(JSON.stringify(f.logs),/PRIVATE-STUDENT-TEXT/);assert.equal(f.providerCalls.length,1);
 });
 

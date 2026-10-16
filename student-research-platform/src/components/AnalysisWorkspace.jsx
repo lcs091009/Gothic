@@ -5,7 +5,7 @@ import { analysisSections } from "../lib/analysisSections";
 import "./AnalysisWorkspace.css";
 import ExplorationPage from "./ExplorationPage";
 
-export default function AnalysisWorkspace({analysis,loading,message,scope,warning,records,files,onBack,onRetry,exploration,extraContext,academicProfile,documentTexts=[],initialSubject="",fileProgress=""}) {
+export default function AnalysisWorkspace({analysis,loading,message,scope,warning,records,files,onBack,onRetry,exploration,extraContext,academicProfile,documentTexts=[],initialSubject="",fileProgress="",explorationState,onExplorationChange,readOnly=false,onResume}) {
   const [active,setActive]=useState(0);
   const [exploring,setExploring]=useState(false);
   const heading=useRef(null);
@@ -15,7 +15,7 @@ export default function AnalysisWorkspace({analysis,loading,message,scope,warnin
   const sections=analysisSections(analysis);
   const subjects=new Map();
   for(const record of records) { const name=record.subject || "과목 미입력";subjects.set(name,(subjects.get(name)||0)+1); }
-  const explorationView=<ExplorationPage documentTexts={documentTexts} initialSubject={initialSubject} academicProfile={academicProfile} seed={exploration} records={records} files={files} extraContext={extraContext} onBack={()=>setExploring(false)} />;
+  const explorationView=<ExplorationPage readOnly={readOnly} initialState={explorationState} onChange={onExplorationChange} documentTexts={documentTexts} initialSubject={initialSubject} academicProfile={academicProfile} seed={exploration} records={records} files={files} extraContext={extraContext} onBack={()=>setExploring(false)} />;
   return <section className="analysis-workspace">
     <aside className="analysis-workspace-nav">
       <button type="button" onClick={onBack}>← 자료 선택</button>
@@ -26,6 +26,7 @@ export default function AnalysisWorkspace({analysis,loading,message,scope,warnin
       <p className="workspace-caption">선택한 기록 {records.length}개<br />선생님 첨부 {files.length}개</p>
     </aside>
     <div className="analysis-workspace-main">
+      {readOnly && <div className="analysis-note-restored"><p>저장된 분석 노트예요. 새 분석을 하려면 원본 자료를 다시 확인해 주세요.</p><button type="button" onClick={onResume}>이 자료로 새 분석 준비</button></div>}
       <header><p className="student-eyebrow">기록에서 다음 탐구로</p><h3>{loading ? "활동의 연결을 분석하고 있어요" : analysis ? "나의 활동을 한눈에" : "분석을 완료하지 못했어요"}</h3></header>
       <div className="analysis-flow" aria-label="분석에 사용한 자료의 연결">
         {[{label:"활동 기록",value:`${records.length}개`},{label:"관련 과목",value:`${subjects.size}개`},{label:"선생님 첨부",value:`${files.length}개`},{label:"다음 탐구",value:analysis ? "제안 확인" : "분석 중"}].map(item=><div key={item.label}><small>{item.label}</small><strong>{item.value}</strong></div>)}

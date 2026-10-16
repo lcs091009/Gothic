@@ -11,9 +11,9 @@ test("follow-up appends collapsible cards, preserves earlier answers and retries
   try {
     const {default:Page}=await server.ssrLoadModule("/src/components/ExplorationPage.jsx");
     const seed={intro:"자료 연결",choices:[{title:"효소 탐구",subject:"생명과학",question:"온도에 따른 효소 반응",sources:[]}],guidelines:[]};
-    const requests=[];let fail=false;
+    const requests=[];let fail=false,saved;
     globalThis.fetch=async(url,options)=>{requests.push(JSON.parse(options.body));return {ok:!fail,json:async()=>fail ? {error:"일시 실패"}:{exploration:{intro:"첫 안내",choices:[],guidelines:[{title:"통제 변인",detail:"온도 외 조건을 일정하게",question:"반복 측정은 어떻게?"}]}}};};
-    await act(async()=>{root=create(createElement(Page,{seed,records:[],files:[],onBack:()=>{}}));});
+    await act(async()=>{root=create(createElement(Page,{seed,records:[],files:[],onBack:()=>{},onChange:value=>{saved=value;}}));});
     const content=node=>typeof node==="string" ? node:(node.children || []).map(content).join("");
     const button=text=>root.root.findAllByType("button").find(node=>content(node).includes(text));
     await act(async()=>button("이 주제로 탐구하기").props.onClick());
@@ -28,5 +28,10 @@ test("follow-up appends collapsible cards, preserves earlier answers and retries
     fail=false;await act(async()=>button("다시 시도").props.onClick());
     assert.equal(root.root.findAllByProps({className:"exploration-step-card"}).length,3);
     assert.equal(root.root.findAllByProps({className:"exploration-key-point"}).length,3);
+    await act(async()=>root.unmount());
+    await act(async()=>{root=create(createElement(Page,{seed,records:[],files:[],initialState:saved,readOnly:true,onBack:()=>{}}));});
+    assert.equal(root.root.findAllByProps({className:"exploration-step-card"}).length,3);
+    assert.equal(root.root.findAllByType("form").length,0);
+    assert.equal(requests.length,3);
   } finally {if(root) await act(async()=>root.unmount());globalThis.fetch=originalFetch;await server.close();}
 });

@@ -12,21 +12,22 @@ const stages=[
   {label:"결과 해석",question:"이 주제의 결과를 해석할 때 확인할 근거와 한계를 안내해 줘. 실제 결과는 아직 제시하지 않았으니 만들지 마."},
   {label:"탐구 정리",question:"같은 주제의 탐구를 정리할 때 남기면 좋은 근거와 성찰 질문을 안내해 줘. 내가 수행하지 않은 사실은 만들지 마."}
 ];
-export default function ExplorationPage({seed,records,files,extraContext,onBack,academicProfile,documentTexts=[],initialSubject=""}) {
-  const [subject,setSubject]=useState(initialSubject);
-  const [steps,setSteps]=useState([{path:[],result:seed}]);
+export default function ExplorationPage({seed,records,files,extraContext,onBack,academicProfile,documentTexts=[],initialSubject="",initialState,onChange,readOnly=false}) {
+  const [subject,setSubject]=useState(initialState?.subject ?? initialSubject);
+  const [steps,setSteps]=useState(initialState?.steps?.length ? initialState.steps:[{path:[],result:seed}]);
   const [loading,setLoading]=useState(false),[error,setError]=useState(""),[question,setQuestion]=useState("");
   const pending=useRef(null),heading=useRef(null);
-  const [expanded,setExpanded]=useState([0]);
+  const [expanded,setExpanded]=useState([Math.max(0,(initialState?.steps?.length || 1)-1)]);
   const step=steps.at(-1);
   useEffect(()=>()=>pending.current?.abort(),[]);
+  useEffect(()=>{if(steps.at(-1)?.result) onChange?.({subject,steps});},[steps,subject,onChange]);
   useEffect(()=>{heading.current?.focus({preventScroll:true});heading.current?.scrollIntoView?.({block:"nearest",behavior:"auto"});},[steps.length]);
   function chooseSubject(value) {
     if(pending.current || value===subject) return;
     setExpanded([0]);setSubject(value);setSteps([{path:[],result:value===initialSubject ? seed:null}]);setError("");setQuestion("");
   }
   async function generate(path,append,nextSubject=subject,connection=step.connection) {
-    if(pending.current) return;
+    if(pending.current || readOnly) return;
     const controller=new AbortController();pending.current=controller;
     if(append) {setExpanded([steps.length]);setSteps(previous=>[...previous,{path,result:null,connection}]);}
     setLoading(true);setError("");setQuestion("");
@@ -56,21 +57,21 @@ export default function ExplorationPage({seed,records,files,extraContext,onBack,
         </summary>
         <div className="exploration-step-body">
           {chosen && <header><SubjectConnection sources={step.connection?.sources || []} subject={step.connection?.subject || subject} /><h4>{step.connection?.title || step.path[0]}</h4></header>}
-      {latest && !chosen && <SubjectFocus value={subject} onChange={chooseSubject} profile={academicProfile} records={records} disabled={loading} />}
+      {latest && !readOnly && !chosen && <SubjectFocus value={subject} onChange={chooseSubject} profile={academicProfile} records={records} disabled={loading} />}
       {latest && loading && <ExplorationLoading onCancel={cancel} />}
       {latest && error && <div className="analysis-workspace-error" role="alert"><p>{error}</p><button type="button" onClick={()=>generate(step.path,false)}>다시 시도</button></div>}
       {step.result && <>
         <article className="analysis-section" aria-live="polite"><p className="exploration-key-point"><ExplorationEmphasis text={step.result.intro} /></p></article>
-        {!chosen && !!step.result.choices.length && <><h4>자료에서 이어지는 주제</h4><div className="exploration-choices">{step.result.choices.map(choice=><button type="button" key={choice.question} disabled={!latest || loading} onClick={()=>{const next=choice.subject || subject;setSubject(next);generate([choice.question],true,next,{sources:choice.sources || [],subject:next,title:choice.title});}}>
+        {!chosen && !!step.result.choices.length && <><h4>자료에서 이어지는 주제</h4><div className="exploration-choices">{step.result.choices.map(choice=><button type="button" key={choice.question} disabled={!latest || loading || readOnly} onClick={()=>{const next=choice.subject || subject;setSubject(next);generate([choice.question],true,next,{sources:choice.sources || [],subject:next,title:choice.title});}}>
           <SubjectConnection sources={choice.sources || []} subject={choice.subject || subject} /><strong>{choice.title}</strong><span className="exploration-question">{choice.question}</span>
           {(choice.connection || choice.why) && <span><b>자료와 연결되는 이유</b> · {choice.connection || choice.why}</span>}<em>이 주제로 탐구하기 →</em>
         </button>)}</div></>}
-        {chosen && !!step.result.guidelines?.length && <div className="exploration-guidelines">{step.result.guidelines.map((item,index)=><article className="analysis-section" key={index}><h4>{item.title}</h4><p><ExplorationEmphasis text={item.detail} /></p>{latest && item.question && <button disabled={loading} type="button" onClick={()=>generate([...step.path,item.question],true)}>{item.question} →</button>}</article>)}</div>}
-        {latest && !chosen && !step.result.choices.length && <button type="button" className="exploration-entry" onClick={()=>generate([],false)}>자료에서 주제 추천받기</button>}
+        {chosen && !!step.result.guidelines?.length && <div className="exploration-guidelines">{step.result.guidelines.map((item,index)=><article className="analysis-section" key={index}><h4>{item.title}</h4><p><ExplorationEmphasis text={item.detail} /></p>{latest && !readOnly && item.question && <button disabled={loading} type="button" onClick={()=>generate([...step.path,item.question],true)}>{item.question} →</button>}</article>)}</div>}
+        {latest && !readOnly && !chosen && !step.result.choices.length && <button type="button" className="exploration-entry" onClick={()=>generate([],false)}>자료에서 주제 추천받기</button>}
       </>}
-      {latest && !loading && !error && !step.result && <div className="analysis-section"><p>{chosen ? "선택한 주제를 유지하며 현재 필요한 안내를 받을 수 있어요.":"자료의 구체적인 내용과 교과 개념을 연결해 주제를 추천합니다."}</p><button type="button" onClick={()=>generate(step.path,false)}>{chosen ? "탐구 가이드 받기":"자료에서 주제 추천받기"}</button></div>}
-      {latest && !loading && chosen && <div className="exploration-stage-options" role="group" aria-label="같은 주제의 탐구 단계">{stages.map(stage=><button type="button" key={stage.label} onClick={()=>generate([...step.path,stage.question],true)}>{stage.label} →</button>)}</div>}
-      {latest && !loading && <form className="exploration-custom" onSubmit={e=>{e.preventDefault();if(question.trim()) generate([...step.path,question.trim()],true);}}>
+      {latest && !readOnly && !loading && !error && !step.result && <div className="analysis-section"><p>{chosen ? "선택한 주제를 유지하며 현재 필요한 안내를 받을 수 있어요.":"자료의 구체적인 내용과 교과 개념을 연결해 주제를 추천합니다."}</p><button type="button" onClick={()=>generate(step.path,false)}>{chosen ? "탐구 가이드 받기":"자료에서 주제 추천받기"}</button></div>}
+      {latest && !readOnly && !loading && chosen && <div className="exploration-stage-options" role="group" aria-label="같은 주제의 탐구 단계">{stages.map(stage=><button type="button" key={stage.label} onClick={()=>generate([...step.path,stage.question],true)}>{stage.label} →</button>)}</div>}
+      {latest && !readOnly && !loading && <form className="exploration-custom" onSubmit={e=>{e.preventDefault();if(question.trim()) generate([...step.path,question.trim()],true);}}>
         <label htmlFor="exploration-question">{chosen ? "내가 한 일이나 막힌 점을 알려 주세요":"원하는 주제를 직접 적어도 좋아요"}</label><textarea id="exploration-question" maxLength={400} rows={3} value={question} onChange={e=>setQuestion(e.target.value)} placeholder={chosen ? "예: 두 조건을 비교했는데 차이가 작았어요. 어떤 근거를 확인하면 좋을까요?":"예: 자료의 효소 내용을 생명과학과 연결해 탐구하고 싶어요."} /><button type="submit" disabled={!question.trim()}>이어서 안내받기 →</button>
       </form>}
       {step.timings && <p className="workspace-caption">AI 응답 {(step.timings.providerMs/1000).toFixed(1)}초</p>}
