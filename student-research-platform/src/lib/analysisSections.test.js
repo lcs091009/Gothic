@@ -19,3 +19,11 @@ test("specific attachment selection preserves stored instructions and excludes u
   assert.throws(()=>selectTeacherMaterials(materials,[{materialId:"other",attachmentId:"file-1"}]),/확인/);
   assert.deepEqual(selectTeacherMaterials(materials,[]),[]);
 });
+
+test("alternative headings and long legacy prose remain readable through bounded previous/next pages",async()=>{
+  const {analysisPages}=await import("./analysisSections.js");
+  const pages=analysisPages("**1) 핵심 흐름:**\n- 핵심: **온도**에 따른 차이를 확인했어요.\n② 교과 연결\n"+"자료의 조건을 비교해 보는 것이 좋아요. ".repeat(70));
+  assert.equal(pages[0].title,"핵심 흐름");assert.ok(pages.length>2);assert.ok(pages.every(page=>page.lines.length<=3));
+  assert.equal(pages.at(-1).title,"교과 연결");assert.ok(pages.at(-1).part>1);
+  const plain=analysisPages("긴 설명을 쪽별로 나누어 읽어요. ".repeat(100));assert.ok(plain.length>1);
+});
