@@ -15,7 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { materialOptions } from "../lib/analysisMaterials";
 import AnalysisWorkspace from "./AnalysisWorkspace";
 
-function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = [], userId, active=true }) {
+function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = [], userId, active=true, recordsLoading=false, recordsError="", onReloadRecords }) {
   const notebook=useAnalysisNotes(userId);
   const [restoredNote,setRestoredNote]=useState(false);
   const [notesView,setNotesView]=useState(false),[openingNote,setOpeningNote]=useState(false),[currentNote,setCurrentNote]=useState(null);
@@ -82,7 +82,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
   }
 
   async function handleAnalyze({allowUnread=false,forceRead=false}={}) {
-    if (requestRef.current) return;
+    if (requestRef.current || recordsLoading || recordsError) return;
     setMessage("");
 
 
@@ -97,6 +97,8 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
     }
     const selectedRecords=records.filter(record=>selectedIds.has(record.id));
     const requestInputs={records:selectedRecords,files:selectedFiles,subject,extraContext};
+    setResultInputs({...requestInputs,documentTexts:[]});
+    setAnalysis("");setExploration(null);setScope(null);setWarning("");setCurrentNote(null);setRestoredNote(false);
     const documents=analysisDocuments(selectedRecords,selectedFiles);
     const key=documents.map(file=>file.id).sort().join("|");
     // Start any needed Google authorization in the original button gesture.
@@ -135,6 +137,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
       if (controller.signal.aborted) return;
       clearTimeout(timeout);
       const inputs={...requestInputs,documentTexts};
+      setResultInputs(inputs);
       const data=await runAnalysisJob({extraContext,explorationSubject:subject,documentTexts:requestDocumentTexts(documentTexts,[subject,extraContext].join(" ")),selectedRecordIds,
         selectedTeacherFiles:selectedFiles.map(file=>({materialId:file.materialId,attachmentId:file.id})),budgetMs:Math.max(1000,Math.min(110000,120000-(Date.now()-preparationStartedAt)))},
         {signal:controller.signal,getToken:()=>getAnalysisAccessToken(supabase.auth)});
@@ -187,7 +190,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
           <span role="status" style={styles.text}>{selectedRecordIds.length}개 선택 / 최대 48개</span>
         </div>
         <div style={{ maxHeight: "440px", overflowY: "auto", display: "grid", gap: 0 }}>
-          {records.length === 0 && <p style={styles.text}>저장된 활동 기록이 없습니다.</p>}
+          {recordsLoading ? <p role="status">활동 기록을 불러오는 중이에요.</p>:recordsError ? <div role="alert"><p>활동 기록을 불러오지 못했어요. 다시 불러온 뒤 분석해 주세요.</p><button type="button" onClick={onReloadRecords}>활동 다시 불러오기</button></div>:records.length === 0 && <p style={styles.text}>저장된 활동 기록이 없습니다.</p>}
           {records.map(record => (
             <div key={record.id} style={{ borderBottom: "1px solid #e3e5e8", padding: "12px",
               background: selectedIds.has(record.id) ? "#f1f5f2" : "white" }}>
@@ -320,7 +323,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
         className="animated-button"
         type="button"
         onClick={handleAnalyze}
-        disabled={isAnalyzing || (!selectedRecordIds.length && !selectedFiles.length)}
+        disabled={isAnalyzing || recordsLoading || !!recordsError || (!selectedRecordIds.length && !selectedFiles.length)}
         style={{
           ...styles.analyzeButton,
           opacity: isAnalyzing ? 0.72 : 1,

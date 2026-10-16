@@ -41,7 +41,7 @@ function App() {
 
   const { message, setMessage } = useScopedMessage(`${session?.user?.id || "guest"}:${currentPage}`);
   const { profile, records, teacherSharedFiles, academicProfile, setAcademicProfile,
-    isAcademicProfileLoading, isLoadingTeacherSharedFiles, loadResearchRecords, loadTeacherSharedFiles
+    isAcademicProfileLoading, isLoadingTeacherSharedFiles, isLoadingResearchRecords, dataErrors, reloadStudentData, loadResearchRecords, loadTeacherSharedFiles
   } = useStudentData(session, setMessage);
   const { isPickerOpen,driveAccountEmail,switchPickerAccount,closeGooglePicker,driveFileId, driveFileName, driveFileUrl, isPickerLoading, isGoogleAuthLoading, isUploadDragging, isUploadingFile, setDriveFileId, setDriveFileName, setDriveFileUrl, openGooglePicker, handleUploadDragOver, handleUploadDragLeave, handleUploadDrop, clearDriveSession } = useGoogleDrive({ setMessage, userId: session?.user?.id });
 
@@ -226,11 +226,12 @@ async function handleDeleteResearchRecord(recordId) {
           </div>
         </div>}
 
+        {Object.values(dataErrors).some(Boolean) && <div role="alert" className="analysis-workspace-error"><p>{Object.entries(dataErrors).filter(([,error])=>error).map(([key])=>({profile:"계정 정보",academic:"학년·선택과목",records:"활동 기록",materials:"선생님 자료"}[key])).join(" · ")} 조회에 실패했어요. 기존 자료는 유지됩니다.</p><button type="button" onClick={reloadStudentData}>자료 다시 불러오기</button></div>}
         {profile?.role === "student" && <div key={session.user.id} className="student-view">
         {profile?.role === "student" && currentPage === "home" && (
           <StudentHome headingRef={sectionTitleRef} name={profile.name} academicProfile={academicProfile}
-            isAcademicProfileLoading={isAcademicProfileLoading} recordsCount={records.length}
-            materialsCount={teacherSharedFiles.length} onNavigate={setCurrentPage} />
+            isAcademicProfileLoading={isAcademicProfileLoading} recordsCount={isLoadingResearchRecords ? "불러오는 중":dataErrors.records ? "확인 필요":records.length}
+            materialsCount={isLoadingTeacherSharedFiles ? "불러오는 중":dataErrors.materials ? "확인 필요":teacherSharedFiles.length} onNavigate={setCurrentPage} />
         )}
         {profile?.role === "student" && currentPage !== "home" && (
           <div className="student-section-header">
@@ -259,7 +260,7 @@ async function handleDeleteResearchRecord(recordId) {
             />
           )}
 
-        {profile?.role === "student" && <RetainedView key={session.user.id} active={currentPage === "ai"}>{isAcademicProfileLoading ? (
+        {profile?.role === "student" && <RetainedView key={session.user.id} active={currentPage === "ai"}>{isAcademicProfileLoading && !academicProfile ? (
           <p style={styles.text} role="status">선택과목 정보를 불러오는 중입니다.</p>
         ) : !academicProfile ? (
           <section style={styles.box}>
@@ -273,6 +274,9 @@ async function handleDeleteResearchRecord(recordId) {
             userId={session.user.id}
             academicProfile={academicProfile}
             records={records}
+            recordsLoading={isLoadingResearchRecords}
+            recordsError={dataErrors.records}
+            onReloadRecords={()=>loadResearchRecords(session.user.id).catch(()=>{})}
             teacherSharedFiles={teacherSharedFiles}
           />
         )}</RetainedView>}
