@@ -388,3 +388,15 @@ test("initial structured response renders analysis separately from recommendatio
   const f=fixture({raw:JSON.stringify({choices:[{message:{content:JSON.stringify(payload)}}]})});
   const response=await f.call();assert.equal(response.code,200);assert.match(response.body.analysis,/효소 실험/);assert.doesNotMatch(response.body.analysis,/"choices"|"analysis"/);assert.equal(response.body.exploration.choices[0].subject,"생명과학");
 });
+
+test("initial and follow-up requests both ask for natural polite guidance, with validated source labels",async()=>{
+  const reply={...explorationReply,choices:explorationReply.choices.map(choice=>({...choice,subject:"화학",sourceRefs:["R2"]}))};
+  for(const explorationPath of [undefined,[]]) {
+    const text=explorationPath===undefined ? JSON.stringify({analysis:"1. 핵심 흐름\n교과 연결",exploration:reply}) : JSON.stringify(reply);
+    const f=fixture({tables:{research_records:{data:[{subject:"수학",title:"함수 비교"},{subject:"생명과학",title:"효소 실험"}]}},raw:JSON.stringify({choices:[{message:{content:text}}]})});
+    const response=await f.call({body:{...(explorationPath===undefined ? {}:{explorationPath})}});
+    assert.equal(response.code,200);assert.deepEqual(response.body.exploration.choices[0].sources,[{subject:"생명과학",topic:"효소 실험"}]);
+    assert.equal(response.body.exploration.choices[0].sourceRefs,undefined);
+    assert.match(JSON.parse(f.providerCalls[0].options.body).messages[0].content,/자연스러운 해요체/);
+  }
+});
