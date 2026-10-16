@@ -94,7 +94,6 @@
 .subject-focus button:focus-visible,.subject-focus select:focus-visible,.subject-focus input:focus-visible { outline:3px solid #648675; outline-offset:3px; }
 .exploration-guidelines { display:grid; gap:14px; margin-top:20px; }
 .exploration-guidelines h4 { margin-top:0; font-size:17px; }
-.exploration-stage-options { display:flex; flex-wrap:wrap; gap:8px; margin-top:22px; }
 .analysis-document-evidence,.analysis-file-failures { padding:16px; margin:16px 0; border-radius:14px; background:#f5f8f3; font-size:13px; line-height:1.8; overflow-wrap:anywhere; }
 .analysis-file-failures { border:1px solid #e1d3cc; }
 .analysis-file-failures button { border:1px solid #d8e3d8; border-radius:12px; padding:11px 14px; background:white; color:#466650; font:inherit; cursor:pointer; }
@@ -167,3 +166,22 @@
 .analysis-curriculum-evidence { margin-top:24px; }
 .analysis-curriculum-evidence li { margin:14px 0; line-height:1.7; }
 .analysis-curriculum-evidence li p { margin:6px 0; }
+
+.analysis-note-card { display:flex; flex-direction:column; align-items:stretch; border:1px solid #dfe7df; border-radius:18px; background:#fff; padding:8px; }
+.analysis-note-card .analysis-note-open { flex:1; border:0; background:transparent; padding:16px; }
+.analysis-note-card > .note-delete { align-self:flex-end; }
+.analysis-note-card .note-delete { color:#91564d; background:#fbf4f1; border-color:#eadbd5; }
+.analysis-note-confirm { padding:12px; background:#fbf4f1; border-radius:12px; }
+.analysis-note-confirm p { font-size:14px; line-height:1.6; }
+.analysis-note-confirm > div { display:flex; justify-content:flex-end; gap:8px; }
+.exploration-next-hint { padding:16px 20px; background:#f0f5ef; border-radius:16px; color:#466650; line-height:1.7; }
+.exploration-subject-option { margin:0 0 18px; }
+.exploration-choice-card { display:grid; gap:14px; padding:20px; border:1px solid #dfe7df; border-radius:18px; background:white; }
+.exploration-choice-card h4 { margin:0; font-size:19px; color:#293e31; line-height:1.5; }
+.exploration-choice-card details { color:#627968; font-size:14px; line-height:1.7; }
+.exploration-choice-card > button { justify-self:start; margin-top:4px; }
+.exploration-question-options,.exploration-write { margin-top:20px; padding:16px; border:1px solid #e1e8df; border-radius:16px; }
+.exploration-question-options > button { display:block; text-align:left; margin-top:10px; width:100%; }
+.exploration-write > summary,.exploration-question-options > summary { cursor:pointer; color:#466650; font-weight:600; }
+.exploration-write .exploration-custom { margin-top:16px; }
+.analysis-notebook button:focus-visible,.exploration-choice-card button:focus-visible { outline:3px solid #648675; outline-offset:3px; }

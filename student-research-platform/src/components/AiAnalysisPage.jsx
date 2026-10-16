@@ -35,6 +35,13 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
     } catch {setMessage("노트를 열지 못했어요. 다시 시도해 주세요.");}
     finally {setOpeningNote(false);}
   }
+  async function deleteNote(id) {
+    const removed=await notebook.remove(id);
+    if(removed && currentNote?.id===id) {
+      setCurrentNote(null);setAnalysis("");setExploration(null);setResultInputs(null);setScope(null);setWarning("");setWorkspace(false);setRestoredNote(false);
+    }
+    return removed;
+  }
   const [selection, setSelection] = useState(null);
   const selectedIds = selection ?? new Set(records.slice(0, 48).map(record => record.id));
   const selectedRecordIds = records.filter(record => selectedIds.has(record.id)).map(record => record.id);
@@ -170,7 +177,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
     <nav className="analysis-top-tabs" aria-label="활동 분석 메뉴"><button type="button" aria-pressed={!workspace && !notesView} onClick={()=>{setWorkspace(false);setNotesView(false);}}>자료 선택</button><button type="button" aria-pressed={notesView} onClick={()=>{setWorkspace(false);setNotesView(true);notebook.refresh();}}>활동 분석 노트 ({notebook.notes.length})</button></nav>
     {isAnalyzing && !workspace && <button type="button" className="student-back" onClick={()=>{setNotesView(false);setWorkspace(true);}}>분석 진행 중 · 진행 화면 보기</button>}
     {(notebook.status || notebook.error) && <div className="analysis-note-status" role="status">{notebook.error || notebook.status}{notebook.error && currentNote && <button type="button" onClick={()=>notebook.save(currentNote)}>저장 다시 시도</button>}</div>}
-    {notesView && <AnalysisNotebook notes={notebook.notes} onOpen={openNote} opening={openingNote} onRefresh={notebook.refresh} error={notebook.error || message} />}
+    {notesView && <AnalysisNotebook notes={notebook.notes} onDelete={deleteNote} busy={isAnalyzing} onOpen={openNote} opening={openingNote} onRefresh={notebook.refresh} error={notebook.error || message} />}
     <RetainedView active={workspace}>{workspaceView}</RetainedView>
     <section hidden={workspace || notesView} className="inner-page ai-analysis-panel" style={styles.page}>
       <PickerAccountBar open={active && isPickerOpen} email={driveAccountEmail} onSwitch={switchPickerAccount} onClose={closeGooglePicker} />
