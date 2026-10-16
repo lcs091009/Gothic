@@ -96,6 +96,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
       return;
     }
     const selectedRecords=records.filter(record=>selectedIds.has(record.id));
+    const requestInputs={records:selectedRecords,files:selectedFiles,subject,extraContext};
     const documents=analysisDocuments(selectedRecords,selectedFiles);
     const key=documents.map(file=>file.id).sort().join("|");
     // Start any needed Google authorization in the original button gesture.
@@ -133,6 +134,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
       }
       if (controller.signal.aborted) return;
       clearTimeout(timeout);
+      const inputs={...requestInputs,documentTexts};
       const data=await runAnalysisJob({extraContext,explorationSubject:subject,documentTexts:requestDocumentTexts(documentTexts,[subject,extraContext].join(" ")),selectedRecordIds,
         selectedTeacherFiles:selectedFiles.map(file=>({materialId:file.materialId,attachmentId:file.id})),budgetMs:Math.max(1000,Math.min(110000,120000-(Date.now()-preparationStartedAt)))},
         {signal:controller.signal,getToken:()=>getAnalysisAccessToken(supabase.auth)});
