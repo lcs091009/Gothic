@@ -1,3 +1,6 @@
+import AnalysisNotebook from "./AnalysisNotebook";
+import {useAnalysisNotes} from "../hooks/useAnalysisNotes";
+import {analysisNoteContent,noteTitle} from "../lib/analysisNotes.js";
 import {requestDocumentTexts} from "../lib/analysisDocumentExcerpt.js";
 import RetainedView from "./RetainedView";
 import {useGoogleDrive} from "../hooks/useGoogleDrive";
@@ -7,11 +10,30 @@ import {analysisDocuments,packDocumentTexts} from "../lib/analysisDocuments";
 import {readAnalysisDocuments} from "../lib/readAnalysisDocument";
 import "./AnalysisWorkspace.css";
 import { supabase } from "../lib/supabaseClient";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { materialOptions } from "../lib/analysisMaterials";
 import AnalysisWorkspace from "./AnalysisWorkspace";
 
 function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = [], userId, active=true }) {
+  const notebook=useAnalysisNotes(userId);
+  const [restoredNote,setRestoredNote]=useState(false);
+  const [notesView,setNotesView]=useState(false),[openingNote,setOpeningNote]=useState(false),[currentNote,setCurrentNote]=useState(null);
+  const changeExploration=useCallback(explorationState=>setCurrentNote(previous=>{
+    if(!previous || JSON.stringify(previous.content.explorationState)===JSON.stringify(explorationState)) return previous;
+    return {...previous,content:{...previous.content,explorationState}};
+  }),[]);
+  const saveNote=notebook.save;
+  useEffect(()=>{if(currentNote) saveNote(currentNote);},[currentNote,saveNote]);
+  async function openNote(id) {
+    requestRef.current?.abort();requestRef.current=null;setIsAnalyzing(false);
+    setOpeningNote(true);
+    try {
+      const note=await notebook.open(id),content=note.content;
+      if(content.version!==1 || typeof content.analysis!=="string" || !Array.isArray(content.inputs?.records) || !Array.isArray(content.inputs?.files)) throw new Error("invalid note");
+      setRestoredNote(true);setCurrentNote(note);setAnalysis(content.analysis);setExploration(content.exploration);setResultInputs({...content.inputs,documentTexts:[]});setScope(content.scope);setWarning(content.warning || "");setWorkspace(true);setNotesView(false);setMessage("");
+    } catch {setMessage("노트를 열지 못했어요. 다시 시도해 주세요.");}
+    finally {setOpeningNote(false);}
+  }
   const [selection, setSelection] = useState(null);
   const selectedIds = selection ?? new Set(records.slice(0, 48).map(record => record.id));
   const selectedRecordIds = records.filter(record => selectedIds.has(record.id)).map(record => record.id);
@@ -142,7 +164,9 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
         return;
       }
 
-      setResultInputs({records:selectedRecords,files:selectedFiles,extraContext,subject,documentTexts});
+      const inputs={records:selectedRecords,files:selectedFiles,extraContext,subject,documentTexts};
+      setRestoredNote(false);setCurrentNote({id:crypto.randomUUID(),title:noteTitle(inputs),content:analysisNoteContent({analysis:data.analysis || "",exploration:data.exploration,inputs,scope:data.scope,warning:data.warning})});
+      setResultInputs(inputs);
       setAnalysis(data.analysis || "분석 결과가 비어 있습니다.");
       setExploration(data.exploration || null);
       setScope(data.scope ? {...data.scope,timings:{...data.timings,documentReadMs}}:null);
@@ -157,7 +181,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
 
   const selectedChoices = academicProfile?.selected_choices || {};
 
-  const workspaceView=<AnalysisWorkspace analysis={analysis} loading={isAnalyzing} message={message} scope={scope} warning={warning}
+  const workspaceView=<AnalysisWorkspace readOnly={restoredNote} onResume={()=>{setSelection(new Set(currentNote.content.inputs.records.map(record=>record.id)));setTeacherSelection(new Set(currentNote.content.inputs.files.map(file=>file.key)));setSubject(currentNote.content.inputs.subject);setExtraContext(currentNote.content.inputs.extraContext);setWorkspace(false);setNotesView(false);setMessage("원본 자료를 확인하고 분석을 눌러 주세요. 새 결과는 별도 노트로 저장됩니다.");}} key={currentNote?.id || "pending"} explorationState={currentNote?.content.explorationState} onExplorationChange={changeExploration} analysis={analysis} loading={isAnalyzing} message={message} scope={scope} warning={warning}
     academicProfile={academicProfile} documentTexts={resultInputs?.documentTexts || []} initialSubject={resultInputs?.subject || ""} fileProgress={fileProgress} exploration={exploration} extraContext={resultInputs?.extraContext || ""}
     records={resultInputs?.records || []} files={resultInputs?.files || []}
     onBack={()=>{requestRef.current?.abort(); requestRef.current=null; setIsAnalyzing(false); setWorkspace(false); setMessage("");}}
@@ -165,8 +189,12 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
 
   return (
     <>
+    <div className="analysis-shell">
+    <nav className="analysis-top-tabs" aria-label="활동 분석 메뉴"><button type="button" aria-pressed={!workspace && !notesView} onClick={()=>{setWorkspace(false);setNotesView(false);}}>자료 선택</button><button type="button" aria-pressed={notesView} onClick={()=>{setWorkspace(false);setNotesView(true);notebook.refresh();}}>활동 분석 노트 ({notebook.notes.length})</button></nav>
+    {(notebook.status || notebook.error) && <div className="analysis-note-status" role="status">{notebook.error || notebook.status}{notebook.error && currentNote && <button type="button" onClick={()=>notebook.save(currentNote)}>저장 다시 시도</button>}</div>}
+    {notesView && <AnalysisNotebook notes={notebook.notes} onOpen={openNote} opening={openingNote} onRefresh={notebook.refresh} error={notebook.error || message} />}
     <RetainedView active={workspace}>{workspaceView}</RetainedView>
-    <section hidden={workspace} className="inner-page ai-analysis-panel" style={styles.page}>
+    <section hidden={workspace || notesView} className="inner-page ai-analysis-panel" style={styles.page}>
       <PickerAccountBar open={active && isPickerOpen} email={driveAccountEmail} onSwitch={switchPickerAccount} onClose={closeGooglePicker} />
       <p style={styles.text}>자료를 읽고 교과와 연결할 주제를 고른 뒤, 같은 탐구를 이어가세요.</p>
 
@@ -340,6 +368,7 @@ function AiAnalysisPage({ academicProfile, records = [], teacherSharedFiles = []
 
       {analysis && <button type="button" className="student-back" onClick={()=>setWorkspace(true)} style={{marginTop:16}}>이전 분석 결과 다시 보기 ↗</button>}
     </section>
+    </div>
     </>
   );
 }

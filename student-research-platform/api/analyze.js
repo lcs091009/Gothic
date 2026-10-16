@@ -251,7 +251,8 @@ return async function handler(request, response) {
       timings:{preparationMs:providerStartedAt-startedAt,providerMs:Date.now()-providerStartedAt,totalMs:Date.now()-startedAt},
       providerModel: usedModel,
       fallbackUsed: usedModel === AI_FALLBACK_MODEL,
-      warning: [choice.finish_reason === "length" ? "응답 길이 제한으로 분석 일부가 생략되었을 수 있습니다." : "",
+      warning: [initial?.formatRecovered || exploration?.formatRecovered ? "응답 형식이 일부 달라 확인된 설명만 표시했어요. 탐구 안내가 비어 있으면 같은 자료로 주제 추천을 다시 요청할 수 있어요.":"",
+        choice.finish_reason === "length" ? "응답 길이 제한으로 분석 일부가 생략되었을 수 있습니다." : "",
         exploration && !explorationPath?.length && !exploration.choices.length ? "설명은 받았지만 주제 선택지는 반환되지 않았습니다. 직접 주제를 입력하거나 주제 제안을 다시 요청할 수 있어요." : ""].filter(Boolean).join(" ") || null,
     });
   } catch (error) {

@@ -40,7 +40,7 @@ test("retains explanation-only responses and string paragraph arrays without inv
   assert.deepEqual(parseExploration(JSON.stringify({intro:["첫 문단","둘째 문단"],choices:[]})),{intro:"첫 문단\n\n둘째 문단",choices:[]});
 });
 test("rejects incomplete JSON, missing explanations and hostile response sizes without code evaluation",()=>{
-  for(const text of ['{"intro":"설명","choices":[', '{"intro":42,"choices":[]}', '{"intro":" ","choices":[]}',
+  for(const text of ['{"intro":"설명', '{"intro":42,"choices":[]}', '{"intro":" ","choices":[]}',
     '({intro:"설명",choices:[]})',"x".repeat(100001),JSON.stringify({intro:["설명",{}],choices:[]})]) assert.equal(parseExploration(text),null);
 });
 
@@ -65,4 +65,14 @@ test("recommendation origins resolve from actual records/materials and ignore in
   assert.equal(choice.sourceRefs,undefined);assert.equal(choice.sourceSubject,undefined);
   assert.deepEqual(choiceWithSources({title:"주제",sourceRefs:["R99"]},[{subject:"수학",title:"함수"}],[]).sources,[]);
   assert.deepEqual(choiceWithSources({title:"주제"},[{subject:"수학",title:"함수"}],[]).sources,[{subject:"수학",topic:"함수"}]);
+});
+
+test("cut-off replies preserve only complete explanations and complete choice fields",async()=>{
+  const {parseInitialAnalysis}=await import("./exploration.js");
+  const analysis='1. 핵심 흐름\n온도와 활성의 관계를 살펴봤어요.';
+  const result=parseInitialAnalysis('{"analysis":'+JSON.stringify(analysis)+',"exploration":{"intro":"자료의 효소 개념을 연결해요.","choices":[{"title":"온도 비교","question":"온도는 어떤 영향을 줄까?","connection":"도중');
+  assert.equal(result.analysis,analysis);assert.equal(result.formatRecovered,true);assert.equal(result.exploration.choices[0].question,"온도는 어떤 영향을 줄까?");assert.equal(result.exploration.choices[0].connection,"");
+  assert.equal(parseInitialAnalysis('{"analysis":"미완성').analysis,"");
+  assert.equal(parseInitialAnalysis(JSON.stringify({analysis:["첫 문단","둘째 문단"]})).analysis,"첫 문단\n\n둘째 문단");
+  const direct=parseInitialAnalysis(JSON.stringify({intro:"실제 주제 안내",choices:[{question:"무엇을 비교할까?"}]}));assert.equal(direct.analysis,"실제 주제 안내");assert.equal(direct.formatRecovered,true);
 });
