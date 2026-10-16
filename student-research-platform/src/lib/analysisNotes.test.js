@@ -12,3 +12,11 @@ test("note queries filter by owner and ignore supplied owner fields when saving"
   assert.equal(calls.filter(call=>call[0]==="eq" && call[1]==="user_id" && call[2]==="owner").length,2);
   assert.equal(calls.find(call=>call[0]==="upsert")[1].user_id,"owner");
 });
+
+test("deleting a note filters both the authenticated owner and selected note; failures propagate",async()=>{
+  const calls=[];let fail=false;
+  const client={from(table){calls.push(table);return {delete(){calls.push("delete");return this;},eq(key,value){calls.push([key,value]);return this;},then(resolve){resolve({error:fail ? new Error("denied"):null});}};}};
+  const service=createAnalysisNotesService(client,"owner");await service.remove("note-id");
+  assert.deepEqual(calls,["analysis_notes","delete",["user_id","owner"],["id","note-id"]]);
+  fail=true;await assert.rejects(()=>service.remove("note-id"),/denied/);
+});

@@ -17,3 +17,20 @@ test("note autosave serializes snapshots so a slower earlier write cannot overwr
   assert.equal(hook.notes.length,0);assert.ok(writes.every(note=>note.user_id==="a"));
   await act(async()=>root.unmount());
 });
+
+test("deletion waits for pending saves and prevents late autosave from recreating a deleted note",async()=>{
+  const stored=new Map(),writes=[];let release,hook,root,removed;
+  const client={from(){let payload,id,remove=false;return {select(){return this;},eq(key,value){if(key==="id") id=value;return this;},order(){return this;},limit:async()=>({data:[...stored.values()]}),upsert(value){payload=value;return this;},async single(){writes.push(payload);await new Promise(resolve=>{release=resolve;});const item={...payload,created_at:"2026-10-16"};stored.set(item.id,item);return {data:item};},delete(){remove=true;return this;},then(resolve){if(remove) stored.delete(id);resolve({error:null});}};}};
+  function Harness(){hook=useAnalysisNotes("owner",client);return null;}
+  try {
+    await act(async()=>{root=create(createElement(Harness));});
+    const note={id:"note",title:"분석",content:{analysis:"saved"}};
+    await act(async()=>hook.save(note));
+    await act(async()=>{void hook.remove("note").then(value=>{removed=value;});hook.save(note);});
+    assert.equal(writes.length,1);
+    await act(async()=>release());
+    assert.equal(removed,true);assert.equal(stored.has("note"),false);assert.equal(hook.notes.length,0);
+    await act(async()=>{hook.save(note);await hook.refresh();});
+    assert.equal(writes.length,1);assert.equal(hook.notes.length,0);
+  } finally {if(root) await act(async()=>root.unmount());}
+});

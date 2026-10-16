@@ -22,9 +22,13 @@ test("follow-up appends collapsible cards, preserves earlier answers and retries
     await act(async()=>button("이 주제로 탐구하기").props.onClick());
     let cards=root.root.findAllByType("details").filter(node=>node.props.className==="exploration-step-card");
     assert.equal(cards.length,2);assert.equal(cards[0].props.open,false);assert.equal(cards[1].props.open,true);
-    await act(async()=>cards[0].findByType("summary").props.onClick({preventDefault(){}}));
+    await act(async()=>cards[0].children.find(node=>node.type==="summary").props.onClick({preventDefault(){}}));
     cards=root.root.findAllByType("details").filter(node=>node.props.className==="exploration-step-card");assert.equal(cards[0].props.open,true);
+    assert.equal(root.root.findAllByProps({className:"exploration-stage-options"}).length,0);
     fail=true;await act(async()=>button("반복 측정은 어떻게?").props.onClick());
+    assert.equal(root.root.findByType("textarea").props.value,"반복 측정은 어떻게?");
+    assert.equal(requests.length,1,"a suggested question is editable before a request");
+    await act(async()=>root.root.findByType("form").props.onSubmit({preventDefault(){}}));
     cards=root.root.findAllByType("details").filter(node=>node.props.className==="exploration-step-card");assert.equal(cards.length,3);
     assert.equal(requests[1].explorationPath[0],"온도에 따른 효소 반응");
     assert.equal(root.root.findAllByProps({className:"exploration-key-point"}).length,2);

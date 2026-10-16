@@ -13,6 +13,7 @@ export function createAnalysisNotesService(client,userId) {
   return {
     async list() {const {data,error}=await client.from("analysis_notes").select("id,title,created_at,updated_at").eq("user_id",userId).order("updated_at",{ascending:false}).limit(100);if(error) throw error;return data || [];},
     async open(id) {const {data,error}=await client.from("analysis_notes").select("*").eq("user_id",userId).eq("id",id).single();if(error) throw error;return data;},
+    async remove(id) {const {error}=await client.from("analysis_notes").delete().eq("user_id",userId).eq("id",id);if(error) throw error;},
     async save(note) {const {data,error}=await client.from("analysis_notes").upsert({id:note.id,user_id:userId,title:note.title,content:note.content,updated_at:new Date().toISOString()},{onConflict:"id"}).select("id,title,created_at,updated_at").single();if(error) throw error;return data;},
   };
 }
