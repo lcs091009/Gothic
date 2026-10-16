@@ -1,28 +1,32 @@
+import AnalysisParagraph from "./AnalysisParagraph";
 import ExplorationLoading from "./ExplorationLoading";
 import RetainedView from "./RetainedView";
 import { useEffect, useRef, useState } from "react";
-import { analysisSections } from "../lib/analysisSections";
+import { analysisPages } from "../lib/analysisSections";
 import "./AnalysisWorkspace.css";
 import ExplorationPage from "./ExplorationPage";
 
 export default function AnalysisWorkspace({analysis,loading,message,scope,warning,records,files,onBack,onRetry,exploration,extraContext,academicProfile,documentTexts=[],initialSubject="",fileProgress="",explorationState,onExplorationChange,readOnly=false,onResume,noteId}) {
   const [active,setActive]=useState(0);
   const [exploring,setExploring]=useState(false);
-  const heading=useRef(null);
+  const heading=useRef(null),explorationScreen=useRef(null);
   useEffect(()=>{heading.current?.focus();},[]);
   useEffect(()=>{setActive(0);setExploring(false);},[analysis]);
   useEffect(()=>{heading.current?.focus();},[active]);
-  const sections=analysisSections(analysis);
+  useEffect(()=>{if(exploring) {explorationScreen.current?.querySelector("summary")?.focus({preventScroll:true});explorationScreen.current?.scrollIntoView?.({block:"start"});}},[exploring]);
+  const sections=analysisPages(analysis);
+  const chapters=Object.values(sections.reduce((items,section,index)=>{items[section.number] ||= {...section,index};return items;},{}));
   const subjects=new Map();
   for(const record of records) { const name=record.subject || "과목 미입력";subjects.set(name,(subjects.get(name)||0)+1); }
   const explorationView=<ExplorationPage noteId={noteId} readOnly={readOnly} initialState={explorationState} onChange={onExplorationChange} documentTexts={documentTexts} initialSubject={initialSubject} academicProfile={academicProfile} seed={exploration} records={records} files={files} extraContext={extraContext} onBack={()=>setExploring(false)} />;
-  return <section className="analysis-workspace">
+  return <>
+    <RetainedView active={exploring}><div ref={explorationScreen} className="analysis-workspace exploration-screen">{explorationView}</div></RetainedView>
+    <section hidden={exploring} className="analysis-workspace">
     <aside className="analysis-workspace-nav">
       <button type="button" onClick={onBack}>← 자료 선택</button>
       <p className="student-eyebrow">나의 탐구 연결</p><h2 ref={heading} tabIndex={-1}>분석 작업실</h2>
-      <nav aria-label="분석 항목">{sections.map((section,index)=><button key={section.number} type="button" disabled={loading || !analysis}
-        aria-pressed={active===index} onClick={()=>setActive(index)}><span>{String(section.number).padStart(2,"0")}</span>{section.title}</button>)}</nav>
-      <button className="exploration-entry" type="button" disabled={loading || !analysis} aria-expanded={exploring} onClick={()=>setExploring(value=>!value)}>{exploring ? "심화탐구 카드 접기":"심화탐구 카드 펼치기"}</button>
+      <nav aria-label="분석 항목">{chapters.map(section=><button key={section.number} type="button" disabled={loading || !analysis}
+        aria-pressed={sections[active]?.number===section.number} onClick={()=>setActive(section.index)}><span>{String(section.number).padStart(2,"0")}</span>{section.title}</button>)}</nav>
       <p className="workspace-caption">선택한 기록 {records.length}개<br />선생님 첨부 {files.length}개</p>
     </aside>
     <div className="analysis-workspace-main">
@@ -34,8 +38,8 @@ export default function AnalysisWorkspace({analysis,loading,message,scope,warnin
       {loading && <ExplorationLoading title={fileProgress ? "첨부 자료의 본문을 읽고 있어요":"AI가 활동 분석과 탐구 주제를 작성하고 있어요"} description={fileProgress || "읽은 자료의 근거와 교과 개념을 연결합니다. 서버에 접수된 분석은 화면을 닫아도 계속되고 노트에 저장돼요."} cancelLabel="자료 선택으로 돌아가기" onCancel={onBack} />}
       {message && <div className="analysis-workspace-error" role="alert"><p>{message}</p><button type="button" disabled={loading} onClick={onRetry}>다시 분석</button></div>}
       {warning && <p className="workspace-caption" role="status">{warning}</p>}
-      {analysis && !loading && <article className="analysis-section" aria-live="polite"><div className="analysis-section-title"><span>{String(sections[active]?.number || 1).padStart(2,"0")}</span><h3>{sections[active]?.title}</h3></div>
-        {(sections[active]?.lines || []).map((line,index)=><p key={index}>{line}</p>)}
+      {analysis && !loading && <article className="analysis-section" aria-live="polite"><div className="analysis-section-title"><span>{String(sections[active]?.number || 1).padStart(2,"0")}</span><h3>{sections[active]?.title}{sections[active]?.parts>1 && <small> · {sections[active].part}/{sections[active].parts}</small>}</h3></div>
+        {(sections[active]?.lines || []).map((line,index)=><AnalysisParagraph key={index} text={line} />)}
         {!sections[active]?.lines.length && <p>이 항목의 설명이 반환되지 않았습니다. 다른 항목을 확인해 주세요.</p>}
         <div className="analysis-section-switch"><button type="button" disabled={active===0} onClick={()=>setActive(index=>index-1)}>← 이전</button><span>{active+1} / {sections.length}</span><button type="button" disabled={active>=sections.length-1} onClick={()=>setActive(index=>index+1)}>다음 →</button></div>
       </article>}
@@ -44,10 +48,11 @@ export default function AnalysisWorkspace({analysis,loading,message,scope,warnin
         <ol className="analysis-record-timeline">{records.map(record=><li key={record.id}><small>{[record.grade,record.semester,record.subject].filter(Boolean).join(" · ")}</small><strong>{record.title || "제목 없음"}</strong><details><summary>기록 내용</summary><p>{record.content || "작성한 내용이 없습니다."}</p></details></li>)}</ol>
         {!!files.length && <div className="analysis-source-files"><h4>선택한 선생님 첨부</h4>{files.map(file=><p key={file.key}>{file.name} · {file.title}</p>)}<small>본문을 읽은 범위는 아래 자료 확인 내역에 표시합니다.</small></div>}
         {!!scope?.documentEvidence?.length && <div className="analysis-document-evidence"><h4>첨부 본문 확인 내역</h4>{scope.documentEvidence.map((file,index)=><p key={index}>{file.name} · {file.pages ? `${file.pages}쪽 텍스트 확인 · `:""}{file.partial ? "일부 발췌/읽지 못한 부분 있음":"추출한 텍스트 전체 반영"}{file.unreadPages>0 ? ` · 텍스트 없는 페이지 ${file.unreadPages}쪽`:""}</p>)}<small>이미지·그래프와 수식의 시각 정보는 텍스트로 추출된 부분만 참고합니다.</small></div>}
+        {!!scope?.curriculumEvidence?.length && <details className="analysis-curriculum-evidence"><summary>교육과정 근거 · 내용 영역과 성취기준</summary><p>교과서별 대·중·소단원과 학교 진도는 별도로 확인해야 해요.</p>{scope.curriculumEvidence.map(course=><section key={`${course.revision}:${course.subject}`}><h4>{course.subject} · {course.revision} 개정</h4><ul>{course.criteria.map(criterion=><li key={criterion.code}><strong>{criterion.area}</strong><p>{criterion.objective}</p><small>{criterion.code}</small></li>)}</ul>{/^https:\/\/(www\.)?moe\.go\.kr\//.test(course.source) && <a href={course.source} target="_blank" rel="noreferrer">교육부 원문 확인 ↗</a>}</section>)}</details>}
         {scope?.timings && <p className="workspace-caption">처리 시간 · 자료 준비 {(scope.timings.documentReadMs/1000).toFixed(1)}초 · AI 응답 {(scope.timings.providerMs/1000).toFixed(1)}초</p>}
         {scope && <p className="workspace-caption">서버 분석 범위: 활동 개요 {scope.scannedRecords}개 · 본문 발췌 {scope.detailedRecords}개 · 선생님 자료 {scope.teacherMaterials}개</p>}
       </details>
-      <RetainedView key={analysis} active={exploring}>{explorationView}</RetainedView>
+      {analysis && !loading && <button className="exploration-next-screen" type="button" onClick={()=>setExploring(true)}><span><strong>후속 탐구 정하러 가기</strong><small>분석을 바탕으로 주제를 고르고, 접이식 카드로 이어가요.</small></span><span aria-hidden="true">→</span></button>}
     </div>
-  </section>;
+  </section></>;
 }

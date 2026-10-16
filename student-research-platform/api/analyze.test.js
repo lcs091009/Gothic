@@ -413,3 +413,11 @@ test("server persistence receives authenticated source context and finishes befo
   const f=fixture({onResult:async(payload,context)=>{await Promise.resolve();assert.equal(context.user.id,user.id);assert.equal(context.records[0].title,"효소 실험");payload.noteId="persisted-note";saved=true;}});
   const response=await f.call();assert.equal(response.code,200);assert.equal(saved,true);assert.equal(response.body.noteId,"persisted-note");
 });
+
+test("accidental foreign narration gets one bounded Korean rewrite using the same analysis quota",async()=>{
+  const content=JSON.stringify({analysis:"1. 핵심 흐름\n온도를 比較해요.",exploration:{intro:"자료 연결",choices:[]}});
+  const fixed=JSON.stringify({"0":"1. 핵심 흐름\n온도를 **비교**해요."});
+  const envelope=value=>JSON.stringify({choices:[{message:{content:value}}]});
+  const f=fixture({providerResponses:[{raw:envelope(content)},{raw:envelope(fixed)}]});
+  const response=await f.call();assert.equal(response.code,200);assert.match(response.body.analysis,/\*\*비교\*\*/);assert.doesNotMatch(response.body.analysis,/比較/);assert.equal(f.providerCalls.length,2);assert.equal(f.quotaCalls,1);
+});

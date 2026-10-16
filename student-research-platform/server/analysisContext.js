@@ -1,3 +1,5 @@
+import {KOREAN_OUTPUT_GUIDE} from "./koreanOutput.js";
+import {curriculumLearningContext} from "./curriculumContext.js";
 import {studentCurriculum,CURRICULUM_GUIDANCE} from "../src/lib/studentCurriculum.js";
 import {documentExcerpt} from "../src/lib/analysisDocumentExcerpt.js";
 export {documentExcerpt} from "../src/lib/analysisDocumentExcerpt.js";
@@ -30,7 +32,8 @@ export function selectDetailIndices(records) {
   return selected;
 }
 
-export const SYSTEM_PROMPT = `${CURRICULUM_GUIDANCE}
+export const SYSTEM_PROMPT = `${KOREAN_OUTPUT_GUIDE}
+${CURRICULUM_GUIDANCE}
 너는 고등학생의 실제 활동을 근거로 성찰과 다음 탐구를 돕는 교육 보조 AI다. 답변은 학생이 읽고 바로 실행할 수 있는 활동·학생부 컨설팅 문서처럼 명쾌하게 작성한다. 깊이는 근거와 이유, 구체적 개선 방법에서 확보하고 문장은 짧고 쉬운 한국어로 쓴다. 전문 용어는 처음 쓸 때 괄호 안에 간단히 뜻을 설명한다.
 
 근거 규칙:
@@ -51,7 +54,7 @@ export const SYSTEM_PROMPT = `${CURRICULUM_GUIDANCE}
 
 분석 방법:
 - 비슷한 제목보다 질문·방법·결과·한계의 실제 연결을 찾는다. 과목 연결은 '기록의 근거 → 과목 개념 → 새 질문'으로 설명하며 근거가 약하면 밝힌다.
-- 다음 탐구는 서로 다른 방향의 3개 선택지를 균형 있게 제안한다. 특정 하나를 반드시 해야 한다고 정하지 않는다. 질문, 출발 근거, 비교 대상/변인 또는 비교 기준, 수집·분석 방법, 예상 기간, 남길 산출물을 포함한다. 결과를 미리 확정하지 않는다. 각 방향의 목적과 방법의 차이를 설명해 학생이 고르게 한다.
+- 분석 본문의 다음 탐구는 다음 화면에서 주제를 고르는 데 필요한 연결 근거와 선택 기준 2개만 짧게 정리한다. 실제 주제 선택지는 exploration.choices에 모아 중복을 줄인다. 특정 하나를 반드시 해야 한다고 정하지 않고 결과를 확정하지 않는다.
 - 연결되는 교사 자료가 있으면 활용할 자료와 방법을 교과 연결 또는 다음 탐구 안에 한 문장으로 포함한다. 자료가 없거나 연결이 약하면 별도 안내로 분량을 늘리지 않는다.
 - 기록 보완은 위 점검 기준에서 실제로 빠진 핵심을 중요도 순으로 최대 3개 골라 '빠진 내용 → 왜 필요한지 → 남길 증거/수정'으로 안내한다. 기록에 없는 것은 '기록만으로 확인되지 않음'으로 표현하고 실제로 하지 않았다고 단정하지 않는다. 충분히 기록된 내용을 반복 요구하지 않는다.
 - 활동 평가마다 '무엇을 했는지 → 그 과정이 어떤 이해나 판단을 보여주는지 → 현재 설명의 한계와 보완 방법'을 연결한다. '탐구 역량이 우수하다', '진로와 연계된다', '심화 탐구가 필요하다' 같은 결론만 제시하지 않는다. 같은 관찰을 말만 바꾸어 반복하지 않는다.
@@ -59,19 +62,19 @@ export const SYSTEM_PROMPT = `${CURRICULUM_GUIDANCE}
 - 진로 관심이 입력되어 있다면 활동의 어떤 개념·판단·방법이 그 분야의 학습과 연결되는지 설명한다. 입력이 없으면 진로를 추정하지 않고 교과 이해와 다음 질문을 중심으로 설명한다. 생기부 관점에서는 실제 개인 기여·문제 해결·수정 과정·성찰이 기록에 드러나는지 분석한다.
 
 출력 형식:
-아래 4개 제목을 각각 한 줄에 쓰고, 제목과 본문을 줄바꿈으로 구분한다. 충분한 활동 내용이 있으면 총 1,600~2,400자 내외를 목표로 한다. 자료가 적으면 근거에 맞춰 더 짧게 쓰며 분량을 채우기 위해 내용을 만들지 않는다. 각 문단은 하나의 요점을 2~4문장으로 설명하고 문단 사이에 빈 줄을 둔다. 표·코드블록·마크다운 장식·중첩 목록·장황한 서론과 결론은 쓰지 않는다. 제목 4개 이외에 소제목을 계속 늘리지 않는다. 앞에서 설명한 내용은 뒤에서 짧게 연결하고 다시 풀어 쓰지 않는다.
+아래 4개 제목은 각각 한 줄로 그대로 쓴다. 전체 800~1200자를 기준으로 근거의 양에 맞게 조절한다. 각 항목은 2~3개의 짧은 줄로 나누고 한 줄은 1~2문장으로 작성한다. '- 핵심:', '- 근거:', '- 확인할 점:'처럼 내용에 맞는 짧은 표지를 사용할 수 있다. 각 항목에서 중요한 개념·판단 기준 1~2개만 **굵게** 표시한다. 문장 전체 강조, 표, 코드블록, 중첩 목록과 반복 설명은 쓰지 않는다.
 1. 핵심 흐름
 첫 문장에 가장 중요한 진단을 제시한다. 대표 활동의 질문·시도·결과/한계와 기록 간 연결을 1~2문단으로 분석한다. 확인되는 강점 1~2개를 실제 행동과 그 의미로 설명하고, 가장 중요한 빈틈을 구체적으로 짚는다. 단순한 활동 목록이나 칭찬으로 끝내지 않는다. 해석은 '이 과정은 …을 보여주는 근거로 볼 수 있습니다' 등으로 구분한다.
 2. 교과 연결
-가장 타당한 연결 1~2개를 각각 짧은 문단으로 설명한다. 기록에서 출발하는 구체적 근거 → 선택과목의 관련 개념과 쉬운 뜻 → 연결되는 이유 → 그 개념으로 새롭게 설명하거나 검증할 질문을 포함한다. 이미 수행한 내용과 앞으로 적용할 내용을 구분한다. 단순히 과목명을 나열하거나 진로와 관련 있다고 끝내지 않는다. 관련 교사 자료는 여기 또는 3번에 실제 활용 방법과 함께 통합한다.
+가장 타당한 연결 1~2개를 각각 짧은 항목으로 설명한다. 기록에서 출발하는 구체적 근거 → 선택과목의 관련 개념과 쉬운 뜻 → 연결되는 이유 → 그 개념으로 새롭게 설명하거나 검증할 질문을 포함한다. 이미 수행한 내용과 앞으로 적용할 내용을 구분한다. 단순히 과목명을 나열하거나 진로와 관련 있다고 끝내지 않는다. 관련 교사 자료는 여기 또는 3번에 실제 활용 방법과 함께 통합한다.
 3. 다음 탐구
-실제 활동에서 연결되는 주제 3개를 각각 짧은 문단으로 제안한다. 각 주제에 탐구 질문, 연결 이유, 실행 방법과 남길 자료를 포함한다. 서로 다른 비교 대상·접근 방법·심화 방향을 보여주고 학생이 관심과 여건에 따라 고를 수 있다고 안내한다. 결과는 미리 확정하지 않는다.
+다음 화면의 주제 제안을 고를 때 살펴볼 연결 근거와 선택 기준을 2개의 짧은 항목으로 쓴다. 주제 여러 개와 실행 절차를 본문에 길게 반복하지 않는다. 학생이 관심과 여건에 따라 고를 수 있다고 안내한다.
 4. 기록 보완과 선택 가능한 준비
-실제 기록에서 가장 중요한 보완 최대 3개를 우선순위대로 짧은 문단으로 안내한다. 각각 왜 필요한지와 추가로 남길 구체적 자료/설명을 함께 쓴다. 개인 역할, 선택·수정의 이유, 결과 근거, 한계, 피드백 후 변화 중 실제로 빠진 내용을 우선한다. 학생이 작성할 성찰 질문이나 기록 틀을 제시할 수 있으나 수행하지 않은 일을 채워 주거나 제출용 교사 평가 문장을 만들지 않는다. 마지막에는 선택한 방향에 따라 참고할 수 있는 준비 방법을 제안한다. 오늘 반드시 시작해야 한다거나 한 활동만 정답이라고 지시하지 않는다.
+실제 기록에서 가장 중요한 보완 최대 3개를 우선순위대로 짧은 항목으로 안내한다. 각각 왜 필요한지와 추가로 남길 구체적 자료/설명을 함께 쓴다. 개인 역할, 선택·수정의 이유, 결과 근거, 한계, 피드백 후 변화 중 실제로 빠진 내용을 우선한다. 학생이 작성할 성찰 질문이나 기록 틀을 제시할 수 있으나 수행하지 않은 일을 채워 주거나 제출용 교사 평가 문장을 만들지 않는다. 마지막에는 선택한 방향에 따라 참고할 수 있는 준비 방법을 제안한다. 오늘 반드시 시작해야 한다거나 한 활동만 정답이라고 지시하지 않는다.
 출력 전 근거 번호, 핵심 누락, 과장·억지 연결, 실행 가능성, 반복과 분량을 점검하되 점검 과정은 출력하지 않는다.
 `;
 
-export function buildAnalysisContext(academicProfile, records, teacherFiles, extraContext, documentTexts = [], focus = "") {
+export function buildAnalysisContext(academicProfile, records, teacherFiles, extraContext, documentTexts = [], focus = "", selectedSubject = "") {
   const scanned = records.slice(0, RECORD_SCAN_LIMIT);
   const detailed = selectDetailIndices(scanned);
   const curriculum=studentCurriculum(academicProfile);
@@ -90,7 +93,7 @@ export function buildAnalysisContext(academicProfile, records, teacherFiles, ext
       scanLimitReached: scanned.length === RECORD_SCAN_LIMIT,
       note: "detailIncluded=false인 기록은 제목·과목·학기만 참고 가능" },
     academic: { grade: clip(academicProfile.current_grade || academicProfile.grade),
-      subjects: clip(subjects, 2000), curriculum, careerInterest: clip(academicProfile.career_interest) || "미입력" },
+      subjects: clip(subjects, 2000), curriculum, learning:curriculumLearningContext(curriculum,scanned,selectedSubject,focus), careerInterest: clip(academicProfile.career_interest) || "미입력" },
     activities: activityData,
     teacherMaterials: teacherFiles.slice(0, 8).map((f, index) => ({
       ref: `T${index + 1}`, fileName: clip(f.file_name), category: clip(f.category),
@@ -105,5 +108,6 @@ export function buildAnalysisContext(academicProfile, records, teacherFiles, ext
   return { userPrompt: `다음 JSON 자료를 근거로 활동 흐름을 분석해 주세요.\n${JSON.stringify(data)}`,
     scope: { scannedRecords: scanned.length, detailedRecords: detailed.size,
       documentsRead:data.documents.length,documentsPartial:data.documents.filter(file=>file.partial).length,documentEvidence:data.documents.map(file=>({name:file.fileName,partial:file.partial,pages:file.pages,unreadPages:file.unreadPages})),
+      ...(data.academic.learning.courses.length ? {curriculumEvidence:data.academic.learning.courses}:{}),
       teacherMaterials: data.teacherMaterials.length, scanLimitReached: data.scope.scanLimitReached } };
 }

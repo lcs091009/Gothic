@@ -48,7 +48,7 @@ export default function ExplorationPage({seed,records,files,extraContext,onBack,
     setError("화면 대기를 멈췄어요. 서버에 접수된 분석은 계속 진행되고 결과는 활동 분석 노트에 저장돼요.");
   }
   return <section className="exploration-workspace exploration-inline">
-    <header className="exploration-inline-header"><div><p className="student-eyebrow">나의 탐구 가이드</p><h3>선택한 주제를 한 걸음씩</h3></div><button type="button" onClick={onBack}>카드 접기</button></header>
+    <header className="exploration-inline-header"><div><p className="student-eyebrow">나의 탐구 가이드</p><h3>선택한 주제를 한 걸음씩</h3></div><button type="button" onClick={onBack}>← 분석 노트로</button></header>
     <p className="workspace-caption">질문을 고르면 아래에 카드가 이어져요. 이전 카드는 눌러서 다시 볼 수 있어요.</p>
     {steps.map((step,index)=>{const latest=index===steps.length-1,chosen=step.path.length>0;
       return <details className="exploration-step-card" key={index} open={expanded.includes(index)}>
