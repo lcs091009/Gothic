@@ -11,18 +11,18 @@ export default function AnalysisWorkspace({analysis,loading,message,scope,warnin
   const heading=useRef(null);
   useEffect(()=>{heading.current?.focus();},[]);
   useEffect(()=>{setActive(0);setExploring(false);},[analysis]);
-  useEffect(()=>{heading.current?.focus();},[active,exploring]);
+  useEffect(()=>{heading.current?.focus();},[active]);
   const sections=analysisSections(analysis);
   const subjects=new Map();
   for(const record of records) { const name=record.subject || "과목 미입력";subjects.set(name,(subjects.get(name)||0)+1); }
   const explorationView=<ExplorationPage documentTexts={documentTexts} initialSubject={initialSubject} academicProfile={academicProfile} seed={exploration} records={records} files={files} extraContext={extraContext} onBack={()=>setExploring(false)} />;
-  return <><RetainedView key={analysis} active={exploring}>{explorationView}</RetainedView><section hidden={exploring} className="analysis-workspace">
+  return <section className="analysis-workspace">
     <aside className="analysis-workspace-nav">
       <button type="button" onClick={onBack}>← 자료 선택</button>
       <p className="student-eyebrow">나의 탐구 연결</p><h2 ref={heading} tabIndex={-1}>분석 작업실</h2>
       <nav aria-label="분석 항목">{sections.map((section,index)=><button key={section.number} type="button" disabled={loading || !analysis}
         aria-pressed={active===index} onClick={()=>setActive(index)}><span>{String(section.number).padStart(2,"0")}</span>{section.title}</button>)}</nav>
-      <button className="exploration-entry" type="button" disabled={loading || !analysis} onClick={()=>setExploring(true)}>과목별 심화탐구 →</button>
+      <button className="exploration-entry" type="button" disabled={loading || !analysis} aria-expanded={exploring} onClick={()=>setExploring(value=>!value)}>{exploring ? "심화탐구 카드 접기":"심화탐구 카드 펼치기"}</button>
       <p className="workspace-caption">선택한 기록 {records.length}개<br />선생님 첨부 {files.length}개</p>
     </aside>
     <div className="analysis-workspace-main">
@@ -45,6 +45,7 @@ export default function AnalysisWorkspace({analysis,loading,message,scope,warnin
         {!!scope?.documentEvidence?.length && <div className="analysis-document-evidence"><h4>첨부 본문 확인 내역</h4>{scope.documentEvidence.map((file,index)=><p key={index}>{file.name} · {file.pages ? `${file.pages}쪽 텍스트 확인 · `:""}{file.partial ? "일부 발췌/읽지 못한 부분 있음":"추출한 텍스트 전체 반영"}{file.unreadPages>0 ? ` · 텍스트 없는 페이지 ${file.unreadPages}쪽`:""}</p>)}<small>이미지·그래프와 수식의 시각 정보는 텍스트로 추출된 부분만 참고합니다.</small></div>}
         {scope && <p className="workspace-caption">서버 분석 범위: 활동 개요 {scope.scannedRecords}개 · 본문 발췌 {scope.detailedRecords}개 · 선생님 자료 {scope.teacherMaterials}개</p>}
       </details>
+      <RetainedView key={analysis} active={exploring}>{explorationView}</RetainedView>
     </div>
-  </section></>;
+  </section>;
 }

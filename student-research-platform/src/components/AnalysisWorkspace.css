@@ -106,3 +106,24 @@
 .exploration-subject-connection > span:last-child { color:#355c50; font-weight:650; }
 .exploration-workspace header > .exploration-subject-connection { margin:0 0 8px; }
 .exploration-subject-connection > span { font-size:inherit; }
+
+.exploration-inline { margin-top:28px; padding-top:24px; border-top:1px solid #dfe7df; }
+.exploration-inline-header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.exploration-inline-header h3 { margin-bottom:8px !important; }
+.exploration-step-card { border:1px solid #d6e2d7; border-radius:20px; background:#fff; margin:14px 0; overflow:hidden; }
+.exploration-step-card > summary { display:flex; align-items:center; gap:12px; padding:20px; cursor:pointer; list-style:none; }
+.exploration-step-card > summary::-webkit-details-marker { display:none; }
+.exploration-step-card > summary:focus-visible { outline:3px solid #648675; outline-offset:-3px; }
+.exploration-step-card > summary strong { flex:1; min-width:0; overflow-wrap:anywhere; line-height:1.6; }
+.exploration-step-number { flex-shrink:0; font-size:12px; color:#466650; background:#edf4ec; padding:7px 10px; border-radius:10px; }
+.exploration-fold { flex-shrink:0; font-size:12px; color:#648675; }
+.exploration-step-card[open] > summary { background:#f2f6f0; border-bottom:1px solid #dfe7df; }
+.exploration-step-body { padding:20px; }
+.exploration-step-body .analysis-section { padding:18px; }
+.exploration-key-point { border-left:4px solid #648675; padding-left:16px; font-weight:600; }
+.exploration-step-body .exploration-guidelines h4 { display:inline-block; background:#edf4ec; color:#355b40; border-radius:8px; padding:6px 10px; }
+.subject-curriculum { font-size:13px; margin-top:12px; color:#466650; }
+.subject-curriculum summary { cursor:pointer; line-height:1.7; }
+.subject-curriculum p { line-height:1.8; }
+@media(max-width:640px) { .exploration-step-card > summary { gap:8px; padding:14px; flex-wrap:wrap; } .exploration-step-card > summary strong { flex-basis:65%; } .exploration-step-body { padding:14px; } .exploration-inline-header { align-items:flex-start; } }
+.exploration-highlight { color:#264d32; background:#e8f0d9; padding:1px 4px; border-radius:4px; font-weight:750; }
