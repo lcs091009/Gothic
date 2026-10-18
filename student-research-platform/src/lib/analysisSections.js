@@ -1,4 +1,4 @@
-const titles=["핵심 흐름","교과 연결","다음 탐구","기록 보완과 선택 가능한 준비"];
+const titles=["핵심 흐름","교과 연결","다음 탐구","기록 보완과 바로 할 일"];
 export function analysisSections(text) {
   const sections=titles.map((title,index)=>({title,number:index+1,lines:[]}));
   let active=0,found=false;

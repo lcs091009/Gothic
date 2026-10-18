@@ -11,7 +11,7 @@ export function validExplorationPath(path) {
   return Array.isArray(path) && path.length <= 12 && path.every(item=>typeof item === "string" && item.trim() && item.length <= 400);
 }
 export const EXPLORATION_VOICE = "학생에게 옆에서 설명하듯 자연스러운 해요체를 사용한다. '~입니다/~하십시오/~해야 합니다'를 반복하지 말고 '이렇게 연결해 볼 수 있어요', '어떤 차이가 있는지 살펴보면 좋아요'처럼 부드럽고 구체적으로 안내한다. 과한 칭찬·감탄·이모지·유아적인 표현은 쓰지 않는다. 근거, 연결 이유, 학생이 고를 수 있는 다음 판단을 짧은 문장으로 설명한다. 쉬운 말투를 쓰더라도 핵심 개념과 근거를 생략하지 않는다.";
-export const CHOICE_FORMAT = `JSON 형식은 {"intro":"자료의 근거와 연결 이유를 쉬운 말로 설명", "choices":[{"title":"새 탐구 제목(과목명은 subject로 분리)", "subject":"추천 과목", "sourceRefs":["R1"], "question":"학생이 선택할 중심 탐구 질문", "connection":"실제 자료와 이 주제가 이어지는 이유"}], "guidelines":[{"title":"현재 단계에서 참고할 지점", "detail":"판단 기준과 선택 가능한 준비·진행·해석 안내", "question":"학생 스스로 결정하거나 확인할 점"}]}이다. 모든 문자열과 키는 큰따옴표로 쓰고 JSON 앞뒤에 설명을 붙이지 않는다. 문자열의 줄바꿈은 JSON 이스케이프를 사용한다. intro는 1200자, question은 400자 이내. 선택 경로가 비어 있으면 자료 본문을 바탕으로 서로 구별되는 주제 choices를 2~3개 제시하고 각 주제의 추천 과목과 결합 이유를 적는다. sourceRefs에는 연결의 출발점인 실제 활동 또는 선생님 자료의 R번호/T번호를 최대 2개 넣는다. 존재하지 않는 번호나 출발 활동을 만들지 않는다. 화면에서 현재 과목(기존 탐구 제목) → 추천 과목을 제목 위에 표시하므로 title에는 새 탐구 제목만 쓴다. 경로가 있으면 choices는 빈 배열로 두고 처음 선택한 주제를 유지하는 guidelines 2~4개를 제시한다. 새로운 주제를 추천하지 않는다. 정답·실험 결과·수행 이력을 만들거나 학생의 결정을 대신하지 않는다.`;
+export const CHOICE_FORMAT = `JSON 형식은 {"intro":"자료의 근거와 연결 이유를 쉬운 말로 설명", "choices":[{"title":"새 탐구 제목(과목명은 subject로 분리)", "subject":"추천 과목", "sourceRefs":["R1"], "question":"학생이 선택할 중심 탐구 질문", "connection":"실제 자료와 이 주제가 이어지는 이유"}], "guidelines":[{"title":"현재 단계에서 참고할 지점", "detail":"판단 기준과 선택 가능한 준비·진행·해석 안내", "question":"학생 스스로 결정하거나 확인할 점"}]}이다. 모든 문자열과 키는 큰따옴표로 쓰고 JSON 앞뒤에 설명을 붙이지 않는다. 문자열의 줄바꿈은 JSON 이스케이프를 사용한다. intro는 1200자, question은 400자 이내. 선택 경로가 비어 있으면 자료 본문을 바탕으로 서로 구별되는 주제 choices를 2~3개 제시하고 각 주제의 추천 과목과 결합 이유를 적는다. 활동 기록·선생님 자료가 합쳐 2개 이상이면 choices 중 1개는 여러 자료를 함께 아우르는 통합 주제로 만들고, sourceRefs에 묶은 자료 번호를 모두 넣으며, connection에 각 자료가 맡는 역할(질문·방법·데이터·비교 기준 등)과 제외한 자료의 이유를 쓴다. sourceRefs에는 연결의 출발점인 실제 활동 또는 선생님 자료의 R번호/T번호를 최대 4개 넣는다. 존재하지 않는 번호나 출발 활동을 만들지 않는다. 화면에서 현재 과목(기존 탐구 제목) → 추천 과목을 제목 위에 표시하므로 title에는 새 탐구 제목만 쓴다. 경로가 있으면 choices는 빈 배열로 두고 처음 선택한 주제를 유지하는 guidelines 2~4개를 제시한다. 새로운 주제를 추천하지 않는다. 정답·실험 결과·수행 이력을 만들거나 학생의 결정을 대신하지 않는다.`;
 export function explorationPrompt(base, subject = "") {
   const evidence=base.slice(base.indexOf("근거 규칙:"),base.indexOf("학생부와 탐구 점검 기준"));
   const subjectGuide=subject ? "사용자 메시지 explorationSubject에 선택 과목이 있다. 이 과목의 개념과 실제 자료를 중심으로 연결하되 억지 연결은 피한다." : "학생이 과목을 고르지 않았다. 자료에서 직접 확인한 개념을 바탕으로 결합하면 좋은 교과와 이유를 추천한다. 이미 수강하거나 배웠다고 단정하지 않는다.";
@@ -84,7 +84,7 @@ export function parseExploration(text) {
     const why=boundedText(choice.why,fields.why) || boundedText(connection,fields.why);
     choices.push({title:boundedText(choice.title,fields.title) || boundedText(question,fields.title),question,why,connection,
       ...(typeof choice.subject==="string" && choice.subject.trim() ? {subject:boundedText(choice.subject,80)} : {}),
-      ...(Array.isArray(choice.sourceRefs) ? {sourceRefs:[...new Set(choice.sourceRefs.filter(ref=>typeof ref==="string" && /^[RT][1-9]\d?$/.test(ref)))].slice(0,2)} : {})});
+      ...(Array.isArray(choice.sourceRefs) ? {sourceRefs:[...new Set(choice.sourceRefs.filter(ref=>typeof ref==="string" && /^[RT][1-9]\d?$/.test(ref)))].slice(0,4)} : {})});
     seen.add(question);
     if(choices.length===4) break;
   }
