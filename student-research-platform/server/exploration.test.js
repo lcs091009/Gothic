@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {parseExploration,validExplorationPath,readableReferences} from "./exploration.js";
+import {parseExploration,validExplorationPath,readableReferences,CHOICE_FORMAT} from "./exploration.js";
 test("references use actual server record order and safe unknown labels",()=>{
   assert.equal(readableReferences("근거 [R1, R2]와 [T1], R99",[{title:"효소 실험"},{title:"독서"}],[{file_name:"수업 자료"}]),"근거 「효소 실험 · 독서」와 「수업 자료」, 「근거 확인 필요」");
 });
@@ -75,4 +75,15 @@ test("cut-off replies preserve only complete explanations and complete choice fi
   assert.equal(parseInitialAnalysis('{"analysis":"미완성').analysis,"");
   assert.equal(parseInitialAnalysis(JSON.stringify({analysis:["첫 문단","둘째 문단"]})).analysis,"첫 문단\n\n둘째 문단");
   const direct=parseInitialAnalysis(JSON.stringify({intro:"실제 주제 안내",choices:[{question:"무엇을 비교할까?"}]}));assert.equal(direct.analysis,"실제 주제 안내");assert.equal(direct.formatRecovered,true);
+});
+
+test("integrated topics keep up to four distinct source records/materials",()=>{
+  const result=parseExploration(JSON.stringify({intro:"자료 연결",choices:[{title:"통합 탐구",question:"세 자료를 함께 보면?",connection:"R1 질문, R2 방법, T1 데이터",sourceRefs:["R1","R2","T1","R3","R4","R1"]}]}));
+  assert.deepEqual(result.choices[0].sourceRefs,["R1","R2","T1","R3"]);
+});
+
+test("prompts keep analysis inside the curriculum and ask for an integrated topic",async()=>{
+  const {SYSTEM_PROMPT}=await import("./analysisContext.js");
+  assert.match(SYSTEM_PROMPT,/교육과정 범위/);assert.match(SYSTEM_PROMPT,/통합 탐구 주제/);
+  assert.match(CHOICE_FORMAT,/통합 주제/);
 });
