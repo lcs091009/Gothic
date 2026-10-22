@@ -17,6 +17,7 @@ import "./styles/innerPages.css";
 import GradeSetup from "./components/GradeSetup";
 import TeacherPage from "./components/TeacherPage";
 import AiAnalysisPage from "./components/AiAnalysisPage";
+import CurriculumGoalsPage from "./components/CurriculumGoalsPage";
 import { useEffect, useRef, useState } from "react";
 import {
   getFriendlySupabaseError,
@@ -259,6 +260,10 @@ async function handleDeleteResearchRecord(recordId) {
               }}
             />
           )}
+
+        {profile?.role === "student" && currentPage === "curriculum" && (
+          <CurriculumGoalsPage academicProfile={academicProfile} records={records} />
+        )}
 
         {profile?.role === "student" && <RetainedView key={session.user.id} active={currentPage === "ai"}>{isAcademicProfileLoading && !academicProfile ? (
           <p style={styles.text} role="status">선택과목 정보를 불러오는 중입니다.</p>
