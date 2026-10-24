@@ -9,7 +9,6 @@ import {ANALYSIS_TIMEOUT_MS,withinAnalysisDeadline} from "../server/analysisDead
 
 export const MAX_BODY_BYTES = 2_500_000;
 export const AI_MODEL = "nvidia/nemotron-3.5-super-vl-120b-a12b";
-export const AI_FALLBACK_MODEL = "google/gemma-4-31b-it";
 export const AI_OUTPUT_TOKENS=6400;
 // Some endpoints include model-specific private thought blocks in content.
 const withoutReasoning=text=>typeof text==="string" ? text
@@ -48,7 +47,7 @@ export function providerFailure(status) {
 }
 
 export function createAnalyzeHandler({ env = process.env, fetchImpl = fetch, clientFactory = createClient,
-  logger = console, onResult=null, timeoutMs=ANALYSIS_TIMEOUT_MS } = {}) {
+  logger = console, onResult=null, timeoutMs=ANALYSIS_TIMEOUT_MS, fallbackModel=null } = {}) {
 return async function handler(request, response) {
   const startedAt=Date.now();
   response.setHeader("Cache-Control", "no-store");
@@ -171,7 +170,7 @@ return async function handler(request, response) {
 
     const providerStartedAt=Date.now();
     let nvidiaResponse, nvidiaRawText, usedModel;
-    for (const model of [AI_MODEL, AI_FALLBACK_MODEL]) {
+    for (const model of [...new Set([AI_MODEL,...(fallbackModel ? [fallbackModel]:[])])]) {
       usedModel = model;
       nvidiaResponse = await run(()=>fetchImpl(
         "https://integrate.api.nvidia.com/v1/chat/completions",
@@ -197,9 +196,10 @@ return async function handler(request, response) {
         }
       ));
       nvidiaRawText = await run(()=>nvidiaResponse.text());
-      // Missing/retired endpoints cannot answer. Use one current alternative,
-      // sharing the original deadline and quota; never retry auth/limit failures.
-      if (![404,410].includes(nvidiaResponse.status) || model === AI_FALLBACK_MODEL) break;
+      // Auto-substitution is disabled by default to preserve the selected model.
+      // A deployment may explicitly supply a quality-verified alternative;
+      // it shares the original deadline and quota and only handles 404/410.
+      if (![404,410].includes(nvidiaResponse.status) || (!fallbackModel || model === fallbackModel)) break;
       logger.warn("AI model unavailable; using fallback", {
         code: nvidiaResponse.status === 404 ? "AI_PROVIDER_MODEL":"AI_PROVIDER_MODEL_RETIRED", providerStatus: nvidiaResponse.status, model,
       });
@@ -264,7 +264,7 @@ return async function handler(request, response) {
       scope,
       timings:{preparationMs:providerStartedAt-startedAt,providerMs:Date.now()-providerStartedAt,totalMs:Date.now()-startedAt},
       providerModel: usedModel,
-      fallbackUsed: usedModel === AI_FALLBACK_MODEL,
+      fallbackUsed: Boolean(fallbackModel && usedModel === fallbackModel),
       warning: [normalized.languageOmitted ? "한국어로 정리하지 못한 일부 문장은 생략했어요. 표시된 근거와 설명부터 확인해 주세요.":"",
         initial?.formatRecovered || exploration?.formatRecovered ? "응답 형식이 일부 달라 확인된 설명만 표시했어요. 탐구 안내가 비어 있으면 같은 자료로 주제 추천을 다시 요청할 수 있어요.":"",
         choice.finish_reason === "length" ? "응답 길이 제한으로 분석 일부가 생략되었을 수 있습니다." : "",

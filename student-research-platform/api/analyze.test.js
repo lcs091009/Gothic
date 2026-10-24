@@ -32,7 +32,7 @@ function fixture(overrides = {}) {
     async rpc(name) { quotaCalls++; assert.equal(name, "consume_ai_analysis_quota"); return overrides.quota || { data: { allowed: true } }; },
   };
   const handler = createAnalyzeHandler({ env: overrides.env || env, clientFactory: () => client,
-    logger: { warn: (...args) => logs.push(args) },onResult:overrides.onResult,timeoutMs:overrides.timeoutMs,
+    logger: { warn: (...args) => logs.push(args) },fallbackModel:overrides.fallbackModel===undefined ? "google/gemma-4-31b-it":overrides.fallbackModel,onResult:overrides.onResult,timeoutMs:overrides.timeoutMs,
     fetchImpl: async (url, options) => {
       providerCalls.push({ url, options });
       if(overrides.hangProvider) return new Promise(()=>{});
@@ -443,4 +443,12 @@ test("Gemma fallback thought blocks cannot become student analysis even when the
   const f=fixture({providerResponses:[{ok:false,status:404},{ok:true,raw}]});
   const result=await f.call();assert.equal(result.code,200);assert.equal(result.body.analysis,"확인된 학생 설명");
   assert.doesNotMatch(JSON.stringify(result.body),/PRIVATE_THOUGHT|channel/);
+});
+
+
+test("production default does not silently change to an unverified lower-cost model",async()=>{
+  const unavailable=fixture({fallbackModel:null,ok:false,status:404});
+  const failed=await unavailable.call();assert.equal(failed.code,503);assert.equal(unavailable.providerCalls.length,1);
+  const available=fixture({fallbackModel:null});const result=await available.call();
+  assert.equal(result.code,200);assert.equal(result.body.providerModel,"nvidia/nemotron-3.5-super-vl-120b-a12b");assert.equal(result.body.fallbackUsed,false);
 });
