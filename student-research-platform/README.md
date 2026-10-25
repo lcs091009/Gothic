@@ -91,7 +91,7 @@ update public.profiles set role = 'teacher' where id = 'VERIFIED_TEACHER_UUID'::
 
 서버는 Supabase `getUser(token)`으로 로그인 토큰을 검증한 뒤 승인된 학생인지 확인합니다. 브라우저는 보충 입력만 전송하며, 서버가 본인의 저장된 선택과목·최근 등록한 활동 최대 48개·교사 자료 8개를 다시 읽습니다. 활동은 개요 전체와 최신 기록·이전 학기·과목을 고려해 고른 최대 12개의 본문을 참고합니다. 긴 본문은 앞부분과 끝부분을 합쳐 2,000자 이내로 발췌하며 생략 여부를 모델에 알립니다. 등록일을 활동일로 취급하지 않습니다. 브라우저가 보낸 임의의 사용자 ID·활동 목록은 분석 자료로 사용하지 않습니다.
 
-요청은 16 KiB, 보충 입력은 1,200자로 제한합니다. 데이터베이스에서 사용자별 **전체 사용자 합계 10분에 200회(일일 제한 없음)**를 제한하며, 서버 재시작이나 여러 인스턴스에서도 동일하게 집계합니다. 한도 SQL 함수가 없거나 오류가 나면 AI 호출을 차단합니다. NVIDIA 요청을 시작한 시도는 실패하더라도 한도에 포함됩니다. NVIDIA에서 제공하는 `nvidia/nemotron-3-super-120b-a12b` 모델에 temperature 0.6을 사용하고, 출력 상한 2,600토큰으로 분석합니다. 기본 모델이 410을 반환하면 `nvidia/nemotron-3-nano-30b-a3b`로 한 번만 전환합니다. 두 호출은 45초 제한과 사용자 한도 차감을 공유하며, 다른 오류에는 자동 재시도하지 않습니다. 두 모델 모두 비추론 모드와 `stream: false`를 명시합니다. 답변에는 활동 근거 번호·과목 연결 이유·탐구 방법·소요 시간·결과물을 요청합니다. 모델 응답 시간 제한은 45초이며 공급자 오류 본문은 브라우저에 노출하지 않습니다.
+요청은 16 KiB, 보충 입력은 1,200자로 제한합니다. 데이터베이스에서 사용자별 **전체 사용자 합계 10분에 200회(일일 제한 없음)**를 제한하며, 서버 재시작이나 여러 인스턴스에서도 동일하게 집계합니다. 한도 SQL 함수가 없거나 오류가 나면 AI 호출을 차단합니다. NVIDIA 요청을 시작한 시도는 실패하더라도 한도에 포함됩니다. NVIDIA API를 통해 기본 `nvidia/nemotron-3.5-super-vl-120b-a12b`를 사용합니다(2026-10-24 공식 카탈로그 제공 상태 확인). 이전 Super 3/Nano 3 무료 엔드포인트는 종료되어 교체했습니다. 성능 유지 요청에 따라 자동 대체는 기본적으로 비활성화했습니다. 성능 비교를 마친 모델을 배포 코드의 fallbackModel로 명시한 경우에만 404 또는 410에서 최대 한 번 전환하며 전체 제한 시간과 한 번의 한도 차감을 공유합니다. 인증·과금·사용량 오류에는 자동 전환하지 않습니다. 최초 출력 상한은 6,400토큰, 심화탐구는 4,200토큰입니다. 모델 요청에는 `chat_template_kwargs.enable_thinking: false`와 `stream: false`를 사용하며 예전 모델용 `reasoning_effort`는 보내지 않습니다. 전체 서버 제한은 기본 115초이며 백그라운드 작업은 남은 요청 시간 안에서 처리합니다. 공급자 오류 원문과 API 키는 로그나 브라우저에 노출하지 않습니다.
 
 근거 번호는 각 분석 요청 안에서 부여한 `R1`(활동), `T1`(교사 자료) 형태입니다. 응답에는 실제 분석 범위와 길이 제한 경고를 함께 반환합니다. 빈 응답은 성공으로 처리하지 않고, 실패 시 화면의 이전 결과를 유지합니다. 일반 오류 재시도는 하지 않으며, 모델 종료(410)에만 최대 1회 대체 모델을 사용합니다. 응답과 안전한 로그에는 실제 사용 모델명을 포함합니다.
 
@@ -99,7 +99,7 @@ update public.profiles set role = 'teacher' where id = 'VERIFIED_TEACHER_UUID'::
 
 기존 Nemotron Super 49B v1/v1.5와 Qwen3-Next 모델의 HTTP 410 문제가 보고되어 Nemotron 3 계열로 전환했습니다. 모델 설명 페이지가 남아 있다고 실제 호스팅 제공을 보장하지 않으므로 배포 후 실제 API 응답을 확인해야 합니다. 기존 `NVIDIA_API_KEY`와 API 주소를 사용합니다.
 
-공식 참고: [Nemotron 3 Super API](https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3-super-120b-a12b-infer), [Nano API](https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3-nano-30b-a3b-infer), [Nano 추론 설정](https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3-nano-30b-a3b).
+공식 참고: [현재 Super 3.5](https://build.nvidia.com/nvidia/nemotron-3.5-super-vl-120b-a12b), [Gemma 4](https://build.nvidia.com/google/gemma-4-31b-it), [Gemma 4 API·추론 설정](https://docs.api.nvidia.com/nim/reference/google-gemma-4-31b-it-infer). 카탈로그에 모델 ID가 남아 있어도 무료 추론 엔드포인트가 종료될 수 있으므로 모델별 제공 상태를 함께 확인합니다.
 
 ## 기존 서비스에 적용하는 순서
 
@@ -140,3 +140,6 @@ select to_regprocedure('public.consume_ai_analysis_quota()');
 과제 전달은 `teacher_shared_files.attachments` 열이 있어야 동작합니다. 첨부가 없어도 빈 목록을 저장하므로, 이 열이 없으면 모든 전달이 `column "attachments" ... does not exist`로 실패합니다. 새 데이터베이스는 `supabase db push`로 **`supabase/migrations/20261014000000_teacher_assignment_attachments.sql`**까지 적용되며, 기존 프로젝트는 SQL Editor에서 이 파일을 실행합니다. 열을 추가만 하므로 기존 과제는 유지되고 다시 실행해도 안전합니다.
 
 교사는 ‘전달한 과제·자료’에서 잘못 보낸 과제를 회수할 수 있습니다. 회수하면 학생 화면에서 과제가 사라지지만, 이미 공유한 Google Drive 파일의 보기 권한은 자동으로 해제되지 않으므로 필요하면 Drive의 ‘공유’에서 직접 해제합니다.
+
+
+2026-10-24에 확인한 무료 제공 상태는 3개월 보장이 아닙니다. 새 모델과 이전 모델의 한국어 활동 분석 품질을 실제 자료로 비교하지 않았으므로 동등 이상 성능을 보장하지 않습니다. Google Cloud 신규 사용자 체험의 90일·300달러 크레딧도 소진 시 먼저 종료되며, AI Studio API 비용에는 적용되지 않습니다: https://docs.cloud.google.com/free/docs/free-cloud-features . 사용자의 학교 자료로 성능을 비교하고 무료 사용 조건을 확인하기 전에는 비용만으로 다른 모델을 선택하지 않습니다.

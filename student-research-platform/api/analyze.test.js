@@ -32,7 +32,7 @@ function fixture(overrides = {}) {
     async rpc(name) { quotaCalls++; assert.equal(name, "consume_ai_analysis_quota"); return overrides.quota || { data: { allowed: true } }; },
   };
   const handler = createAnalyzeHandler({ env: overrides.env || env, clientFactory: () => client,
-    logger: { warn: (...args) => logs.push(args) },onResult:overrides.onResult,timeoutMs:overrides.timeoutMs,
+    logger: { warn: (...args) => logs.push(args) },fallbackModel:overrides.fallbackModel===undefined ? "google/gemma-4-31b-it":overrides.fallbackModel,onResult:overrides.onResult,timeoutMs:overrides.timeoutMs,
     fetchImpl: async (url, options) => {
       providerCalls.push({ url, options });
       if(overrides.hangProvider) return new Promise(()=>{});
@@ -147,8 +147,8 @@ test("distinguishes provider authentication, model, billing, input and availabil
     assert.equal(r.body.providerStatus, status);
     assert.match(r.body.error, new RegExp(String(status)));
     assert.doesNotMatch(JSON.stringify([r.body, f.logs]), /PRIVATE_PROVIDER_BODY|fake-test-only|valid-token/);
-    assert.equal(f.providerCalls.length, status === 410 ? 2 : 1);
-    assert.equal(f.logs.length, status === 410 ? 2 : 1);
+    assert.equal(f.providerCalls.length, [404,410].includes(status) ? 2 : 1);
+    assert.equal(f.logs.length, [404,410].includes(status) ? 2 : 1);
   }
 });
 
@@ -171,15 +171,15 @@ test("trims accidental whitespace around a server key and rejects whitespace-onl
   assert.equal(empty.providerCalls.length, 0);
 });
 
-test("uses Nemotron 3 Super with explicit non-streaming and reasoning disabled", async () => {
+test("uses current Nemotron 3.5 Super with explicit non-streaming and reasoning disabled", async () => {
   const f = fixture();
   assert.equal((await f.call()).code, 200);
   const payload = JSON.parse(f.providerCalls[0].options.body);
-  assert.equal(payload.model, "nvidia/nemotron-3-super-120b-a12b");
+  assert.equal(payload.model, "nvidia/nemotron-3.5-super-vl-120b-a12b");
   assert.equal(payload.temperature, 0.6);
   assert.ok(payload.max_tokens <= 32768);
   assert.equal(payload.stream, false);
-  assert.equal(payload.reasoning_effort, "none");
+  assert.equal(payload.reasoning_effort, undefined);
   assert.deepEqual(payload.chat_template_kwargs,{enable_thinking:false});
   assert.deepEqual(payload.messages.map(m => m.role), ["system", "user"]);
   assert.doesNotMatch(payload.messages[0].content, /\/no_think/);
@@ -188,13 +188,13 @@ test("uses Nemotron 3 Super with explicit non-streaming and reasoning disabled",
 });
 
 
-test("a 410 switches once to Nano with the same deadline, owner data and one quota charge", async () => {
+test("a 410 switches once to Gemma with the same deadline, owner data and one quota charge", async () => {
   const f = fixture({ providerResponses: [{ ok: false, status: 410, raw: "PRIVATE_RETIRED_BODY" }, { ok: true }] });
   const r = await f.call();
   assert.equal(r.code, 200);
   assert.equal(r.body.analysis, "분석 완료");
   assert.equal(r.body.fallbackUsed, true);
-  assert.equal(r.body.providerModel, "nvidia/nemotron-3-nano-30b-a3b");
+  assert.equal(r.body.providerModel, "google/gemma-4-31b-it");
   assert.equal(f.quotaCalls, 1);
   assert.equal(f.providerCalls.length, 2);
   const first = JSON.parse(f.providerCalls[0].options.body);
@@ -206,8 +206,8 @@ test("a 410 switches once to Nano with the same deadline, owner data and one quo
   assert.doesNotMatch(JSON.stringify([r.body, f.logs]), /PRIVATE_RETIRED_BODY/);
 });
 
-test("does not retry authentication, rate limit, unavailable models, server failure or empty successful answers", async () => {
-  for (const status of [401, 403, 404, 429, 500]) {
+test("does not retry authentication, rate limit, server failure or empty successful answers", async () => {
+  for (const status of [401, 403, 429, 500]) {
     const f = fixture({ ok: false, status });
     await f.call();
     assert.equal(f.providerCalls.length, 1);
@@ -222,7 +222,7 @@ test("two retired models stop after two attempts and identify the final model", 
   const r = await f.call();
   assert.equal(r.code, 503);
   assert.equal(r.body.code, "AI_PROVIDER_MODEL_RETIRED");
-  assert.equal(r.body.providerModel, "nvidia/nemotron-3-nano-30b-a3b");
+  assert.equal(r.body.providerModel, "google/gemma-4-31b-it");
   assert.equal(f.providerCalls.length, 2);
   assert.equal(f.quotaCalls, 1);
 });
@@ -420,4 +420,35 @@ test("accidental foreign narration gets one bounded Korean rewrite using the sam
   const envelope=value=>JSON.stringify({choices:[{message:{content:value}}]});
   const f=fixture({providerResponses:[{raw:envelope(content)},{raw:envelope(fixed)}]});
   const response=await f.call();assert.equal(response.code,200);assert.match(response.body.analysis,/\*\*비교\*\*/);assert.doesNotMatch(response.body.analysis,/比較/);assert.equal(f.providerCalls.length,2);assert.equal(f.quotaCalls,1);
+});
+
+
+test("a 404 switches once to the current alternative for initial and follow-up analysis",async()=>{
+  for(const body of [{}, {explorationPath:["효소 조건 비교"],explorationSubject:"생명과학"}]) {
+    const raw=JSON.stringify({choices:[{message:{content:JSON.stringify({analysis:"확인한 근거",intro:"실험 조건을 비교해 볼 수 있어요.",choices:[],guidelines:[]})}}]});
+    const f=fixture({providerResponses:[{ok:false,status:404,raw:"PRIVATE_MISSING_MODEL"},{ok:true,raw}]});
+    const result=await f.call({body});assert.equal(result.code,200);assert.equal(result.body.fallbackUsed,true);
+    assert.equal(result.body.providerModel,"google/gemma-4-31b-it");assert.equal(f.providerCalls.length,2);assert.equal(f.quotaCalls,1);
+    const first=JSON.parse(f.providerCalls[0].options.body),second=JSON.parse(f.providerCalls[1].options.body);
+    assert.deepEqual(first.messages,second.messages);assert.deepEqual(second.chat_template_kwargs,{enable_thinking:false});
+    assert.equal(first.reasoning_effort,undefined);assert.equal(second.reasoning_effort,undefined);
+    assert.equal(f.providerCalls[0].options.signal,f.providerCalls[1].options.signal);
+    assert.doesNotMatch(JSON.stringify([result.body,f.logs]),/PRIVATE_MISSING_MODEL/);
+  }
+});
+
+
+test("Gemma fallback thought blocks cannot become student analysis even when they contain JSON",async()=>{
+  const raw=JSON.stringify({choices:[{message:{content:'<|channel>thought\n{"analysis":"PRIVATE_THOUGHT"}<channel|>{"analysis":"확인된 학생 설명"}'}}]});
+  const f=fixture({providerResponses:[{ok:false,status:404},{ok:true,raw}]});
+  const result=await f.call();assert.equal(result.code,200);assert.equal(result.body.analysis,"확인된 학생 설명");
+  assert.doesNotMatch(JSON.stringify(result.body),/PRIVATE_THOUGHT|channel/);
+});
+
+
+test("production default does not silently change to an unverified lower-cost model",async()=>{
+  const unavailable=fixture({fallbackModel:null,ok:false,status:404});
+  const failed=await unavailable.call();assert.equal(failed.code,503);assert.equal(unavailable.providerCalls.length,1);
+  const available=fixture({fallbackModel:null});const result=await available.call();
+  assert.equal(result.code,200);assert.equal(result.body.providerModel,"nvidia/nemotron-3.5-super-vl-120b-a12b");assert.equal(result.body.fallbackUsed,false);
 });
